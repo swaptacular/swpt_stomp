@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "swpt-stomp"
+version = "0.1.0"
+description = "Client and server implementations of the STOMP protocol for Swaptacular"
+authors = ["Evgeni Pandurski <epandurski@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "swpt_stomp"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.group.dev.dependencies]
+python-lsp-server = {extras = ["all"], version = "^1.7.1"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
