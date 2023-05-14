@@ -8,6 +8,7 @@ def test_regexps():
     m = HEAD_RE.match(b"""CONNECT\n\n""")
     assert m[1] == b"CONNECT"
     assert m[2] == b""
+    assert m[3] == b"\n"
     assert m.end() == 9
 
     m = HEAD_RE.match(b"""CONNECT\nh1:v1\nh2:v2\n\n""")

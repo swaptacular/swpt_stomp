@@ -4,15 +4,26 @@ from collections import deque
 import re
 
 HEARTBEAT_RE = re.compile(
-    rb"""^(?:\r?\n)+                                       # empty lines""",
-    re.DOTALL | re.VERBOSE)
+    rb"""\A(?:\r?\n)+       # empty lines""",
+    re.VERBOSE)
 
 HEAD_RE = re.compile(
-    rb"""^
-         ([A-Z]{1,20})\r?\n                                # command
-         ((?:[^\n\r:]{1,500}:[^\n\r:]{0,500}\r?\n){0,50})  # header lines
-         \r?\n                                             # empty line""",
-    re.DOTALL | re.VERBOSE)
+    rb"""\A(?:\Z|
+    ([A-Z]{1,50})(?:\Z|                                       # command
+    \r?(?:\Z|                                                 # optional \r
+    \n((?:[^\n\r:]{1,500}:[^\n\r:]{0,500}\r?\n){0,50})(?:\Z|  # header lines
+      # an incomplete header line, or a closing line:
+      (?:
+        # an incomplete header line:
+        [^\n\r:]{1,500}(?::[^\n\r:]{0,500}\r?)?\Z
+      ) | (?:
+        # a closing line:
+        \r?(?:\Z|               # optional \r
+        (\n)                    # \n
+        )
+      )
+    ))))""",
+    re.VERBOSE)
 
 HEADER_ESCAPE_RE = re.compile(rb'\\.')
 HEADER_ESCAPE_CHARS = {
@@ -23,10 +34,10 @@ HEADER_ESCAPE_CHARS = {
 }
 
 BODY_RE = re.compile(
-    rb"""^
+    rb"""\A
          ([^\x00]{0,50000}?)                               # optional body
          \x00                                              # NULL""",
-    re.DOTALL | re.VERBOSE)
+    re.VERBOSE)
 
 
 class ProtocolError(Exception):
@@ -107,18 +118,21 @@ class StompParser:
     def _parse_command(self) -> bool:
         assert not self._command
         m = HEAD_RE.match(self._data, self._current_pos)
-        if m:
-            self._current_pos = m.end()
-            self._command = m[1].decode('ascii')
-            self._headers = parse_headers(m[2])
-            try:
-                n = int(self._headers['content-length'])
-            except (KeyError, ValueError):
-                n = 0
-            self._body_end = self._current_pos + n
-            return True
+        if m is None:
+            raise ProtocolError()
 
-        return False
+        if len(m.groups()) < 3:
+            return False  # The head seems valid, but incomplete.
+
+        self._current_pos = m.end()
+        self._command = m[1].decode('ascii')
+        self._headers = parse_headers(m[2])
+        try:
+            n = int(self._headers['content-length'])
+        except (KeyError, ValueError):
+            n = 0
+        self._body_end = self._current_pos + n
+        return True
 
     def _parse_body(self) -> bool:
         assert self._command
