@@ -31,11 +31,7 @@ HEADER_ESCAPE_CHARS = {
     rb'\\': b'\\',
 }
 
-BODY_RE = re.compile(
-    rb"""\A
-         ([^\x00]{0,50000}?)                               # optional body
-         \x00                                              # NULL""",
-    re.VERBOSE)
+BODY_MAX_LENGTH = 50_000
 
 
 class ProtocolError(Exception):
@@ -48,7 +44,7 @@ def substitute_header_escape_chars(s: bytes) -> bytes:
     try:
         return HEADER_ESCAPE_RE.sub(lambda m: HEADER_ESCAPE_CHARS[m[0]], s)
     except KeyError:
-        raise ProtocolError()
+        raise ProtocolError('invalid header')
 
 
 def parse_headers(s: bytes) -> dict[str, str]:
@@ -71,7 +67,7 @@ def parse_headers(s: bytes) -> dict[str, str]:
 class StompFrame:
     command: str
     headers: dict[str, str]
-    body: bytes
+    body: bytearray
 
 
 class StompParser:
@@ -92,12 +88,17 @@ class StompParser:
 
     def add_bytes(self, data: bytes) -> bool:
         self._data.extend(data)
+
         work_done = False
         while self._parse():
             work_done = True
 
-        del self._data[:self._current_pos]
-        self._current_pos = 0
+        n = self._current_pos
+        if n > 0:
+            del self._data[:n]
+            self._body_end -= n
+            self._current_pos = 0
+
         return work_done
 
     def _parse(self) -> None:
@@ -108,16 +109,14 @@ class StompParser:
             return self._parse_command()
 
     def _parse_heartbeats(self) -> None:
-        assert not self._command
         m = HEARTBEAT_RE.match(self._data, self._current_pos)
         if m:
             self._current_pos = m.end()
 
     def _parse_command(self) -> bool:
-        assert not self._command
         m = HEAD_RE.match(self._data, self._current_pos)
         if m is None:
-            raise ProtocolError()
+            raise ProtocolError('invalid frame')
 
         if len(m.groups()) < 3:
             return False  # The head seems valid, but incomplete.
@@ -125,6 +124,7 @@ class StompParser:
         self._current_pos = m.end()
         self._command = m[1].decode('ascii')
         self._headers = parse_headers(m[2])
+
         try:
             n = int(self._headers['content-length'])
         except (KeyError, ValueError):
@@ -133,16 +133,26 @@ class StompParser:
         return True
 
     def _parse_body(self) -> bool:
-        assert self._command
+        current_pos = self._current_pos
+        body_offlimit = current_pos + BODY_MAX_LENGTH + 1
+        body_end = self._body_end
+        if body_end >= body_offlimit:
+            raise ProtocolError('the body is too large')
+
         data = self._data
-        if len(data) > self._body_end and (m := BODY_RE.match(data, self._current_pos)):
-            self._frames.append(StompFrame(
-                command=self._command,
-                headers=self._headers,
-                body=m[1],
-            ))
-            self._current_pos = m.end()
-            self._command = ''
-            return True
+        n = len(data)
+        if n > body_end:
+            stop = data.find(0, body_end, body_offlimit)
+            if (stop == -1):
+                self._body_end = body_offlimit
+            else:
+                self._frames.append(StompFrame(
+                    command=self._command,
+                    headers=self._headers,
+                    body=data[current_pos:stop],
+                ))
+                self._current_pos = stop + 1
+                self._command = ''
+                return True
 
         return False
