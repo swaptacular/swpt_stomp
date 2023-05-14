@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from collections import deque
 import re
 
 HEARTBEAT_RE = re.compile(
@@ -23,7 +24,7 @@ HEADER_ESCAPE_CHARS = {
 
 BODY_RE = re.compile(
     rb"""^
-         ([^\x00]{0,50000})                                # optional body
+         ([^\x00]{0,50000}?)                               # optional body
          \x00                                              # NULL""",
     re.DOTALL | re.VERBOSE)
 
@@ -41,7 +42,7 @@ def substitute_header_escape_chars(s: bytes) -> bytes:
         raise ProtocolError()
 
 
-def parse_headers(s: str) -> dict[str, str]:
+def parse_headers(s: bytes) -> dict[str, str]:
     headers = {}
     lines = s.split(b'\n')
     for line in lines:
@@ -65,70 +66,71 @@ class StompFrame:
 
 
 class StompParser:
+    _data: bytearray
+    _current_pos: int
+    _command: str
+    _headers: dict[str, str]
+    _body_end: int
+    _frames: deque[StompFrame]
+
     def __init__(self):
-        self.data = bytearray()
-        self.command = ''
-        self.parsed_heartbeat = False
-        self.headers = {}
-        self.body_start = 0
-        self.body_end = 0
-        self.frames = []
+        self._data = bytearray()
+        self._current_pos = 0
+        self._command = ''
+        self._headers = {}
+        self._body_end = 0
+        self._frames = deque()
 
-    def read(self, data: bytes) -> bool:
-        self.data.extend(data)
-        while True:
-            received_heartbeat, work_done = self._parse()
-            if not work_done:
-                break
+    def add_bytes(self, data: bytes) -> bool:
+        self._data.extend(data)
+        work_done = False
+        while self._parse():
+            work_done = True
 
-        return received_heartbeat or work_done
+        del self._data[:self._current_pos]
+        self._current_pos = 0
+        return work_done
 
-    def _parse(self) -> tuple[bool, bool]:
-        if self.command:
-            received_heartbeat = False
-            work_done = self._parse_body()
+    def _parse(self) -> None:
+        if self._command:
+            return self._parse_body()
         else:
-            received_heartbeat = self._parse_heartbeat()
-            work_done = self._parse_command()
+            self._parse_heartbeats()
+            return self._parse_command()
 
-        return received_heartbeat, work_done
-
-    def _parse_heartbeat(self) -> bool:
-        assert not self.command
-        m = HEARTBEAT_RE.match(self.data)
+    def _parse_heartbeats(self) -> None:
+        assert not self._command
+        m = HEARTBEAT_RE.match(self._data, self._current_pos)
         if m:
-            self.data = self.data[m.end():]
-            return True
-
-        return False
+            self._current_pos = m.end()
 
     def _parse_command(self) -> bool:
-        assert not self.command
-        m = HEAD_RE.match(self.data)
+        assert not self._command
+        m = HEAD_RE.match(self._data, self._current_pos)
         if m:
-            self.body_start = m.end()
-            self.command = m[1].decode('utf8')
-            self.headers = parse_headers(m[2])
+            self._current_pos = m.end()
+            self._command = m[1].decode('ascii')
+            self._headers = parse_headers(m[2])
             try:
-                n = int(self.headers['content-length'])
+                n = int(self._headers['content-length'])
             except (KeyError, ValueError):
                 n = 0
-            self.body_end = self.body_start + n
+            self._body_end = self._current_pos + n
             return True
 
         return False
 
     def _parse_body(self) -> bool:
-        assert self.command
-        data = self.data
-        if len(data) > self.body_end and (m := BODY_RE.match(data, self.body_start)):
-            self.frames.append(StompFrame(
-                command=self.command,
-                headers=self.headers,
+        assert self._command
+        data = self._data
+        if len(data) > self._body_end and (m := BODY_RE.match(data, self._current_pos)):
+            self._frames.append(StompFrame(
+                command=self._command,
+                headers=self._headers,
                 body=m[1],
             ))
-            self.data = data[m.end():]
-            self.command = ''
+            self._current_pos = m.end()
+            self._command = ''
             return True
 
         return False
