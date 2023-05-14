@@ -18,9 +18,7 @@ HEAD_RE = re.compile(
         [^\n\r:]{1,500}(?::[^\n\r:]{0,500}\r?)?\Z
       ) | (?:
         # a closing line:
-        \r?(?:\Z|               # optional \r
-        (\n)                    # \n
-        )
+        \r?(?:\Z|(\n))
       )
     ))))""",
     re.VERBOSE)
