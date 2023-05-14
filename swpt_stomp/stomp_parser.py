@@ -31,14 +31,8 @@ _HEADER_ESCAPE_CHARS = {
     rb'\\': b'\\',
 }
 
-BODY_MAX_LENGTH = 50_000
 
-
-class ProtocolError(Exception):
-    """STOMP 1.2 protocol error"""
-
-
-def substitute_header_escape_chars(s: bytes) -> bytes:
+def _substitute_header_escape_chars(s: bytes) -> bytes:
     # \r, \n, \c, \\ in headers should be substituted accordingly. Other
     # escape symbols are not allowed.
     try:
@@ -47,7 +41,7 @@ def substitute_header_escape_chars(s: bytes) -> bytes:
         raise ProtocolError('invalid header')
 
 
-def parse_headers(s: bytes) -> dict[str, str]:
+def _parse_headers(s: bytes) -> dict[str, str]:
     headers = {}
     lines = s.split(b'\n')
     for line in lines:
@@ -56,15 +50,24 @@ def parse_headers(s: bytes) -> dict[str, str]:
         if not line:
             break
         k_bytes, v_bytes = line.split(b':')
-        k = substitute_header_escape_chars(k_bytes).decode('utf8')
-        v = substitute_header_escape_chars(v_bytes).decode('utf8')
+        k = _substitute_header_escape_chars(k_bytes).decode('utf8')
+        v = _substitute_header_escape_chars(v_bytes).decode('utf8')
         if k not in headers:
             headers[k] = v
     return headers
 
 
+BODY_MAX_LENGTH = 50_000
+
+
+class ProtocolError(Exception):
+    """STOMP 1.2 protocol error"""
+
+
 @dataclass
 class StompFrame:
+    """STOMP 1.2 Protocol Frame"""
+
     command: str
     headers: dict[str, str]
     body: bytearray
@@ -148,7 +151,7 @@ class StompParser:
 
         self._current_pos = m.end()
         self._command = m[1].decode('ascii')
-        self._headers = parse_headers(m[2])
+        self._headers = _parse_headers(m[2])
 
         try:
             n = int(self._headers['content-length'])

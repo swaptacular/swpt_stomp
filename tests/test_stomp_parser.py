@@ -1,5 +1,5 @@
 import pytest
-from swpt_stomp.stomp_parser import _HEAD_RE, _HEARTBEAT_RE, parse_headers, ProtocolError
+from swpt_stomp.stomp_parser import _HEAD_RE, _HEARTBEAT_RE, _parse_headers, ProtocolError
 
 
 def test_regexps():
@@ -16,12 +16,12 @@ def test_regexps():
     assert m[2] == b"h1:v1\nh2:v2\n"
 
     m = _HEAD_RE.match(b"""CONNECT\nkey\\n\\c:value\\r\\\n\n""")
-    headers = parse_headers(m[2])
+    headers = _parse_headers(m[2])
     assert headers['key\n:'] == 'value\r\\'
 
     m = _HEAD_RE.match(b"""CONNECT\nkey\\t:value\n\n""")
     with pytest.raises(ProtocolError):
-        parse_headers(m[2])
+        _parse_headers(m[2])
 
     assert _HEAD_RE.match(b"""CONNECT\nWRONGHEADER\n\n""") is None
 
