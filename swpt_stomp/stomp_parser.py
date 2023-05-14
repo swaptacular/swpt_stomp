@@ -71,6 +71,8 @@ class StompFrame:
 
 
 class StompParser:
+    """STOMP version 1.2 parser."""
+
     _data: bytearray
     _current_pos: int
     _command: str
@@ -79,6 +81,11 @@ class StompParser:
     _frames: deque[StompFrame]
 
     def __init__(self):
+        self.reset()
+
+    def reset(self) -> None:
+        """Reset the parser, parsed frames will be lost.
+        """
         self._data = bytearray()
         self._current_pos = 0
         self._command = ''
@@ -86,12 +93,19 @@ class StompParser:
         self._body_end = 0
         self._frames = deque()
 
-    def add_bytes(self, data: bytes) -> bool:
-        self._data.extend(data)
+    def add_bytes(self, data: bytes) -> None:
+        """Feed bytes to the parser.
 
-        work_done = False
-        while self._parse():
-            work_done = True
+        If, as a result of feeding the given `data` to the parser, one or
+        more frames have been completed, after this method returns, the
+        frames will be available via the `parser.get_frame` method.
+
+        This method will raise a `ProtocolError` exception, if the incoming
+        byte-stream does not obey the STOMP 1.2 protocol specification.
+        """
+        self._data.extend(data)
+        while self._parse_block():
+            pass
 
         n = self._current_pos
         if n > 0:
@@ -99,9 +113,20 @@ class StompParser:
             self._body_end -= n
             self._current_pos = 0
 
-        return work_done
+    def has_frame(self) -> bool:
+        """Return whether at least one frame is available for reading.
+        """
+        return bool(self._frames)
 
-    def _parse(self) -> None:
+    def get_frame(self) -> StompFrame | None:
+        """Return a parsed frame or `None`.
+        """
+        try:
+            return self._frames.popleft()
+        except IndexError:
+            return None
+
+    def _parse_block(self) -> None:
         if self._command:
             return self._parse_body()
         else:
