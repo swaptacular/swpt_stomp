@@ -134,17 +134,17 @@ class StompParser:
 
     def _parse_body(self) -> bool:
         current_pos = self._current_pos
-        body_offlimit = current_pos + BODY_MAX_LENGTH + 1
+        body_illegal = current_pos + BODY_MAX_LENGTH + 1
         body_end = self._body_end
-        if body_end >= body_offlimit:
+        if body_end >= body_illegal:
             raise ProtocolError('the body is too large')
 
         data = self._data
         n = len(data)
         if n > body_end:
-            stop = data.find(0, body_end, body_offlimit)
+            stop = data.find(0, body_end, body_illegal)
             if (stop == -1):
-                self._body_end = body_offlimit
+                self._body_end = min(n, body_illegal)
             else:
                 self._frames.append(StompFrame(
                     command=self._command,
