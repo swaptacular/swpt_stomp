@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from collections import deque
 import re
 
-HEARTBEAT_RE = re.compile(
+_HEARTBEAT_RE = re.compile(
     rb"""\A(?:\r?\n)+       # empty lines""",
     re.VERBOSE)
 
-HEAD_RE = re.compile(
+_HEAD_RE = re.compile(
     rb"""\A(?:\Z|
     ([A-Z]{1,50})(?:\Z|                                       # command
     \r?(?:\Z|                                                 # optional \r
@@ -23,8 +23,8 @@ HEAD_RE = re.compile(
     ))))""",
     re.VERBOSE)
 
-HEADER_ESCAPE_RE = re.compile(rb'\\.')
-HEADER_ESCAPE_CHARS = {
+_HEADER_ESCAPE_RE = re.compile(rb'\\.')
+_HEADER_ESCAPE_CHARS = {
     rb'\r': b'\r',
     rb'\n': b'\n',
     rb'\c': b':',
@@ -35,14 +35,14 @@ BODY_MAX_LENGTH = 50_000
 
 
 class ProtocolError(Exception):
-    """Protocol error"""
+    """STOMP 1.2 protocol error"""
 
 
 def substitute_header_escape_chars(s: bytes) -> bytes:
     # \r, \n, \c, \\ in headers should be substituted accordingly. Other
     # escape symbols are not allowed.
     try:
-        return HEADER_ESCAPE_RE.sub(lambda m: HEADER_ESCAPE_CHARS[m[0]], s)
+        return _HEADER_ESCAPE_RE.sub(lambda m: _HEADER_ESCAPE_CHARS[m[0]], s)
     except KeyError:
         raise ProtocolError('invalid header')
 
@@ -134,12 +134,12 @@ class StompParser:
             return self._parse_command()
 
     def _parse_heartbeats(self) -> None:
-        m = HEARTBEAT_RE.match(self._data, self._current_pos)
+        m = _HEARTBEAT_RE.match(self._data, self._current_pos)
         if m:
             self._current_pos = m.end()
 
     def _parse_command(self) -> bool:
-        m = HEAD_RE.match(self._data, self._current_pos)
+        m = _HEAD_RE.match(self._data, self._current_pos)
         if m is None:
             raise ProtocolError('invalid frame')
 
