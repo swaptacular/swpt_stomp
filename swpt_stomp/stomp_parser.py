@@ -4,7 +4,7 @@ from collections import deque
 import re
 
 _HEARTBEAT_RE = re.compile(
-    rb"""\A(?:\r?\n)+       # empty lines""",
+    rb"""\A(?:\r?\n)+    # empty lines""",
     re.VERBOSE)
 
 _HEAD_RE = re.compile(
@@ -61,21 +61,22 @@ BODY_MAX_LENGTH = 50_000
 
 
 class ProtocolError(Exception):
-    """STOMP 1.2 protocol error"""
+    """STOMP 1.2 protocol error.
+    """
 
 
 @dataclass
 class StompFrame:
-    """STOMP 1.2 Protocol Frame"""
-
+    """STOMP 1.2 Protocol Frame.
+    """
     command: str
     headers: dict[str, str]
     body: bytearray
 
 
 class StompParser:
-    """STOMP version 1.2 parser."""
-
+    """STOMP version 1.2 parser.
+    """
     _data: bytearray
     _current_pos: int
     _command: str
