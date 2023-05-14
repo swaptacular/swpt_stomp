@@ -129,29 +129,30 @@ class StompParser:
             n = int(self._headers['content-length'])
         except (KeyError, ValueError):
             n = 0
+        if n > BODY_MAX_LENGTH:
+            raise ProtocolError('content-length is too large')
+
         self._body_end = self._current_pos + n
         return True
 
     def _parse_body(self) -> bool:
-        current_pos = self._current_pos
-        body_illegal = current_pos + BODY_MAX_LENGTH + 1
-        body_end = self._body_end
-        if body_end >= body_illegal:
-            raise ProtocolError('the body is too large')
-
         data = self._data
         n = len(data)
+        body_end = self._body_end
         if n > body_end:
-            stop = data.find(0, body_end, body_illegal)
+            first_illegal_index = self._current_pos + BODY_MAX_LENGTH + 1
+            stop = data.find(0, body_end, first_illegal_index)
             if (stop == -1):
-                self._body_end = min(n, body_illegal)
+                if n >= first_illegal_index:
+                    raise ProtocolError('the body is too large')
+                self._body_end = n
             else:
                 self._frames.append(StompFrame(
                     command=self._command,
                     headers=self._headers,
-                    body=data[current_pos:stop],
+                    body=data[self._current_pos:stop],
                 ))
-                self._current_pos = stop + 1
+                self._current_pos = stop + 1  # Skip the frame-terminating NULL.
                 self._command = ''
                 return True
 
