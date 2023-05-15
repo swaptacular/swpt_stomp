@@ -190,7 +190,7 @@ def test_body_containing_null():
     p.add_bytes(b"SEND\ncontent-length:17\n\nThere is a \0 byte!\0")
     assert p.pop_frame().body == b'There is a \0 byte!'
 
-    # Smaller content-length, still not OK:
+    # Smaller content-length, already not OK:
     with pytest.raises(ProtocolError):
         p.add_bytes(b"SEND\ncontent-length:7\n\nThere is a \0 byte!\0")
     assert p.pop_frame().body == b'There is a '
