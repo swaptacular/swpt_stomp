@@ -99,6 +99,43 @@ def test_add_all_bytes_at_once():
     assert p.has_frame() is False
 
 
+def test_add_bytes_one_by_one():
+    message = b"SEND\nkey:value\n\nbody\0"
+    p = StompParser()
+    for i in message:
+        assert not p.has_frame()
+        p.add_bytes(bytes([i]))
+    assert len(p.frames) == 1
+    frame = p.frames[0]
+    assert frame.command == 'SEND'
+    assert len(frame.headers) == 1
+    assert frame.headers['key'] == 'value'
+    assert frame.body == bytearray(b'body')
+
+    p.add_bytes(b"SEND\nkey:value\n\nbody\0")
+    assert len(p.frames) == 2
+
+
+def test_heartbeats():
+    heartbeats = b"\n\n\r\n"
+    message = b"SEND\nkey:value\n\nbody\0"
+    p = StompParser()
+    p.add_bytes(heartbeats)
+    p.add_bytes(heartbeats)
+    assert len(p.frames) == 0
+    p.add_bytes(message)
+    assert len(p.frames) == 1
+    p.add_bytes(heartbeats)
+    p.add_bytes(heartbeats)
+    assert len(p.frames) == 1
+    p.add_bytes(message)
+    assert len(p.frames) == 2
+    p.add_bytes(message)
+    assert len(p.frames) == 3
+    p.add_bytes(heartbeats)
+    assert len(p.frames) == 3
+
+
 def test_reset():
     p = StompParser()
     p.add_bytes(b"SEND\nkey:value\n\nbody\0")
