@@ -160,6 +160,11 @@ def test_content_length_too_big():
     from swpt_stomp.stomp_parser import BODY_MAX_LENGTH
 
     p = StompParser()
+
+    # Invalid content-length's get ignored.
+    p.add_bytes(b"SEND\ncontent-length:INVALID\n\n\0")
+    assert p.pop_frame().headers['content-length'] == 'INVALID'
+
     body_ok = BODY_MAX_LENGTH * "x"
     p.add_bytes(f"SEND\ncontent-length:{BODY_MAX_LENGTH}\n\n{body_ok}\0".encode('ascii'))
 
