@@ -174,3 +174,23 @@ def test_body_is_too_large():
 
     with pytest.raises(ProtocolError):
         p.add_bytes(b"SEND\n\n" + body_ok + b'x' + b"\0")
+
+    p.reset()
+    p.add_bytes(b"SEND\n\n" + body_ok)
+    with pytest.raises(ProtocolError):
+        p.add_bytes(b'x')
+
+
+def test_body_containing_null():
+    p = StompParser()
+    p.add_bytes(b"SEND\ncontent-length:18\n\nThere is a \0 byte!\0")
+    assert p.pop_frame().body == b'There is a \0 byte!'
+
+    # Smaller content-length, still OK:
+    p.add_bytes(b"SEND\ncontent-length:17\n\nThere is a \0 byte!\0")
+    assert p.pop_frame().body == b'There is a \0 byte!'
+
+    # Smaller content-length, still not OK:
+    with pytest.raises(ProtocolError):
+        p.add_bytes(b"SEND\ncontent-length:7\n\nThere is a \0 byte!\0")
+    assert p.pop_frame().body == b'There is a '
