@@ -1,4 +1,5 @@
 import pytest
+from swpt_stomp.stomp_parser import StompParser
 
 
 def test_regexps():
@@ -21,6 +22,11 @@ def test_regexps():
     m = _HEAD_RE.match(b"""CONNECT\r\nh1:v1\r\nh2:v2\r\n\r\n""")
     assert m[1] == b"CONNECT"
     assert m[2] == b"h1:v1\r\nh2:v2\r\n"
+    assert m[3] == b"\n"
+
+    m = _HEAD_RE.match(bytearray(b"""SEND\nkey:value\n\nboby\0"""))
+    assert m[1] == b"SEND"
+    assert m[2] == b"key:value\n"
     assert m[3] == b"\n"
 
     # Not obeying the protocol:
@@ -70,3 +76,10 @@ def test_parse_headers():
     m = _HEAD_RE.match(b"""CONNECT\nkey\\t:value\n\n""")
     with pytest.raises(ProtocolError):
         _parse_headers(m[2])
+
+
+def test_add_all_bytes_at_once():
+    p = StompParser()
+    assert not p.has_frame()
+    p.add_bytes(b"SEND\nkey:value\n\nboby\0")
+    assert p.has_frame()

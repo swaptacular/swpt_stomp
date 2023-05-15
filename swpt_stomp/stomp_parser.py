@@ -146,19 +146,27 @@ class StompParser:
             return self._parse_command()
 
     def _parse_heartbeats(self) -> None:
-        m = _HEARTBEAT_RE.match(self._data, self._current_pos)
-        if m:
-            self._current_pos = m.end()
+        data = self._data
+        current_pos = self._current_pos
+        if len(data) > current_pos:
+            m = _HEARTBEAT_RE.match(data, current_pos)
+            if m:
+                self._current_pos = m.end()
 
     def _parse_command(self) -> bool:
-        m = _HEAD_RE.match(self._data, self._current_pos)
+        data = self._data
+        current_pos = self._current_pos
+        if len(data) == current_pos:
+            return False  # There is nothing to match.
+
+        m = _HEAD_RE.match(data, current_pos)
         if m is None:
             raise ProtocolError('invalid frame')
 
         if m[3] is None:
             return False  # The head seems valid, but incomplete.
 
-        self._current_pos = m.end()
+        self._current_pos = current_pos = m.end()
         self._command = m[1].decode('ascii')
         self._headers = _parse_headers(m[2])
 
@@ -169,7 +177,7 @@ class StompParser:
         if n > BODY_MAX_LENGTH:
             raise ProtocolError('content-length is too large')
 
-        self._body_end = self._current_pos + n
+        self._body_end = current_pos + n
         return True
 
     def _parse_body(self) -> bool:
