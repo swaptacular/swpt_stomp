@@ -6,6 +6,7 @@ def test_regexps():
     assert _HEAD_RE.match(b"""123""") is None
 
     m = _HEAD_RE.match(b"""CONNECT\n\n""")
+    assert len(m.groups()) == 3
     assert m[1] == b"CONNECT"
     assert m[2] == b""
     assert m[3] == b"\n"
@@ -14,16 +15,45 @@ def test_regexps():
     m = _HEAD_RE.match(b"""CONNECT\nh1:v1\nh2:v2\n\n""")
     assert m[1] == b"CONNECT"
     assert m[2] == b"h1:v1\nh2:v2\n"
+    assert m[3] == b"\n"
 
     m = _HEAD_RE.match(b"""CONNECT\nkey\\n\\c:value\\r\\\n\n""")
     headers = _parse_headers(m[2])
     assert headers['key\n:'] == 'value\r\\'
+    assert m[3] == b"\n"
 
     m = _HEAD_RE.match(b"""CONNECT\nkey\\t:value\n\n""")
     with pytest.raises(ProtocolError):
         _parse_headers(m[2])
 
+    # Not obeying the protocol:
+    assert _HEAD_RE.match(b"""CONNxxx""") is None
     assert _HEAD_RE.match(b"""CONNECT\nWRONGHEADER\n\n""") is None
+    assert _HEAD_RE.match(b"""CONNECT\naa:bb\n:""") is None
+    assert _HEAD_RE.match(b"""CONNECT\naa:bb\n:""") is None
+
+    # Incomplete head:
+    assert _HEAD_RE.match(b"")[3] is None
+    assert _HEAD_RE.match(b"CONNECT")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\r")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\r\n")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\n")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\r\na")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\na:b")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\na:b\r")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\na:b\r\n")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\na:b\n")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\na:b\r\naa")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\na:b\r\naa:bb\r\n")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\na:b\naa:bb\n")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\na:b\naa:bb\n\r")[3] is None
+    assert _HEAD_RE.match(b"CONNECT\na:b\naa:bb\n\r\n")[3] == b'\n'
+    assert _HEAD_RE.match(b"CONNECT\na:b\naa:bb\n\n")[3] == b'\n'
+
+    m = _HEAD_RE.match(b"""CONNECT\nh1:v1\nh2:v2""")
+    assert m[1] == b"CONNECT"
+    assert m[2] == b"h1:v1\n"
+    assert m[3] is None
 
     m = _HEAD_RE.match(b"""CONNECT\r\nh1:v1\r\nh2:v2\r\n\r\n""")
     assert m[1] == b"CONNECT"

@@ -155,7 +155,7 @@ class StompParser:
         if m is None:
             raise ProtocolError('invalid frame')
 
-        if len(m.groups()) < 3:
+        if m[3] is None:
             return False  # The head seems valid, but incomplete.
 
         self._current_pos = m.end()
