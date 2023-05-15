@@ -1,5 +1,5 @@
 import pytest
-from swpt_stomp.stomp_parser import StompParser, EmptyQueue
+from swpt_stomp.stomp_parser import StompParser, EmptyQueue, ProtocolError
 
 
 def test_regexps():
@@ -67,6 +67,12 @@ def test_regexps():
 
 def test_parse_headers():
     from swpt_stomp.stomp_parser import _HEAD_RE, _parse_headers, ProtocolError
+
+    m = _HEAD_RE.match(b"""CONNECT\naa:bb\r\naaaa:bbbb\r\n\r\n""")
+    headers = _parse_headers(m[2])
+    assert headers['aa'] == 'bb'
+    assert headers['aaaa'] == 'bbbb'
+    assert m[3] == b"\n"
 
     m = _HEAD_RE.match(b"""CONNECT\nkey\\n\\c:value\\r\\\n\n""")
     headers = _parse_headers(m[2])
@@ -142,3 +148,29 @@ def test_reset():
     assert len(p.frames) == 1
     p.reset()
     assert len(p.frames) == 0
+
+
+def test_protocol_error():
+    p = StompParser()
+    with pytest.raises(ProtocolError):
+        p.add_bytes(b"error")
+
+
+def test_content_length_too_big():
+    p = StompParser()
+    p.add_bytes(b"SEND\ncontent-length:4\n\nbody\0")
+
+    with pytest.raises(ProtocolError):
+        p.add_bytes(b"SEND\ncontent-length:400000\n\nbody\0")
+
+
+def test_body_is_too_large():
+    from swpt_stomp.stomp_parser import BODY_MAX_LENGTH
+
+    p = StompParser()
+    body_ok = BODY_MAX_LENGTH * b"x"
+    p.add_bytes(b"SEND\n\n" + body_ok + b"\0")
+    assert p.pop_frame().body == body_ok
+
+    with pytest.raises(ProtocolError):
+        p.add_bytes(b"SEND\n\n" + body_ok + b'x' + b"\0")
