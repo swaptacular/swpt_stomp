@@ -65,6 +65,11 @@ class ProtocolError(Exception):
     """
 
 
+class EmptyQueue(Exception):
+    """There are no available frames in the queue.
+    """
+
+
 @dataclass
 class StompFrame:
     """STOMP 1.2 Protocol Frame.
@@ -82,7 +87,8 @@ class StompParser:
     _command: str
     _headers: dict[str, str]
     _body_end: int
-    _frames: deque[StompFrame]
+
+    frames: deque[StompFrame]
 
     def __init__(self):
         self.reset()
@@ -95,7 +101,7 @@ class StompParser:
         self._command = ''
         self._headers = {}
         self._body_end = 0
-        self._frames = deque()
+        self.frames = deque()
 
     def add_bytes(self, data: bytes) -> None:
         """Feed bytes to the parser.
@@ -120,15 +126,17 @@ class StompParser:
     def has_frame(self) -> bool:
         """Return whether at least one frame is available for reading.
         """
-        return bool(self._frames)
+        return bool(self.frames)
 
-    def get_frame(self) -> StompFrame | None:
-        """Return a parsed frame or `None`.
+    def pop_frame(self) -> StompFrame:
+        """Return a parsed frame, and remove it from the queue.
+
+        Raises `EmptyQueue` error if there are no available frames.
         """
         try:
-            return self._frames.popleft()
+            return self.frames.popleft()
         except IndexError:
-            return None
+            raise EmptyQueue()
 
     def _parse_block(self) -> None:
         if self._command:
@@ -176,7 +184,7 @@ class StompParser:
                     raise ProtocolError('the body is too large')
                 self._body_end = n
             else:
-                self._frames.append(StompFrame(
+                self.frames.append(StompFrame(
                     command=self._command,
                     headers=self._headers,
                     body=data[self._current_pos:stop],
