@@ -157,11 +157,14 @@ def test_protocol_error():
 
 
 def test_content_length_too_big():
+    from swpt_stomp.stomp_parser import BODY_MAX_LENGTH
+
     p = StompParser()
-    p.add_bytes(b"SEND\ncontent-length:4\n\nbody\0")
+    body_ok = BODY_MAX_LENGTH * "x"
+    p.add_bytes(f"SEND\ncontent-length:{BODY_MAX_LENGTH}\n\n{body_ok}\0".encode('ascii'))
 
     with pytest.raises(ProtocolError):
-        p.add_bytes(b"SEND\ncontent-length:400000\n\nbody\0")
+        p.add_bytes(f"SEND\ncontent-length:{BODY_MAX_LENGTH + 1}\n\nbody\0".encode('ascii'))
 
 
 def test_body_is_too_large():
