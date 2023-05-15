@@ -165,8 +165,9 @@ def test_content_length_too_big():
     p.add_bytes(b"SEND\ncontent-length:INVALID\n\n\0")
     assert p.pop_frame().headers['content-length'] == 'INVALID'
 
-    body_ok = BODY_MAX_LENGTH * "x"
-    p.add_bytes(f"SEND\ncontent-length:{BODY_MAX_LENGTH}\n\n{body_ok}\0".encode('ascii'))
+    body_ok = BODY_MAX_LENGTH * b"\0"
+    p.add_bytes(f"SEND\ncontent-length:{BODY_MAX_LENGTH}\n\n".encode('ascii') + body_ok + b"\0")
+    assert p.pop_frame().body == body_ok
 
     with pytest.raises(ProtocolError):
         p.add_bytes(f"SEND\ncontent-length:{BODY_MAX_LENGTH + 1}\n\nbody\0".encode('ascii'))
