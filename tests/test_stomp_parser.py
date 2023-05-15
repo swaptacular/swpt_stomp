@@ -1,5 +1,5 @@
 import pytest
-from swpt_stomp.stomp_parser import StompParser
+from swpt_stomp.stomp_parser import StompParser, EmptyQueue
 
 
 def test_regexps():
@@ -24,7 +24,7 @@ def test_regexps():
     assert m[2] == b"h1:v1\r\nh2:v2\r\n"
     assert m[3] == b"\n"
 
-    m = _HEAD_RE.match(bytearray(b"""SEND\nkey:value\n\nboby\0"""))
+    m = _HEAD_RE.match(bytearray(b"""SEND\nkey:value\n\nbody\0"""))
     assert m[1] == b"SEND"
     assert m[2] == b"key:value\n"
     assert m[3] == b"\n"
@@ -80,6 +80,28 @@ def test_parse_headers():
 
 def test_add_all_bytes_at_once():
     p = StompParser()
-    assert not p.has_frame()
-    p.add_bytes(b"SEND\nkey:value\n\nboby\0")
-    assert p.has_frame()
+    assert len(p.frames) == 0
+    assert p.has_frame() is False
+    p.add_bytes(b"SEND\nkey:value\n\nbody\0")
+    assert len(p.frames) == 1
+    assert p.has_frame() is True
+    frame = p.pop_frame()
+    assert frame.command == 'SEND'
+    assert len(frame.headers) == 1
+    assert frame.headers['key'] == 'value'
+    assert frame.body == bytearray(b'body')
+    assert len(p.frames) == 0
+    assert p.has_frame() is False
+
+    with pytest.raises(EmptyQueue):
+        p.pop_frame()
+    assert len(p.frames) == 0
+    assert p.has_frame() is False
+
+
+def test_reset():
+    p = StompParser()
+    p.add_bytes(b"SEND\nkey:value\n\nbody\0")
+    assert len(p.frames) == 1
+    p.reset()
+    assert len(p.frames) == 0
