@@ -1,8 +1,9 @@
 import pytest
-from swpt_stomp.stomp_parser import _HEAD_RE, _HEARTBEAT_RE, _parse_headers, ProtocolError
 
 
 def test_regexps():
+    from swpt_stomp.stomp_parser import _HEAD_RE, _HEARTBEAT_RE
+
     assert _HEAD_RE.match(b"""123""") is None
 
     m = _HEAD_RE.match(b"""CONNECT\n\n""")
@@ -17,14 +18,10 @@ def test_regexps():
     assert m[2] == b"h1:v1\nh2:v2\n"
     assert m[3] == b"\n"
 
-    m = _HEAD_RE.match(b"""CONNECT\nkey\\n\\c:value\\r\\\n\n""")
-    headers = _parse_headers(m[2])
-    assert headers['key\n:'] == 'value\r\\'
+    m = _HEAD_RE.match(b"""CONNECT\r\nh1:v1\r\nh2:v2\r\n\r\n""")
+    assert m[1] == b"CONNECT"
+    assert m[2] == b"h1:v1\r\nh2:v2\r\n"
     assert m[3] == b"\n"
-
-    m = _HEAD_RE.match(b"""CONNECT\nkey\\t:value\n\n""")
-    with pytest.raises(ProtocolError):
-        _parse_headers(m[2])
 
     # Not obeying the protocol:
     assert _HEAD_RE.match(b"""CONNxxx""") is None
@@ -55,12 +52,21 @@ def test_regexps():
     assert m[2] == b"h1:v1\n"
     assert m[3] is None
 
-    m = _HEAD_RE.match(b"""CONNECT\r\nh1:v1\r\nh2:v2\r\n\r\n""")
-    assert m[1] == b"CONNECT"
-    assert m[2] == b"h1:v1\r\nh2:v2\r\n"
-
     assert _HEARTBEAT_RE.match(b'123') is None
     assert _HEARTBEAT_RE.match(b'\n')
     assert _HEARTBEAT_RE.match(b'\n\n')
     m = _HEARTBEAT_RE.match(b'\r\n\r\n')
     assert m.end() == 4
+
+
+def test_parse_headers():
+    from swpt_stomp.stomp_parser import _HEAD_RE, _parse_headers, ProtocolError
+
+    m = _HEAD_RE.match(b"""CONNECT\nkey\\n\\c:value\\r\\\n\n""")
+    headers = _parse_headers(m[2])
+    assert headers['key\n:'] == 'value\r\\'
+    assert m[3] == b"\n"
+
+    m = _HEAD_RE.match(b"""CONNECT\nkey\\t:value\n\n""")
+    with pytest.raises(ProtocolError):
+        _parse_headers(m[2])
