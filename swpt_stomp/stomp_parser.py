@@ -136,7 +136,7 @@ class StompParser:
 
         If, as a result of feeding the given `data` to the parser, one or
         more frames have been completed, after this method returns, the
-        frames will be available via the `parser.get_frame` method.
+        frames will be available via the `parser.pop_frame` method.
 
         This method will raise a `ProtocolError` exception, if the incoming
         byte-stream does not obey the STOMP 1.2 protocol specification.
