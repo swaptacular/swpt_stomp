@@ -53,7 +53,7 @@ class StompClient(asyncio.Protocol):
         self._hb_send = 0
         self._hb_recv = 0
         self._parser = StompParser()
-        self._reader_task: Optional[asyncio.Task] = None
+        self._writer_task: Optional[asyncio.Task] = None
 
     def connection_made(self, transport: asyncio.WriteTransport) -> None:  # type: ignore[override]
         self._transport = transport
@@ -108,6 +108,26 @@ class StompClient(asyncio.Protocol):
     def resume_writing(self) -> None:
         self._paused = False
 
+    def send_message(self, message: Message) -> None:
+        if self._closed:
+            return
+
+        transport = self._transport
+        if not (transport and self._connected):
+            raise RuntimeError('An attempt has been made to send a message over a '
+                               'connection that is not ready to receive messages.')
+
+        message_frame = StompFrame(
+            command='SEND',
+            headers={
+                'destination': 'smp',
+                'content-type': message.content_type,
+                'receipt': message.id,
+            },
+            body=message.body,
+        )
+        transport.write(bytes(message_frame))
+
     def _received_connected_command(self, frame: StompFrame):
         if self._connected:
             self._close_with_error("Received CONNECTED command more than once.")
@@ -123,7 +143,7 @@ class StompClient(asyncio.Protocol):
                 self._hb_send = _calc_heartbeat(self._hb_send_min, hb_recv_desired)
                 self._hb_recv = _calc_heartbeat(hb_send_min, self._hb_recv_desired)
                 self._connected = True
-                self._reader_task = self._loop.create_task(self._read_queue(), name='Reader')
+                self._writer_task = self._loop.create_task(self._process_messages(), name='Reader')
 
     def _received_receipt_command(self, frame: StompFrame) -> None:
         if self._connected:
@@ -147,30 +167,16 @@ class StompClient(asyncio.Protocol):
         # TODO:
         pass
 
-    def write_message(self, message: Message) -> None:
-        message_frame = StompFrame(
-            command='SEND',
-            headers={
-                'destination': 'main',
-                'content-type': message.content_type,
-                'receipt': message.id,
-            },
-            body=message.body,
-        )
-        transport = self._transport
-        assert transport
-        transport.write(bytes(message_frame))
-
     def _close_with_error(self, message: str) -> None:
         assert self._transport
         _logger.warning('Protocol error: %s', message)
         self._transport.close()
         self._closed = True
 
-    async def _read_queue(self):
+    async def _process_messages(self):
         while True:
             message = await self.queue.get()
-            self.write_message(message)
+            self.send_message(message)
 
 
 class StompServer(asyncio.Protocol):
