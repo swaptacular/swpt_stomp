@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional
 import asyncio
 import logging
+from dataclasses import dataclass
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 
 DEFAULT_QUEUE_SIZE = 1000
@@ -20,8 +21,17 @@ def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
     return max(send_min, recv_desired)
 
 
+@dataclass
+class Message:
+    id: str
+    content_type: str
+    body: bytearray
+
+
 class StompClient(asyncio.Protocol):
     """STOMP client that sends messages to STOMP server."""
+
+    queue: asyncio.Queue[Message]
 
     def __init__(
             self,
@@ -31,8 +41,8 @@ class StompClient(asyncio.Protocol):
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
     ):
-        self._queue: asyncio.Queue = asyncio.Queue(queue_size)
-        self._transport: Optional[asyncio.Transport] = None
+        self.queue: asyncio.Queue[Message] = asyncio.Queue(queue_size)
+        self._transport: Optional[asyncio.WriteTransport] = None
         self._loop = asyncio.get_event_loop()
         self._host = host
         self._connected = False
@@ -45,7 +55,7 @@ class StompClient(asyncio.Protocol):
         self._parser = StompParser()
         self._reader_task: Optional[asyncio.Task] = None
 
-    def connection_made(self, transport) -> None:
+    def connection_made(self, transport: asyncio.WriteTransport) -> None:  # type: ignore[override]
         self._transport = transport
 
         host = self._host
@@ -113,7 +123,7 @@ class StompClient(asyncio.Protocol):
                 self._hb_send = _calc_heartbeat(self._hb_send_min, hb_recv_desired)
                 self._hb_recv = _calc_heartbeat(hb_send_min, self._hb_recv_desired)
                 self._connected = True
-                self._reader_task = self._loop.create_task(self._read(), name='Reader')
+                self._reader_task = self._loop.create_task(self._read_queue(), name='Reader')
 
     def _received_receipt_command(self, frame: StompFrame) -> None:
         if self._connected:
@@ -137,29 +147,30 @@ class StompClient(asyncio.Protocol):
         # TODO:
         pass
 
+    def write_message(self, message: Message) -> None:
+        message_frame = StompFrame(
+            command='SEND',
+            headers={
+                'destination': 'main',
+                'content-type': message.content_type,
+                'receipt': message.id,
+            },
+            body=message.body,
+        )
+        transport = self._transport
+        assert transport
+        transport.write(bytes(message_frame))
+
     def _close_with_error(self, message: str) -> None:
         assert self._transport
         _logger.warning('Protocol error: %s', message)
         self._transport.close()
         self._closed = True
 
-    async def _read(self):
-        transport = self._transport
-        # assert transport
-        n = 0
+    async def _read_queue(self):
         while True:
-            await asyncio.sleep(5)
-            n += 1
-            message_frame = StompFrame(
-                command='SEND',
-                headers={
-                    'destination': 'main',
-                    'content-type': 'application/json',
-                    'receipt': f'message-{n}',
-                },
-                body=bytearray(str(n).encode('ascii'))
-            )
-            transport.write(bytes(message_frame))
+            message = await self.queue.get()
+            self.write_message(message)
 
 
 class StompServer(asyncio.Protocol):
