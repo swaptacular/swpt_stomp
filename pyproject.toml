@@ -14,6 +14,10 @@ python = "^3.9"
 python-lsp-server = {extras = ["all"], version = "^1.7.1"}
 pytest = "^7.3.1"
 pytest-cov = "^4.0.0"
+pylsp-mypy = "^0.6.6"
+
+[tool.pylsp-mypy]
+enabled = true
 
 [build-system]
 requires = ["poetry-core"]

@@ -138,7 +138,7 @@ class StompParser:
         except IndexError:
             raise EmptyQueue()
 
-    def _parse_block(self) -> None:
+    def _parse_block(self) -> bool:
         if self._command:
             return self._parse_body()
         else:
