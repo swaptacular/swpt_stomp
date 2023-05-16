@@ -110,12 +110,6 @@ class StompFrame:
 class StompParser:
     """STOMP version 1.2 parser.
     """
-    _data: bytearray
-    _current_pos: int
-    _command: str
-    _headers: dict[str, str]
-    _body_end: int
-
     frames: deque[StompFrame]
 
     def __init__(self):
@@ -127,7 +121,7 @@ class StompParser:
         self._data = bytearray()
         self._current_pos = 0
         self._command = ''
-        self._headers = {}
+        self._headers: dict[str, str] = {}
         self._body_end = 0
         self.frames = deque()
 
