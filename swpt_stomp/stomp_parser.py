@@ -159,6 +159,15 @@ class StompParser:
         except IndexError:
             raise EmptyQueue()
 
+    def __iter__(self):
+        """Iterate over available frames, removing them from the queue.
+        """
+        while True:
+            try:
+                yield self.pop_frame()
+            except EmptyQueue:
+                break
+
     def _parse_block(self) -> bool:
         if self._command:
             return self._parse_body()

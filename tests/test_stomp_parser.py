@@ -205,6 +205,18 @@ def test_body_containing_null():
     assert p.pop_frame().body == b'There is a '
 
 
+def test_frame_iter():
+    from swpt_stomp.stomp_parser import StompFrame
+
+    p = StompParser()
+    frames = [StompFrame(command) for command in 'ABCDE']
+    for f in frames:
+        p.add_bytes(bytes(f))
+    for recv, send in zip(p, frames):
+        assert send.command == recv.command
+    assert not p.has_frame()
+
+
 def test_frame_serialization():
     from swpt_stomp.stomp_parser import StompFrame
 
