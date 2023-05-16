@@ -44,7 +44,7 @@ def _substitute_header_escape_chars(s: bytes) -> bytes:
     try:
         return _HEADER_UNESCAPE_RE.sub(lambda m: _HEADER_UNESCAPE_CHARS[m[0]], s)
     except KeyError:
-        raise ProtocolError('invalid header')
+        raise ProtocolError('Invalid header.')
 
 
 def _parse_headers(s: bytes) -> dict[str, str]:
@@ -198,7 +198,7 @@ class StompParser:
 
         m = _HEAD_RE.match(data, current_pos)
         if m is None:
-            raise ProtocolError('invalid frame')
+            raise ProtocolError('Invalid frame.')
 
         if m[3] is None:
             return False  # The head seems valid, but incomplete.
@@ -212,7 +212,7 @@ class StompParser:
         except (KeyError, ValueError):
             n = 0
         if n > BODY_MAX_LENGTH:
-            raise ProtocolError('content-length is too large')
+            raise ProtocolError('Content-length is too large.')
 
         self._body_end = current_pos + n
         return True
@@ -226,7 +226,7 @@ class StompParser:
             stop = data.find(0, body_end, first_illegal_index)
             if (stop == -1):
                 if n >= first_illegal_index:
-                    raise ProtocolError('the body is too large')
+                    raise ProtocolError('The body is too large.')
                 self._body_end = n
             else:
                 self.frames.append(StompFrame(
