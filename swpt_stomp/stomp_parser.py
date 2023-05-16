@@ -70,6 +70,13 @@ class ProtocolError(Exception):
     """STOMP 1.2 protocol error.
     """
 
+    def __init__(self, message):
+        super().__init__(message)
+
+    @property
+    def message(self):
+        return self.args[0]
+
 
 class EmptyQueue(Exception):
     """There are no available frames in the queue.

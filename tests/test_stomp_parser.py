@@ -155,6 +155,12 @@ def test_protocol_error():
     with pytest.raises(ProtocolError):
         p.add_bytes(b"error")
 
+    p2 = StompParser()
+    try:
+        p2.add_bytes(b"error")
+    except ProtocolError as e:
+        assert isinstance(e.message, str)
+
 
 def test_content_length_too_big():
     from swpt_stomp.stomp_parser import BODY_MAX_LENGTH
