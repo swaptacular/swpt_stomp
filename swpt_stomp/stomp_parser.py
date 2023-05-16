@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections import deque
 import re
 
@@ -23,20 +23,26 @@ _HEAD_RE = re.compile(
     ))))""",
     re.VERBOSE)
 
-_HEADER_ESCAPE_RE = re.compile(rb'\\.')
-_HEADER_ESCAPE_CHARS = {
+_HEADER_UNESCAPE_RE = re.compile(rb'\\.')
+_HEADER_UNESCAPE_CHARS = {
     rb'\r': b'\r',
     rb'\n': b'\n',
     rb'\c': b':',
     rb'\\': b'\\',
 }
+_HEADER_ESCAPE_TABLE = str.maketrans({
+    ord('\r'): r'\r',
+    ord('\n'): r'\n',
+    ord(':'): r'\c',
+    ord('\\'): r'\\',
+})
 
 
 def _substitute_header_escape_chars(s: bytes) -> bytes:
     # \r, \n, \c, \\ in headers should be substituted accordingly. Other
     # escape symbols are not allowed.
     try:
-        return _HEADER_ESCAPE_RE.sub(lambda m: _HEADER_ESCAPE_CHARS[m[0]], s)
+        return _HEADER_UNESCAPE_RE.sub(lambda m: _HEADER_UNESCAPE_CHARS[m[0]], s)
     except KeyError:
         raise ProtocolError('invalid header')
 
@@ -75,8 +81,23 @@ class StompFrame:
     """STOMP 1.2 Protocol Frame.
     """
     command: str
-    headers: dict[str, str]
-    body: bytearray
+    headers: dict[str, str] = field(default_factory=dict)
+    body: bytearray = field(default_factory=bytearray)
+
+    def __bytes__(self):
+        t = _HEADER_ESCAPE_TABLE
+        body = self.body
+        headers = self.headers
+        header_lines = [
+            f'{k.translate(t)}:{v.translate(t)}\n'
+            for k, v in headers.items()
+        ]
+        if body and 'content-length' not in headers:
+            header_lines.append(f'content-length:{len(body)}\n')
+
+        headers_bytes = ''.join(header_lines).encode('utf8')
+        command_bytes = self.command.encode('ascii')
+        return b'%s\n%s\n%s\0' % (command_bytes, headers_bytes, body)
 
 
 class StompParser:

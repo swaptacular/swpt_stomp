@@ -203,3 +203,33 @@ def test_body_containing_null():
     with pytest.raises(ProtocolError):
         p.add_bytes(b"SEND\ncontent-length:7\n\nThere is a \0 byte!\0")
     assert p.pop_frame().body == b'There is a '
+
+
+def test_frame_serialization():
+    from swpt_stomp.stomp_parser import StompFrame
+
+    p = StompParser()
+
+    frame1 = StompFrame('SEND')
+    p.add_bytes(bytes(frame1))
+    assert p.has_frame()
+    f = p.pop_frame()
+    assert f.command == frame1.command
+    assert f.headers == frame1.headers
+    assert f.body == frame1.body
+
+    frame2 = StompFrame('SEND', {'aa': 'bb', 'aa:aa\\': 'bb\nbb\r'})
+    p.add_bytes(bytes(frame2))
+    assert p.has_frame()
+    f = p.pop_frame()
+    assert f.command == frame2.command
+    assert f.headers == frame2.headers
+    assert f.body == frame2.body
+
+    frame3 = StompFrame('SEND', body=bytearray(b'123'))
+    p.add_bytes(bytes(frame3))
+    assert p.has_frame()
+    f = p.pop_frame()
+    assert f.command == frame3.command
+    assert f.headers == {'content-length': '3'}
+    assert f.body == frame3.body
