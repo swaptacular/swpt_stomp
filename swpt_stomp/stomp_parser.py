@@ -70,11 +70,11 @@ class ProtocolError(Exception):
     """STOMP 1.2 protocol error.
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
     @property
-    def message(self):
+    def message(self) -> str:
         return self.args[0]
 
 
