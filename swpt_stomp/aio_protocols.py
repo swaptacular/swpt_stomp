@@ -37,17 +37,20 @@ class StompClient(asyncio.Protocol):
         self._host = host
         self._connected = False
         self._closed = False
+        self._paused = False  # TODO: This probably should be a condition!
         self._hb_send_min = hb_send_min
         self._hb_recv_desired = hb_recv_desired
         self._hb_send = 0
         self._hb_recv = 0
         self._parser = StompParser()
+        self._reader_task: Optional[asyncio.Task] = None
 
     def connection_made(self, transport) -> None:
         self._transport = transport
 
         host = self._host
         if host is None:
+            # TODO: This is probably not reliable!
             host, *others = transport.get_extra_info('peername')
 
         connect_frame = StompFrame(
@@ -59,7 +62,6 @@ class StompClient(asyncio.Protocol):
             },
         )
         transport.write(bytes(connect_frame))
-        # self._reader_task = self._loop.create_task(self._read(), name='Reader')
 
     def data_received(self, data: bytes) -> None:
         if self._closed:
@@ -91,12 +93,10 @@ class StompClient(asyncio.Protocol):
         pass
 
     def pause_writing(self) -> None:
-        # TODO
-        pass
+        self._paused = True
 
     def resume_writing(self) -> None:
-        # TODO
-        pass
+        self._paused = False
 
     def _received_connected_command(self, frame: StompFrame):
         if self._connected:
@@ -113,6 +113,7 @@ class StompClient(asyncio.Protocol):
                 self._hb_send = _calc_heartbeat(self._hb_send_min, hb_recv_desired)
                 self._hb_recv = _calc_heartbeat(hb_send_min, self._hb_recv_desired)
                 self._connected = True
+                self._reader_task = self._loop.create_task(self._read(), name='Reader')
 
     def _received_receipt_command(self, frame: StompFrame) -> None:
         if self._connected:
@@ -143,7 +144,22 @@ class StompClient(asyncio.Protocol):
         self._closed = True
 
     async def _read(self):
-        pass
+        transport = self._transport
+        # assert transport
+        n = 0
+        while True:
+            await asyncio.sleep(5)
+            n += 1
+            message_frame = StompFrame(
+                command='SEND',
+                headers={
+                    'destination': 'main',
+                    'content-type': 'application/json',
+                    'receipt': f'message-{n}',
+                },
+                body=bytearray(str(n).encode('ascii'))
+            )
+            transport.write(bytes(message_frame))
 
 
 class StompServer(asyncio.Protocol):
