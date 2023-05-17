@@ -2,10 +2,9 @@ from __future__ import annotations
 from typing import Optional
 import asyncio
 import logging
-from swpt_stomp.common import Message
+from swpt_stomp.common import Message, WatermarkQueue
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 
-DEFAULT_QUEUE_SIZE = 1000
 DEFAULT_HB_SEND_MIN = 5_000  # 5 seconds
 DEFAULT_HB_RECV_DESIRED = 30_000  # 30 seconds
 
@@ -24,31 +23,31 @@ def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
 class StompClient(asyncio.Protocol):
     """STOMP client that sends messages to STOMP server."""
 
-    queue: asyncio.Queue[Message]
-
     def __init__(
             self,
             *,
+            input_queue: asyncio.Queue[Message],
+            output_queue: WatermarkQueue[str],
             host: Optional[str] = None,
-            queue_size: int = DEFAULT_QUEUE_SIZE,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
     ):
-        self.queue: asyncio.Queue[Message] = asyncio.Queue(queue_size)
-        self._transport: Optional[asyncio.WriteTransport] = None
-        self._loop = asyncio.get_event_loop()
+        self._input_queue = input_queue
+        self._output_queue = output_queue
         self._host = host
+        self._hb_send_min = hb_send_min
+        self._hb_recv_desired = hb_recv_desired
+        self._transport: Optional[asyncio.Transport] = None
         self._connected = False
         self._closed = False
         self._paused = False  # TODO: This probably should be a condition!
-        self._hb_send_min = hb_send_min
-        self._hb_recv_desired = hb_recv_desired
         self._hb_send = 0
         self._hb_recv = 0
+        self._loop = asyncio.get_event_loop()
         self._parser = StompParser()
         self._writer_task: Optional[asyncio.Task] = None
 
-    def connection_made(self, transport: asyncio.WriteTransport) -> None:  # type: ignore[override]
+    def connection_made(self, transport: asyncio.Transport) -> None:  # type: ignore[override]
         self._transport = transport
 
         host = self._host
@@ -65,6 +64,8 @@ class StompClient(asyncio.Protocol):
             },
         )
         transport.write(bytes(connect_frame))
+        self._output_queue.add_high_watermark_callback(transport.pause_reading)
+        self._output_queue.add_low_watermark_callback(transport.resume_reading)
 
     def data_received(self, data: bytes) -> None:
         if self._closed:
@@ -92,8 +93,14 @@ class StompClient(asyncio.Protocol):
                 break
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
-        # TODO
-        pass
+        if self._writer_task:
+            self._writer_task.cancel('connection lost')
+            self._writer_task = None
+
+        t = self._transport
+        assert t
+        self._output_queue.remove_high_watermark_callback(t.pause_reading)
+        self._output_queue.remove_low_watermark_callback(t.resume_reading)
 
     def pause_writing(self) -> None:
         self._paused = True
@@ -136,7 +143,10 @@ class StompClient(asyncio.Protocol):
                 self._hb_send = _calc_heartbeat(self._hb_send_min, hb_recv_desired)
                 self._hb_recv = _calc_heartbeat(hb_send_min, self._hb_recv_desired)
                 self._connected = True
-                self._writer_task = self._loop.create_task(self._process_messages(), name='Reader')
+                self._writer_task = self._loop.create_task(
+                    self._process_input_messages(),
+                    name='Writer task',
+                )
 
     def _received_receipt_command(self, frame: StompFrame) -> None:
         if self._connected:
@@ -145,7 +155,7 @@ class StompClient(asyncio.Protocol):
             except KeyError:
                 self._close_with_error('Received a RECEIPT command without a receipt ID.')
             else:
-                self._received_ack(receipt_id)
+                self._output_queue.put_nowait(receipt_id)
         else:
             self._close_with_error("Received other command, without receiving CONNECTED.")
 
@@ -156,20 +166,16 @@ class StompClient(asyncio.Protocol):
         else:
             self._close_with_error("Received other command, without receiving CONNECTED.")
 
-    def _received_ack(self, receipt_id: str) -> None:
-        # TODO:
-        pass
-
     def _close_with_error(self, message: str) -> None:
         assert self._transport
         _logger.warning('Protocol error: %s', message)
         self._transport.close()
         self._closed = True
 
-    async def _process_messages(self):
+    async def _process_input_messages(self):
         while True:
-            message = await self.queue.get()
-            self.send_message(message)
+            m = await self._input_queue.get()
+            self.send_message(m)
 
 
 class StompServer(asyncio.Protocol):
