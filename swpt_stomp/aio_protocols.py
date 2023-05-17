@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional
 import asyncio
 import logging
-from dataclasses import dataclass
+from swpt_stomp.common import Message
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 
 DEFAULT_QUEUE_SIZE = 1000
@@ -19,13 +19,6 @@ def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
         return 0  # no heartbeats
 
     return max(send_min, recv_desired)
-
-
-@dataclass
-class Message:
-    id: str
-    content_type: str
-    body: bytearray
 
 
 class StompClient(asyncio.Protocol):
