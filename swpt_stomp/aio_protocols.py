@@ -53,8 +53,8 @@ class StompClient(asyncio.Protocol):
 
         host = self._host
         if host is None:
-            # TODO: This is probably not reliable!
-            host, *others = transport.get_extra_info('peername')
+            peername = transport.get_extra_info('peername')
+            host = 'default' if (peername is None) else peername[0]
 
         connect_frame = StompFrame(
             command='CONNECT',
