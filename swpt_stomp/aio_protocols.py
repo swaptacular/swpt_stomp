@@ -40,12 +40,13 @@ class StompClient(asyncio.Protocol):
         self._transport: Optional[asyncio.Transport] = None
         self._connected = False
         self._closed = False
-        self._paused = False  # TODO: This probably should be a condition!
         self._hb_send = 0
         self._hb_recv = 0
         self._loop = asyncio.get_event_loop()
         self._parser = StompParser()
         self._writer_task: Optional[asyncio.Task] = None
+        self._start_writing = asyncio.Event()
+        self._start_writing.set()
 
     def connection_made(self, transport: asyncio.Transport) -> None:  # type: ignore[override]
         self._transport = transport
@@ -103,10 +104,10 @@ class StompClient(asyncio.Protocol):
         self._output_queue.remove_low_watermark_callback(t.resume_reading)
 
     def pause_writing(self) -> None:
-        self._paused = True
+        self._start_writing.clear()
 
     def resume_writing(self) -> None:
-        self._paused = False
+        self._start_writing.set()
 
     def send_message(self, message: Message) -> None:
         if self._closed:
@@ -173,7 +174,7 @@ class StompClient(asyncio.Protocol):
         self._closed = True
 
     async def _process_input_messages(self):
-        while True:
+        while await self._start_writing.wait():
             m = await self._input_queue.get()
             self.send_message(m)
 
