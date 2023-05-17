@@ -1,8 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Callable, List, Any, Optional
+from typing import Callable, List, Any, Optional, TypeVar
 import asyncio
 
+_T = TypeVar("_T")
 
 Callback = Callable[[], Any]
 
@@ -14,7 +15,9 @@ class Message:
     body: bytearray
 
 
-class WatermarkQueue(asyncio.Queue):
+class WatermarkQueue(asyncio.Queue[_T]):
+    """A queue that can signal when the given watermarks are reached."""
+
     low_watermark: int
     high_watermark: int
 
