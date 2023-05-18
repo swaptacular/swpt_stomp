@@ -181,6 +181,35 @@ def test_client_pause_writing():
     c.connection_lost(None)
 
 
+def test_client_pause_reading():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(2)
+    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    c = StompClient(input_queue, output_queue)
+    c.connection_made(transport)
+    c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
+    transport.pause_reading.assert_not_called()
+    transport.resume_reading.reset_mock()
+
+    # The first message do not cause a pause.
+    c.data_received(b'RECEIPT\nreceipt-id:m1\n\n\x00')
+    transport.pause_reading.assert_not_called()
+    transport.resume_reading.assert_not_called()
+
+    # The second message causes a pause.
+    c.data_received(b'RECEIPT\nreceipt-id:m1\n\n\x00')
+    transport.pause_reading.assert_called_once()
+    transport.resume_reading.assert_not_called()
+
+    # Removing both messages from the queue resumes reading.
+    output_queue.get_nowait()
+    output_queue.task_done()
+    output_queue.get_nowait()
+    output_queue.task_done()
+    transport.pause_reading.assert_called_once()
+    transport.resume_reading.assert_called_once()
+
+
 def test_client_send_heartbeats():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
