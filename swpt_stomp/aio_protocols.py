@@ -143,6 +143,8 @@ class StompClient(asyncio.Protocol):
             heartbeat = frame.headers.get('heart-beat', '0,0')
             try:
                 hb_send_min, hb_recv_desired = [int(n) for n in heartbeat.split(',', 2)]
+                if hb_send_min < 0 or hb_recv_desired < 0:
+                    raise ValueError()
             except ValueError:
                 self._close_with_error("Received invalid heart-beat value.")
             else:
