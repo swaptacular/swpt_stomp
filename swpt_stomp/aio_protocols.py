@@ -59,7 +59,10 @@ class StompClient(asyncio.Protocol):
         self._start_sending = asyncio.Event()
         self._start_sending.set()
 
-    def connection_made(self, transport: asyncio.Transport) -> None:  # type: ignore[override]
+    def connection_made(
+            self,
+            transport: asyncio.Transport,  # type: ignore[override]
+    ) -> None:
         self._transport = transport
 
         host = self._host
@@ -92,15 +95,15 @@ class StompClient(asyncio.Protocol):
             return
 
         for frame in parser:
-            command = frame.command
-            if command == 'CONNECTED':
+            cmd = frame.command
+            if cmd == 'CONNECTED':
                 self._received_connected_command(frame)
-            elif command == 'RECEIPT':
+            elif cmd == 'RECEIPT':
                 self._received_receipt_command(frame)
-            elif command == 'ERROR':
+            elif cmd == 'ERROR':
                 self._received_error_command(frame)
             else:
-                self._close_with_error(f'Received unexpected command "{command}".')
+                self._close_with_error(f'Received unexpected command "{cmd}".')
 
             if self._closed:
                 break
@@ -131,10 +134,11 @@ class StompClient(asyncio.Protocol):
         if self._closed:
             return
 
-        t = self._transport
-        if not (t and self._connected):
-            raise RuntimeError('An attempt has been made to send a message over a '
-                               'connection that is not ready to receive messages.')
+        transport = self._transport
+        if not (transport and self._connected):
+            raise RuntimeError(
+                'An attempt has been made to send a message over a '
+                'connection that is not ready to receive messages.')
 
         message_frame = StompFrame(
             command='SEND',
@@ -145,44 +149,54 @@ class StompClient(asyncio.Protocol):
             },
             body=message.body,
         )
-        t.write(bytes(message_frame))
+        transport.write(bytes(message_frame))
 
     def _received_connected_command(self, frame: StompFrame) -> None:
         if self._connected:
-            self._close_with_error("Received CONNECTED command more than once.")
-        elif frame.headers.get('version') != '1.2':
-            self._close_with_error("Received wrong protocol version.")
-        else:
-            heartbeat = frame.headers.get('heart-beat', '0,0')
-            try:
-                hb_send_min, hb_recv_desired = [int(n) for n in heartbeat.split(',', 2)]
-                if hb_send_min < 0 or hb_recv_desired < 0:
-                    raise ValueError()
-            except ValueError:
-                self._close_with_error("Received invalid heart-beat value.")
-            else:
-                self._hb_send = _calc_heartbeat(self._hb_send_min, hb_recv_desired)
-                self._hb_recv = _calc_heartbeat(hb_send_min, self._hb_recv_desired)
-                self._connected = True
-                self._writer_task = self._loop.create_task(self._send_input_messages())
+            self._close_with_error('Received CONNECTED command more than once.')
+            return
 
-                if self._hb_send != 0:
-                    delay = self._calc_heartbeat_delay()
-                    self._loop.call_later(delay, self._send_heartbeat)
+        if frame.headers.get('version') != '1.2':
+            self._close_with_error('Received wrong protocol version.')
+            return
 
-                if self._hb_recv != 0:
-                    self._watchdog_task = self._loop.create_task(self._check_aliveness())
+        heartbeat = frame.headers.get('heart-beat', '0,0')
+        try:
+            hb_send_min, hb_recv_desired = [
+                int(n) for n in heartbeat.split(',', 2)
+            ]
+            if hb_send_min < 0 or hb_recv_desired < 0:
+                raise ValueError()
+        except ValueError:
+            self._close_with_error('Received invalid heart-beat value.')
+            return
+
+        self._connected = True
+        self._hb_send = _calc_heartbeat(self._hb_send_min, hb_recv_desired)
+        self._hb_recv = _calc_heartbeat(hb_send_min, self._hb_recv_desired)
+        loop = self._loop
+
+        if self._hb_send != 0:
+            delay = self._calc_heartbeat_delay()
+            loop.call_later(delay, self._send_heartbeat)
+
+        if self._hb_recv != 0:
+            self._watchdog_task = loop.create_task(self._check_aliveness())
+
+        self._writer_task = loop.create_task(self._send_input_messages())
 
     def _received_receipt_command(self, frame: StompFrame) -> None:
-        if self._connected:
-            try:
-                receipt_id = frame.headers['receipt-id']
-            except KeyError:
-                self._close_with_error('Received a RECEIPT command without a receipt ID.')
-            else:
-                self.output_queue.put_nowait(receipt_id)
-        else:
-            self._close_with_error("Received other command, without receiving CONNECTED.")
+        if not self._connected:
+            self._close_with_error('Received another command before CONNECTED.')
+            return
+
+        try:
+            receipt_id = frame.headers['receipt-id']
+        except KeyError:
+            self._close_with_error('RECEIPT command without a receipt ID.')
+            return
+
+        self.output_queue.put_nowait(receipt_id)
 
     def _received_error_command(self, frame: StompFrame) -> None:
         error_message = frame.headers.get('message', '')
@@ -202,7 +216,8 @@ class StompClient(asyncio.Protocol):
             self._loop.call_later(delay, self._send_heartbeat)
 
     def _calc_heartbeat_delay(self) -> float:
-        return max(self._hb_send - DEFAULT_HB_SEND_MIN, self._hb_send_min) / 1000
+        hb_send_with_tolerance = self._hb_send - DEFAULT_HB_SEND_MIN
+        return max(hb_send_with_tolerance, self._hb_send_min) / 1000
 
     async def _send_input_messages(self) -> None:
         queue = self.input_queue
@@ -217,7 +232,8 @@ class StompClient(asyncio.Protocol):
         while not self._closed:
             await asyncio.sleep(sleep_seconds)
             if time.time() - self._data_receved_at > watchdog_seconds:
-                self._close_with_error(f'No data received for {watchdog_seconds:.3f} seconds.')
+                self._close_with_error(
+                    f'No data received for {watchdog_seconds:.3f} seconds.')
 
 
 class StompServer(asyncio.Protocol):
