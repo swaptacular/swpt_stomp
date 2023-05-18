@@ -119,6 +119,7 @@ def test_client_connection_error(data):
     transport.close.assert_called_once()
     assert not c._connected
     assert c._closed
+    c.connection_lost(None)
 
 
 @pytest.mark.parametrize("data", [
@@ -144,3 +145,37 @@ def test_client_post_connection_error(data):
     transport.close.assert_called_once()
     assert c._connected
     assert c._closed
+    c.connection_lost(None)
+
+
+def test_client_pause_writing():
+    loop = asyncio.get_event_loop()
+
+    def run_once():
+        loop.call_soon(loop.stop)
+        loop.run_forever()
+
+    # Make a proper connection.
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    c = StompClient(input_queue, output_queue)
+    c.connection_made(transport)
+    c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
+    transport.write.reset_mock()
+
+    # Pause writing and queue a message.
+    c.pause_writing()
+    m = Message(id='m1', content_type='text/plain', body=bytearray(b'1'))
+    input_queue.put_nowait(m)
+    run_once()
+    run_once()
+    run_once()
+    transport.write.assert_not_called()
+
+    # Resume writing.
+    loop.call_soon(c.resume_writing)
+    loop.run_until_complete(input_queue.join())
+    transport.write.assert_called_once()
+
+    c.connection_lost(None)
