@@ -69,10 +69,14 @@ class WatermarkQueue(asyncio.Queue[_T]):
 
     def remove_high_watermark_callback(self, cb: Callback) -> None:
         """Remove a high watermark callback.
+
+        Raises `ValueError` if the callback has not been registered.
         """
         self.__hw_callbacks.remove(cb)
 
     def remove_low_watermark_callback(self, cb: Callback) -> None:
         """Remove a low watermark callback.
+
+        Raises `ValueError` if the callback has not been registered.
         """
         self.__lw_callbacks.remove(cb)

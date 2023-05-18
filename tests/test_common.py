@@ -98,3 +98,27 @@ def test_remove_watermark_callbacks():
     q.get_nowait()
     q.task_done()
     assert cb_called == 1
+
+    with pytest.raises(ValueError):
+        q.remove_low_watermark_callback('invalid')
+
+    with pytest.raises(ValueError):
+        q.remove_high_watermark_callback('invalid')
+
+
+def test_watermark_queue_put():
+    import asyncio
+
+    cb_called = 0
+
+    def cb():
+        nonlocal cb_called
+        cb_called += 1
+
+    q = WatermarkQueue(0, 0)
+    q.add_high_watermark_callback(cb)
+
+    loop = asyncio.get_event_loop()
+    assert cb_called == 0
+    loop.run_until_complete(q.put('item'))
+    assert cb_called == 1
