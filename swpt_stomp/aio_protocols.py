@@ -44,6 +44,7 @@ class StompClient(asyncio.Protocol):
         self._closed = False
         self._hb_send = 0
         self._hb_recv = 0
+        self._loop = asyncio.get_event_loop()
         self._parser = StompParser()
         self._transport: Optional[asyncio.Transport] = None
         self._writer_task: Optional[asyncio.Task] = None
@@ -96,6 +97,8 @@ class StompClient(asyncio.Protocol):
                 break
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
+        self._closed = True
+
         if self._writer_task:
             self._writer_task.cancel('connection lost')
             self._writer_task = None
@@ -131,7 +134,7 @@ class StompClient(asyncio.Protocol):
         )
         t.write(bytes(message_frame))
 
-    def _received_connected_command(self, frame: StompFrame):
+    def _received_connected_command(self, frame: StompFrame) -> None:
         if self._connected:
             self._close_with_error("Received CONNECTED command more than once.")
         elif frame.headers.get('version') != '1.2':
@@ -146,8 +149,10 @@ class StompClient(asyncio.Protocol):
                 self._hb_send = _calc_heartbeat(self._hb_send_min, hb_recv_desired)
                 self._hb_recv = _calc_heartbeat(hb_send_min, self._hb_recv_desired)
                 self._connected = True
-                loop = asyncio.get_event_loop()
-                self._writer_task = loop.create_task(self._send_input_messages())
+                self._writer_task = self._loop.create_task(self._send_input_messages())
+                if self._hb_send != 0:
+                    delay = self._calc_heartbeat_delay()
+                    self._loop.call_later(delay, self._send_heartbeat)
 
     def _received_receipt_command(self, frame: StompFrame) -> None:
         if self._connected:
@@ -170,7 +175,17 @@ class StompClient(asyncio.Protocol):
         self._transport.close()
         self._closed = True
 
-    async def _send_input_messages(self):
+    def _send_heartbeat(self) -> None:
+        if not self._closed:
+            assert self._transport
+            self._transport.write(b'\n')
+            delay = self._calc_heartbeat_delay()
+            self._loop.call_later(delay, self._send_heartbeat)
+
+    def _calc_heartbeat_delay(self) -> float:
+        return max(self._hb_send - DEFAULT_HB_SEND_MIN, self._hb_send_min) / 1000
+
+    async def _send_input_messages(self) -> None:
         queue = self.input_queue
         while await self._start_sending.wait():
             m = await queue.get()
