@@ -133,7 +133,7 @@ class StompClient(asyncio.Protocol):
         self._start_sending.set()
 
     def _send_message(self, message: Message) -> None:
-        if not self._closed:
+        if self._closed:
             return
 
         message_frame = StompFrame(
