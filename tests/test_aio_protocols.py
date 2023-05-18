@@ -179,3 +179,23 @@ def test_client_pause_writing():
     transport.write.assert_called_once()
 
     c.connection_lost(None)
+
+
+def test_client_send_heartbeats():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    c = StompClient(input_queue, output_queue, hb_send_min=1)
+    c.connection_made(transport)
+    c.data_received(b'CONNECTED\nversion:1.2\nheart-beat:0,1\n\n\x00')
+    transport.write.reset_mock()
+    assert c._hb_send == 1
+
+    async def wait_for_write():
+        while not transport.write.called:
+            await asyncio.sleep(0)
+
+    transport.write.assert_not_called()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_for_write())
+    transport.write.assert_called_with(b'\n')
