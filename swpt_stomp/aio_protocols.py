@@ -171,7 +171,6 @@ class StompClient(asyncio.Protocol):
                 if self._hb_recv != 0:
                     self._watchdog_task = self._loop.create_task(self._check_aliveness())
 
-
     def _received_receipt_command(self, frame: StompFrame) -> None:
         if self._connected:
             try:
