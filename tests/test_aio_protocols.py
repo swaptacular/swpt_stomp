@@ -1,3 +1,4 @@
+import pytest
 import asyncio
 from unittest.mock import NonCallableMock, Mock
 from swpt_stomp.common import WatermarkQueue, Message
@@ -13,7 +14,7 @@ def test_client_connection():
         input_queue,
         output_queue,
         hb_send_min=1000,
-        hb_recv_desired=9000,
+        hb_recv_desired=90,
         send_destination='dest',
     )
     assert c.input_queue is input_queue
@@ -23,7 +24,7 @@ def test_client_connection():
     transport = NonCallableMock(get_extra_info=Mock(return_value=('my',)))
     c.connection_made(transport)
     transport.write.assert_called_with(
-        b'CONNECT\naccept-version:1.2\nhost:my\nheart-beat:1000,9000\n\n\x00')
+        b'CONNECT\naccept-version:1.2\nhost:my\nheart-beat:1000,90\n\n\x00')
     transport.write.reset_mock()
     transport.close.assert_not_called()
     assert not c._connected
@@ -37,6 +38,8 @@ def test_client_connection():
     transport.close.assert_not_called()
     assert c._connected
     assert not c._closed
+    assert c._hb_send == 8000
+    assert c._hb_recv == 500
     assert isinstance(c._writer_task, asyncio.Task)
     assert isinstance(c._watchdog_task, asyncio.Task)
 
@@ -94,3 +97,50 @@ def test_client_connection():
     assert c._watchdog_task is None
     transport.write.assert_not_called()
     transport.close.assert_not_called()
+
+
+@pytest.mark.parametrize("data", [
+    b'protocol error',
+    b'INVALIDCMD\n\n\x00',
+    b'CONNECTED\nversion:1.0\nheart-beat:500,8000\n\n\x00',
+    b'CONNECTED\nversion:1.2\nheart-beat:invalid\n\n\x00',
+    b'CONNECTED\nversion:1.2\nheart-beat:-10,0\n\n\x00',
+    b'RECEIPT\nreceipt-id:m1\n\n\x00',
+])
+def test_client_connection_error(data):
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    c = StompClient(input_queue, output_queue)
+    c.connection_made(transport)
+    transport.write.reset_mock()
+    c.data_received(data)
+    transport.write.assert_not_called()
+    transport.close.assert_called_once()
+    assert not c._connected
+    assert c._closed
+
+
+@pytest.mark.parametrize("data", [
+    b'protocol error',
+    b'INVALIDCMD\n\n\x00',
+    b'CONNECTED\nversion:1.2\nheart-beat:500,8000\n\n\x00',
+    b'RECEIPT\n\n\x00',
+])
+def test_client_post_connection_error(data):
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    c = StompClient(input_queue, output_queue, hb_send_min=0, hb_recv_desired=0)
+    c.connection_made(transport)
+    transport.write.reset_mock()
+    c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
+    assert c._connected
+    assert not c._closed
+    assert c._hb_send == 0
+    assert c._hb_recv == 0
+    c.data_received(data)
+    transport.write.assert_not_called()
+    transport.close.assert_called_once()
+    assert c._connected
+    assert c._closed
