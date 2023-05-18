@@ -37,6 +37,7 @@ class StompClient(asyncio.Protocol):
             host: Optional[str] = None,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
+            send_destination: str = 'smp'
     ):
         assert hb_send_min >= 0
         assert hb_recv_desired >= 0
@@ -46,6 +47,7 @@ class StompClient(asyncio.Protocol):
         self._host = host
         self._hb_send_min = hb_send_min
         self._hb_recv_desired = hb_recv_desired
+        self._send_destination = send_destination
         self._connected = False
         self._closed = False
         self._hb_send = 0
@@ -130,26 +132,21 @@ class StompClient(asyncio.Protocol):
     def resume_writing(self) -> None:
         self._start_sending.set()
 
-    def send_message(self, message: Message) -> None:
-        if self._closed:
+    def _send_message(self, message: Message) -> None:
+        if not self._closed:
             return
-
-        transport = self._transport
-        if not (transport and self._connected):
-            raise RuntimeError(
-                'An attempt has been made to send a message over a '
-                'connection that is not ready to receive messages.')
 
         message_frame = StompFrame(
             command='SEND',
             headers={
-                'destination': 'smp',
+                'destination': self._send_destination,
                 'content-type': message.content_type,
                 'receipt': message.id,
             },
             body=message.body,
         )
-        transport.write(bytes(message_frame))
+        assert self._transport
+        self._transport.write(bytes(message_frame))
 
     def _received_connected_command(self, frame: StompFrame) -> None:
         if self._connected:
@@ -223,7 +220,7 @@ class StompClient(asyncio.Protocol):
         queue = self.input_queue
         while await self._start_sending.wait():
             m = await queue.get()
-            self.send_message(m)
+            self._send_message(m)
             queue.task_done()
 
     async def _check_aliveness(self) -> None:
