@@ -231,14 +231,4 @@ class StompClient(asyncio.Protocol):
             if time.time() - self._data_receved_at > watchdog_seconds:
                 self._close_with_error(
                     f'No data received for {watchdog_seconds:.3f} seconds.')
-
-
-class StompServer(asyncio.Protocol):
-    _transport: Optional[asyncio.Transport]
-
-    def _send_error(self, headers: dict[str, str]):
-        transport = self._transport
-        assert transport
-        error_frame = StompFrame('ERROR', headers)
-        transport.write(bytes(error_frame))
-        transport.close()
+                return

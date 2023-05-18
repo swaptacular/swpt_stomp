@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from unittest.mock import NonCallableMock, Mock
+from unittest.mock import NonCallableMock, Mock, patch
 from swpt_stomp.common import WatermarkQueue, Message
 from swpt_stomp.aio_protocols import StompClient
 
@@ -199,3 +199,25 @@ def test_client_send_heartbeats():
     loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_for_write())
     transport.write.assert_called_with(b'\n')
+
+    c.connection_lost(None)
+
+
+@patch('swpt_stomp.aio_protocols.DEFAULT_HB_SEND_MIN', new=1)
+def test_client_recv_heartbeats():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    c = StompClient(input_queue, output_queue, hb_recv_desired=1)
+    c.connection_made(transport)
+    c.data_received(b'CONNECTED\nversion:1.2\nheart-beat:1,0\n\n\x00')
+    assert c._hb_recv == 1
+
+    async def wait_disconnect():
+        while not c._closed:
+            await asyncio.sleep(0)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_disconnect())
+
+    c.connection_lost(None)
