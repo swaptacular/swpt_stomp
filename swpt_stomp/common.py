@@ -21,7 +21,11 @@ class WatermarkQueue(asyncio.Queue[_T]):
     low_watermark: int
     high_watermark: int
 
-    def __init__(self, high_watermark: int, low_watermark: Optional[int] = None):
+    def __init__(
+            self,
+            high_watermark: int,
+            low_watermark: Optional[int] = None,
+    ):
         if low_watermark is None:
             low_watermark = high_watermark // 4
 

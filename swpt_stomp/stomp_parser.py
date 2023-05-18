@@ -42,7 +42,8 @@ def _substitute_header_escape_chars(s: bytes) -> bytes:
     # \r, \n, \c, \\ in headers should be substituted accordingly. Other
     # escape symbols are not allowed.
     try:
-        return _HEADER_UNESCAPE_RE.sub(lambda m: _HEADER_UNESCAPE_CHARS[m[0]], s)
+        return _HEADER_UNESCAPE_RE.sub(
+            lambda m: _HEADER_UNESCAPE_CHARS[m[0]], s)
     except KeyError:
         raise ProtocolError('Invalid header.')
 
