@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Union
 import asyncio
 import logging
 from swpt_stomp.common import Message, WatermarkQueue
@@ -24,14 +24,16 @@ def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
 
 
 class StompClient(asyncio.Protocol):
-    """STOMP client that sends messages to STOMP server."""
+    """STOMP client that sends messages to STOMP server.
 
-    input_queue: asyncio.Queue[Message]
+    Putting `None` in the input message queue will close the connection.
+    """
+    input_queue: asyncio.Queue[Union[Message, None]]
     output_queue: WatermarkQueue[str]
 
     def __init__(
             self,
-            input_queue: asyncio.Queue[Message],
+            input_queue: asyncio.Queue[Union[Message, None]],
             output_queue: WatermarkQueue[str],
             *,
             host: Optional[str] = None,
@@ -208,6 +210,9 @@ class StompClient(asyncio.Protocol):
 
     def _close_with_error(self, message: str) -> None:
         _logger.warning('Protocol error: %s', message)
+        self._close()
+
+    def _close(self) -> None:
         assert self._transport
         self._transport.close()
         self._closed = True
@@ -229,6 +234,10 @@ class StompClient(asyncio.Protocol):
         queue = self.input_queue
         while await self._start_sending.wait():
             m = await queue.get()
+            if m is None:
+                self._close()
+                return
+
             self._send_message(m)
             queue.task_done()
 

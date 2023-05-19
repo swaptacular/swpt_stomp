@@ -272,3 +272,23 @@ def test_client_connected_timeout():
     loop.run_until_complete(wait_disconnect())
 
     c.connection_lost(None)
+
+
+def test_client_message_none():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    c = StompClient(input_queue, output_queue, hb_send_min=0, hb_recv_desired=0)
+    c.connection_made(transport)
+    transport.write.reset_mock()
+    c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
+
+    async def wait_disconnect():
+        while not c._closed:
+            await asyncio.sleep(0)
+
+    input_queue.put_nowait(None)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_disconnect())
+
+    c.connection_lost(None)
