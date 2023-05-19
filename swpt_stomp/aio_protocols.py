@@ -2,12 +2,12 @@ from __future__ import annotations
 from typing import Optional
 import asyncio
 import logging
-import time
 from swpt_stomp.common import Message, WatermarkQueue
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 
 DEFAULT_HB_SEND_MIN = 5_000  # 5 seconds
 DEFAULT_HB_RECV_DESIRED = 30_000  # 30 seconds
+DEFAULT_MAX_NETWORK_DELAY = 10_000  # 10 seconds
 
 # TODO: Configure an async logging handler, as explained here:
 #       https://stackoverflow.com/questions/45842926/python-asynchronous-logging
@@ -37,6 +37,7 @@ class StompClient(asyncio.Protocol):
             host: Optional[str] = None,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
+            max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
             send_destination: str = 'smp'
     ):
         assert hb_send_min >= 0
@@ -47,11 +48,13 @@ class StompClient(asyncio.Protocol):
         self._host = host
         self._hb_send_min = hb_send_min
         self._hb_recv_desired = hb_recv_desired
+        self._max_network_delay = max_network_delay
         self._send_destination = send_destination
         self._connected = False
         self._closed = False
         self._hb_send = 0
         self._hb_recv = 0
+        self._connection_made_at = 0.0
         self._data_receved_at = 0.0
         self._loop = asyncio.get_event_loop()
         self._parser = StompParser()
@@ -65,6 +68,7 @@ class StompClient(asyncio.Protocol):
             self,
             transport: asyncio.Transport,  # type: ignore[override]
     ) -> None:
+        self._connection_made_at = self._loop.time()
         self._transport = transport
 
         host = self._host
@@ -88,7 +92,7 @@ class StompClient(asyncio.Protocol):
         if self._closed:
             return
 
-        self._data_receved_at = time.time()
+        self._data_receved_at = self._loop.time()
         parser = self._parser
         try:
             parser.add_bytes(data)
@@ -174,8 +178,8 @@ class StompClient(asyncio.Protocol):
         loop = self._loop
 
         if self._hb_send != 0:
-            delay = self._calc_heartbeat_delay()
-            loop.call_later(delay, self._send_heartbeat)
+            loop.call_at(self._connection_made_at + self._hb_send / 1000,
+                         self._send_heartbeat)
 
         if self._hb_recv != 0:
             self._watchdog_task = loop.create_task(self._check_aliveness())
@@ -209,12 +213,7 @@ class StompClient(asyncio.Protocol):
         if not self._closed:
             assert self._transport
             self._transport.write(b'\n')
-            delay = self._calc_heartbeat_delay()
-            self._loop.call_later(delay, self._send_heartbeat)
-
-    def _calc_heartbeat_delay(self) -> float:
-        hb_send_with_tolerance = self._hb_send - DEFAULT_HB_SEND_MIN
-        return max(hb_send_with_tolerance, self._hb_send_min) / 1000
+            self._loop.call_later(self._hb_send / 1000, self._send_heartbeat)
 
     async def _send_input_messages(self) -> None:
         queue = self.input_queue
@@ -224,11 +223,13 @@ class StompClient(asyncio.Protocol):
             queue.task_done()
 
     async def _check_aliveness(self) -> None:
+        loop = self._loop
+        hb_recv_with_tolerance = self._hb_recv + self._max_network_delay
         sleep_seconds = DEFAULT_HB_SEND_MIN / 1000
-        watchdog_seconds = self._hb_recv / 1000 + 2 * sleep_seconds
+        watchdog_seconds = sleep_seconds + hb_recv_with_tolerance / 1000
         while not self._closed:
             await asyncio.sleep(sleep_seconds)
-            if time.time() - self._data_receved_at > watchdog_seconds:
+            if loop.time() - self._data_receved_at > watchdog_seconds:
                 self._close_with_error(
                     f'No data received for {watchdog_seconds:.3f} seconds.')
                 return

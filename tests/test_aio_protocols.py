@@ -119,6 +119,7 @@ def test_client_connection_error(data):
     transport.close.assert_called_once()
     assert not c._connected
     assert c._closed
+
     c.connection_lost(None)
 
 
@@ -145,6 +146,7 @@ def test_client_post_connection_error(data):
     transport.close.assert_called_once()
     assert c._connected
     assert c._closed
+
     c.connection_lost(None)
 
 
@@ -209,6 +211,8 @@ def test_client_pause_reading():
     transport.pause_reading.assert_called_once()
     transport.resume_reading.assert_called_once()
 
+    c.connection_lost(None)
+
 
 def test_client_send_heartbeats():
     input_queue = asyncio.Queue()
@@ -237,7 +241,8 @@ def test_client_recv_heartbeats():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
     transport = NonCallableMock(get_extra_info=Mock(return_value=None))
-    c = StompClient(input_queue, output_queue, hb_recv_desired=1)
+    c = StompClient(
+        input_queue, output_queue, hb_recv_desired=1, max_network_delay=1)
     c.connection_made(transport)
     c.data_received(b'CONNECTED\nversion:1.2\nheart-beat:1,0\n\n\x00')
     assert c._hb_recv == 1
