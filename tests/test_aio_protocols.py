@@ -255,3 +255,20 @@ def test_client_recv_heartbeats():
     loop.run_until_complete(wait_disconnect())
 
     c.connection_lost(None)
+
+
+def test_client_connected_timeout():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    c = StompClient(input_queue, output_queue, max_network_delay=1)
+    c.connection_made(transport)
+
+    async def wait_disconnect():
+        while not c._closed:
+            await asyncio.sleep(0)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_disconnect())
+
+    c.connection_lost(None)

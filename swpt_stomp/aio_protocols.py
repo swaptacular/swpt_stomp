@@ -68,7 +68,8 @@ class StompClient(asyncio.Protocol):
             self,
             transport: asyncio.Transport,  # type: ignore[override]
     ) -> None:
-        self._connection_made_at = self._loop.time()
+        loop = self._loop
+        self._connection_made_at = loop.time()
         self._transport = transport
 
         host = self._host
@@ -87,6 +88,8 @@ class StompClient(asyncio.Protocol):
         transport.write(bytes(connect_frame))
         self.output_queue.add_high_watermark_callback(transport.pause_reading)
         self.output_queue.add_low_watermark_callback(transport.resume_reading)
+        loop.call_later(self._max_network_delay / 1000,
+                        self._detect_connected_timeout)
 
     def data_received(self, data: bytes) -> None:
         if self._closed:
@@ -204,10 +207,17 @@ class StompClient(asyncio.Protocol):
         self._close_with_error(f'Received server error "{error_message}".')
 
     def _close_with_error(self, message: str) -> None:
-        assert self._transport
         _logger.warning('Protocol error: %s', message)
+        assert self._transport
         self._transport.close()
         self._closed = True
+
+    def _detect_connected_timeout(self) -> None:
+        if not self._connected:
+            _logger.warning('Protocol error: No response from the server.')
+            assert self._transport
+            self._transport.close()
+            self._closed = True
 
     def _send_heartbeat(self) -> None:
         if not self._closed:
