@@ -28,7 +28,7 @@ def test_client_connection():
     transport.write.reset_mock()
     transport.close.assert_not_called()
     assert not c._connected
-    assert not c._closed
+    assert not c._done
     assert c._writer_task is None
     assert c._watchdog_task is None
 
@@ -37,7 +37,7 @@ def test_client_connection():
     transport.write.assert_not_called()
     transport.close.assert_not_called()
     assert c._connected
-    assert not c._closed
+    assert not c._done
     assert c._hb_send == 8000
     assert c._hb_recv == 500
     assert isinstance(c._writer_task, asyncio.Task)
@@ -59,7 +59,7 @@ def test_client_connection():
     transport.write.reset_mock()
     transport.close.assert_not_called()
     assert c._connected
-    assert not c._closed
+    assert not c._done
 
     # Get a receipt confirmation from the server.
     c.data_received(b'RECEIPT\nreceipt-id:m1\n\n\x00')
@@ -67,7 +67,7 @@ def test_client_connection():
     transport.close.assert_not_called()
     assert output_queue.get_nowait() == 'm1'
     assert c._connected
-    assert not c._closed
+    assert not c._done
 
     # Receive a server error.
     c.data_received(b'ERROR\nmessage:test-error\n\n\x00')
@@ -75,21 +75,21 @@ def test_client_connection():
     transport.close.assert_called_once()
     transport.close.reset_mock()
     assert c._connected
-    assert c._closed
+    assert c._done
 
     # Receive data on a closed connection.
     c.data_received(b'XXX\n\n\x00')
     transport.write.assert_not_called()
     transport.close.assert_not_called()
     assert c._connected
-    assert c._closed
+    assert c._done
 
     # Send message to a closed connection.
     c._send_message(m)
     transport.write.assert_not_called()
     transport.close.assert_not_called()
     assert c._connected
-    assert c._closed
+    assert c._done
 
     # The connection has been lost.
     c.connection_lost(None)
@@ -118,7 +118,7 @@ def test_client_connection_error(data):
     transport.write.assert_not_called()
     transport.close.assert_called_once()
     assert not c._connected
-    assert c._closed
+    assert c._done
 
     c.connection_lost(None)
 
@@ -138,14 +138,14 @@ def test_client_post_connection_error(data):
     transport.write.reset_mock()
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
     assert c._connected
-    assert not c._closed
+    assert not c._done
     assert c._hb_send == 0
     assert c._hb_recv == 0
     c.data_received(data)
     transport.write.assert_not_called()
     transport.close.assert_called_once()
     assert c._connected
-    assert c._closed
+    assert c._done
 
     c.connection_lost(None)
 
@@ -248,7 +248,7 @@ def test_client_recv_heartbeats():
     assert c._hb_recv == 1
 
     async def wait_disconnect():
-        while not c._closed:
+        while not c._done:
             await asyncio.sleep(0)
 
     loop = asyncio.get_event_loop()
@@ -265,7 +265,7 @@ def test_client_connected_timeout():
     c.connection_made(transport)
 
     async def wait_disconnect():
-        while not c._closed:
+        while not c._done:
             await asyncio.sleep(0)
 
     loop = asyncio.get_event_loop()
@@ -284,7 +284,7 @@ def test_client_message_none():
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
 
     async def wait_disconnect():
-        while not c._closed:
+        while not c._done:
             await asyncio.sleep(0)
 
     input_queue.put_nowait(None)

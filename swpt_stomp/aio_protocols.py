@@ -53,7 +53,7 @@ class StompClient(asyncio.Protocol):
         self._max_network_delay = max_network_delay
         self._send_destination = send_destination
         self._connected = False
-        self._closed = False
+        self._done = False
         self._hb_send = 0
         self._hb_recv = 0
         self._connection_made_at = 0.0
@@ -94,7 +94,7 @@ class StompClient(asyncio.Protocol):
                         self._detect_connected_timeout)
 
     def data_received(self, data: bytes) -> None:
-        if self._closed:
+        if self._done:
             return
 
         self._data_receved_at = self._loop.time()
@@ -116,11 +116,11 @@ class StompClient(asyncio.Protocol):
             else:
                 self._close_with_error(f'Received unexpected command "{cmd}".')
 
-            if self._closed:
+            if self._done:
                 break
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
-        self._closed = True
+        self._done = True
 
         if self._writer_task:
             self._writer_task.cancel('connection lost')
@@ -142,7 +142,7 @@ class StompClient(asyncio.Protocol):
         self._start_sending.set()
 
     def _send_message(self, message: Message) -> None:
-        if self._closed:
+        if self._done:
             return
 
         message_frame = StompFrame(
@@ -215,17 +215,17 @@ class StompClient(asyncio.Protocol):
     def _close(self) -> None:
         assert self._transport
         self._transport.close()
-        self._closed = True
+        self._done = True
 
     def _detect_connected_timeout(self) -> None:
         if not self._connected:
             _logger.warning('Protocol error: No response from the server.')
             assert self._transport
             self._transport.close()
-            self._closed = True
+            self._done = True
 
     def _send_heartbeat(self) -> None:
-        if not self._closed:
+        if not self._done:
             assert self._transport
             self._transport.write(b'\n')
             self._loop.call_later(self._hb_send / 1000, self._send_heartbeat)
@@ -246,7 +246,7 @@ class StompClient(asyncio.Protocol):
         hb_recv_with_tolerance = self._hb_recv + self._max_network_delay
         sleep_seconds = DEFAULT_HB_SEND_MIN / 1000
         watchdog_seconds = sleep_seconds + hb_recv_with_tolerance / 1000
-        while not self._closed:
+        while not self._done:
             await asyncio.sleep(sleep_seconds)
             if loop.time() - self._data_receved_at > watchdog_seconds:
                 self._close_with_error(
