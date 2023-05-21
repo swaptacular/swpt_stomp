@@ -346,8 +346,9 @@ class StompServer(BaseStompProtocol[str, Message]):
             max_network_delay=max_network_delay,
         )
         self._recv_destination = recv_destination
+        self._last_message_id: Union[str, None] = None
+        self._last_receipt_id: Union[str, None] = None
         self._disconnect_receipt_id: Union[str, None] = None
-        self._pending_receipts: set[str] = set()  # TODO: Do not use set!
 
     def data_received(self, data: bytes) -> None:
         super().data_received(data)
@@ -414,7 +415,7 @@ class StompServer(BaseStompProtocol[str, Message]):
             body=frame.body,
         )
         self.output_queue.put_nowait(message)
-        self._pending_receipts.add(message_id)
+        self._last_message_id = message_id
 
     def _received_disconnect_command(self, frame: StompFrame) -> None:
         if not self._connected:
@@ -427,7 +428,8 @@ class StompServer(BaseStompProtocol[str, Message]):
             self._close_with_error('DISCONNECT command without a receipt ID.')
             return
 
-        if len(self._pending_receipts) == 0:
+        if (self._last_message_id is None
+                or self._last_message_id == self._last_receipt_id):
             self._send_receipt_command(self._disconnect_receipt_id)
             self._close()
 
@@ -440,14 +442,14 @@ class StompServer(BaseStompProtocol[str, Message]):
         if self._done:
             return
 
-        self._pending_receipts.discard(receipt_id)
         if (self._disconnect_receipt_id is not None
-                and len(self._pending_receipts) == 0):
+                and self._last_message_id == receipt_id):
             self._send_receipt_command(self._disconnect_receipt_id)
             self._close()
             return
 
         self._send_receipt_command(receipt_id)
+        self._last_receipt_id = receipt_id
 
     def _close_gracefully(self) -> None:
         self._close_with_error('The connection has been closed by the server.')
