@@ -170,7 +170,7 @@ class BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
         queue = self.input_queue
         while await self._start_sending.wait():
             obj = await queue.get()
-            if obj is None:
+            if obj is None:  # TODO: Allow passing an error object.
                 self._close_gracefully()
                 return
 
