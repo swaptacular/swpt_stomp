@@ -27,7 +27,7 @@ _U = TypeVar('_U')
 _V = TypeVar('_V')
 
 
-class BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
+class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
     """Implements functionality common for STOMP clients and servers.
     """
     input_queue: asyncio.Queue[Union[_U, None]]
@@ -178,7 +178,7 @@ class BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
             queue.task_done()
 
 
-class StompClient(BaseStompProtocol[Message, str]):
+class StompClient(_BaseStompProtocol[Message, str]):
     """STOMP client that sends messages to STOMP server.
 
     Putting `None` in the input message queue will close the connection.
@@ -321,7 +321,7 @@ class StompClient(BaseStompProtocol[Message, str]):
         self._close()
 
 
-class StompServer(BaseStompProtocol[str, Message]):
+class StompServer(_BaseStompProtocol[str, Message]):
     """STOMP server that receives messages from STOMP client.
 
     Putting `None` in the input message queue will close the connection.
