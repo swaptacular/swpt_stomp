@@ -5,6 +5,10 @@ from swpt_stomp.common import WatermarkQueue, Message
 from swpt_stomp.aio_protocols import StompClient
 
 
+#######################
+# `StompClient` tests #
+#######################
+
 def test_client_connection():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
@@ -85,7 +89,7 @@ def test_client_connection():
     assert c._done
 
     # Send message to a closed connection.
-    c._send_message(m)
+    c._send_frame(m)
     transport.write.assert_not_called()
     transport.close.assert_not_called()
     assert c._connected
@@ -93,6 +97,7 @@ def test_client_connection():
 
     # The connection has been lost.
     c.connection_lost(None)
+    assert output_queue.get_nowait() is None
     assert c._writer_task is None
     assert c._watchdog_task is None
     transport.write.assert_not_called()
@@ -121,6 +126,7 @@ def test_client_connection_error(data):
     assert c._done
 
     c.connection_lost(None)
+    assert output_queue.get_nowait() is None
 
 
 @pytest.mark.parametrize("data", [
@@ -148,6 +154,7 @@ def test_client_post_connection_error(data):
     assert c._done
 
     c.connection_lost(None)
+    assert output_queue.get_nowait() is None
 
 
 def test_client_pause_writing():
@@ -181,6 +188,7 @@ def test_client_pause_writing():
     transport.write.assert_called_once()
 
     c.connection_lost(None)
+    assert output_queue.get_nowait() is None
 
 
 def test_client_pause_reading():
@@ -212,6 +220,7 @@ def test_client_pause_reading():
     transport.resume_reading.assert_called_once()
 
     c.connection_lost(None)
+    assert output_queue.get_nowait() is None
 
 
 def test_client_send_heartbeats():
@@ -234,6 +243,7 @@ def test_client_send_heartbeats():
     transport.write.assert_called_with(b'\n')
 
     c.connection_lost(None)
+    assert output_queue.get_nowait() is None
 
 
 @patch('swpt_stomp.aio_protocols.DEFAULT_HB_SEND_MIN', new=1)
@@ -272,9 +282,10 @@ def test_client_connected_timeout():
     loop.run_until_complete(wait_disconnect())
 
     c.connection_lost(None)
+    assert output_queue.get_nowait() is None
 
 
-def test_client_message_none():
+def test_client_graceful_disconnect_no_messages():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
     transport = NonCallableMock(get_extra_info=Mock(return_value=None))
@@ -284,11 +295,53 @@ def test_client_message_none():
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
 
     async def wait_disconnect():
-        while not c._done:
+        while not c._sent_disconnect:
             await asyncio.sleep(0)
 
     input_queue.put_nowait(None)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_disconnect())
+    assert not c._done
+
+    c.data_received(b'RECEIPT\nreceipt-id:disconnect\n\n\x00')
+    assert c._done
 
     c.connection_lost(None)
+    assert output_queue.get_nowait() == 'disconnect'
+    assert output_queue.get_nowait() is None
+
+
+def test_client_graceful_disconnect():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    c = StompClient(input_queue, output_queue, hb_send_min=0, hb_recv_desired=0)
+    c.connection_made(transport)
+    transport.write.reset_mock()
+    c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
+    m = Message(id='m1', content_type='text/plain', body=bytearray(b'1'))
+    input_queue.put_nowait(m)
+
+    async def wait_disconnect():
+        while not c._sent_disconnect:
+            await asyncio.sleep(0)
+
+    input_queue.put_nowait(None)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_disconnect())
+    assert not c._done
+
+    c.data_received(b'RECEIPT\nreceipt-id:m0\n\n\x00')
+    assert not c._done
+    c.data_received(b'RECEIPT\nreceipt-id:m1\n\n\x00')
+    assert c._done
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait() == 'm0'
+    assert output_queue.get_nowait() == 'm1'
+    assert output_queue.get_nowait() is None
+
+
+#######################
+# `StompServer` tests #
+#######################
