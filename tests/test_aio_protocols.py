@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from unittest.mock import NonCallableMock, Mock, patch
+from unittest.mock import NonCallableMock, Mock, patch, call
 from swpt_stomp.common import WatermarkQueue, Message
 from swpt_stomp.aio_protocols import ServerError, StompClient, StompServer
 
@@ -390,7 +390,7 @@ def test_server_connection(cmd):
     assert isinstance(c._writer_task, asyncio.Task)
     assert isinstance(c._watchdog_task, asyncio.Task)
 
-    # Receive a message.
+    # Receive two messages, and a disconnect command.
     c.data_received(
         b'SEND\n'
         b'destination:dest\n'
@@ -400,28 +400,31 @@ def test_server_connection(cmd):
         b'\n'
         b'1\x00'
     )
-    m = output_queue.get_nowait()
-    assert m.id == 'm1'
-    assert m.content_type == 'text/plain'
-    assert m.body == b'1'
+    c.data_received(
+        b'SEND\n'
+        b'destination:dest\n'
+        b'content-type:text/plain\n'
+        b'receipt:m2\n'
+        b'content-length:1\n'
+        b'\n'
+        b'1\x00'
+    )
+    c.data_received(b'DISCONNECT\nreceipt:m2\n\n\x00')
     transport.write.assert_not_called()
     transport.close.assert_not_called()
     assert c._connected
     assert not c._done
 
-    # Send a confirmation to the client.
+    # Send confirmations to the client.
     input_queue.put_nowait('m1')
+    input_queue.put_nowait('m2')
     loop = asyncio.get_event_loop()
     loop.run_until_complete(input_queue.join())
-    transport.write.assert_called_with(b'RECEIPT\nreceipt-id:m1\n\n\x00')
-    transport.write.reset_mock()
-    transport.close.assert_not_called()
-    assert c._connected
-    assert not c._done
-
-    # Receive a disconnect command.
-    c.data_received(b'DISCONNECT\nreceipt:m1\n\n\x00')
-    transport.write.assert_called_with(b'RECEIPT\nreceipt-id:m1\n\n\x00')
+    assert transport.write.call_count == 2
+    assert transport.write.call_args_list == [
+        call(b'RECEIPT\nreceipt-id:m1\n\n\x00'),
+        call(b'RECEIPT\nreceipt-id:m2\n\n\x00'),
+    ]
     transport.write.reset_mock()
     transport.close.assert_called_once()
     transport.close.reset_mock()
@@ -432,7 +435,6 @@ def test_server_connection(cmd):
     c.data_received(b'XXX\n\n\x00')
     transport.write.assert_not_called()
     transport.close.assert_not_called()
-    assert output_queue.empty()
     assert c._connected
     assert c._done
 
@@ -445,6 +447,8 @@ def test_server_connection(cmd):
 
     # The connection has been lost.
     c.connection_lost(None)
+    assert output_queue.get_nowait().id == 'm1'
+    assert output_queue.get_nowait().id == 'm2'
     assert output_queue.get_nowait() is None
     transport.write.assert_not_called()
     transport.close.assert_not_called()
@@ -455,6 +459,8 @@ def test_server_connection(cmd):
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_for_cancelation())
+    transport.write.assert_not_called()
+    transport.close.assert_not_called()
     assert c._writer_task.cancelled()
     assert c._watchdog_task.cancelled()
 
@@ -535,10 +541,8 @@ def test_server_command_after_disconnect():
 
     c.data_received(b'SEND\ndestination:smp\nreceipt:m2\n\n\body\x00',)
     transport.write.assert_called_once()
-    assert (
-        b'ERROR\nmessage:Received command after DISCONNECT.\n\n\x00'
-        == transport.write.call_args[0][0]
-    )
+    transport.write.assert_called_with(
+        b'ERROR\nmessage:Received command after DISCONNECT.\n\n\x00')
     transport.close.assert_called_once()
     assert c._connected
     assert c._done
@@ -563,10 +567,8 @@ def test_server_close_gracefully():
     loop = asyncio.get_event_loop()
     loop.run_until_complete(input_queue.join())
     transport.write.assert_called_once()
-    assert (
-        b'ERROR\nmessage:The connection has been closed by the server.\n\n\x00'
-        == transport.write.call_args[0][0]
-    )
+    transport.write.assert_called_with(
+        b'ERROR\nmessage:The connection has been closed by the server.\n\n\x00')
     transport.close.assert_called_once()
     assert c._connected
     assert c._done
@@ -595,6 +597,25 @@ def test_server_close_gracefully_with_error():
     assert error_frame.endswith(b'\n\nc1\x00')
     assert b'message:err1\n' in error_frame
     assert b'receipt-id:m1\n' in error_frame
+    transport.close.assert_called_once()
+    assert c._connected
+    assert c._done
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait() is None
+
+
+def test_server_immediate_disconnect():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(input_queue, output_queue)
+    c.connection_made(transport)
+    c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
+    transport.write.reset_mock()
+    c.data_received(b'DISCONNECT\nreceipt:m1\n\n\x00')
+    transport.write.assert_called_once()
+    transport.write.called_with((b'RECEIPT\nreceipt-id:m1\n\n\x00'))
     transport.close.assert_called_once()
     assert c._connected
     assert c._done
