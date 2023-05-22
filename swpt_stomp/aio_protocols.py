@@ -329,7 +329,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
     def _close_gracefully(self, error: Optional[ServerError]) -> None:
         last_msg_id = self._last_message_id
         if last_msg_id is None or last_msg_id == self._last_receipt_id:
-            # All sent messages (if any) have been confirmed.
+            # All sent messages have been confirmed.
             self._close()
             return
 
@@ -470,8 +470,9 @@ class StompServer(_BaseStompProtocol[str, Message]):
             self._close_with_error('DISCONNECT command without a receipt ID.')
             return
 
-        if (self._last_message_id is None
-                or self._last_message_id == self._last_receipt_id):
+        last_msg_id = self._last_message_id
+        if (last_msg_id is None or last_msg_id == self._last_receipt_id):
+            # All received messages have been confirmed.
             self._send_receipt_command(self._disconnect_receipt_id)
             self._close()
 
@@ -484,9 +485,9 @@ class StompServer(_BaseStompProtocol[str, Message]):
         if self._done:
             return
 
-        if (self._disconnect_receipt_id is not None
-                and self._last_message_id == receipt_id):
-            self._send_receipt_command(self._disconnect_receipt_id)
+        disconnect_id = self._disconnect_receipt_id
+        if (disconnect_id is not None and receipt_id == self._last_message_id):
+            self._send_receipt_command(disconnect_id)
             self._close()
             return
 
