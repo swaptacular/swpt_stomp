@@ -613,12 +613,74 @@ def test_server_immediate_disconnect():
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
-    c.data_received(b'DISCONNECT\nreceipt:m1\n\n\x00')
+    c.data_received(b'DISCONNECT\nreceipt:x\n\n\x00')
     transport.write.assert_called_once()
-    transport.write.called_with((b'RECEIPT\nreceipt-id:m1\n\n\x00'))
+    transport.write.called_with((b'RECEIPT\nreceipt-id:x\n\n\x00'))
     transport.close.assert_called_once()
     assert c._connected
     assert c._done
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait() is None
+
+
+def test_server_send_heartbeats():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(input_queue, output_queue, hb_send_min=1)
+    c.connection_made(transport)
+    c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,1\n\n\x00')
+    transport.write.reset_mock()
+    assert c._hb_send == 1
+
+    async def wait_for_write():
+        while not transport.write.called:
+            await asyncio.sleep(0)
+
+    transport.write.assert_not_called()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_for_write())
+    transport.write.assert_called_with(b'\n')
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait() is None
+
+
+@patch('swpt_stomp.aio_protocols.DEFAULT_HB_SEND_MIN', new=1)
+def test_server_recv_heartbeats():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(
+        input_queue, output_queue, hb_recv_desired=1, max_network_delay=1)
+    c.connection_made(transport)
+    c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:1,0\n\n\x00')
+    assert c._hb_recv == 1
+
+    async def wait_disconnect():
+        while not c._done:
+            await asyncio.sleep(0)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_disconnect())
+
+    c.connection_lost(None)
+
+
+def test_server_connected_timeout():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(input_queue, output_queue, max_network_delay=1)
+    c.connection_made(transport)
+
+    async def wait_disconnect():
+        while not c._done:
+            await asyncio.sleep(0)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_disconnect())
 
     c.connection_lost(None)
     assert output_queue.get_nowait() is None
