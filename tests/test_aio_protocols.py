@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import NonCallableMock, Mock, patch
 from swpt_stomp.common import WatermarkQueue, Message
-from swpt_stomp.aio_protocols import StompClient
+from swpt_stomp.aio_protocols import StompClient, StompServer
 
 
 #######################
@@ -345,3 +345,99 @@ def test_client_graceful_disconnect():
 #######################
 # `StompServer` tests #
 #######################
+
+def test_server_connection():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+
+    # create instance
+    c = StompServer(
+        input_queue,
+        output_queue,
+        hb_send_min=500,
+        hb_recv_desired=8000,
+        recv_destination='dest',
+    )
+    assert c.input_queue is input_queue
+    assert c.output_queue is output_queue
+
+    # Make a connection to the server.
+    transport = NonCallableMock(get_extra_info=Mock(return_value=('my',)))
+    c.connection_made(transport)
+    transport.write.assert_not_called()
+    transport.write.reset_mock()
+    transport.close.assert_not_called()
+    assert not c._connected
+    assert not c._done
+    assert c._writer_task is None
+    assert c._watchdog_task is None
+
+    # Received "CONNECT" from the server.
+    c.data_received(
+        b'CONNECT\naccept-version:1.2\nhost:my\nheart-beat:1000,90\n\n\x00')
+    transport.write.assert_called_with(
+        b'CONNECTED\nversion:1.2\nheart-beat:500,8000\n\n\x00')
+    transport.write.reset_mock()
+    transport.close.assert_not_called()
+    assert c._connected
+    assert not c._done
+    assert c._hb_send == 500
+    assert c._hb_recv == 8000
+    assert isinstance(c._writer_task, asyncio.Task)
+    assert isinstance(c._watchdog_task, asyncio.Task)
+
+    # # Put a message in the input queue.
+    # m = Message(id='m1', content_type='text/plain', body=bytearray(b'1'))
+    # input_queue.put_nowait(m)
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(input_queue.join())
+    # transport.write.assert_called_with(
+    #     b'SEND\n'
+    #     b'destination:dest\n'
+    #     b'content-type:text/plain\n'
+    #     b'receipt:m1\n'
+    #     b'content-length:1\n'
+    #     b'\n'
+    #     b'1\x00')
+    # transport.write.reset_mock()
+    # transport.close.assert_not_called()
+    # assert c._connected
+    # assert not c._done
+
+    # # Get a receipt confirmation from the server.
+    # c.data_received(b'RECEIPT\nreceipt-id:m1\n\n\x00')
+    # transport.write.assert_not_called()
+    # transport.close.assert_not_called()
+    # assert output_queue.get_nowait() == 'm1'
+    # assert c._connected
+    # assert not c._done
+
+    # # Receive a server error.
+    # c.data_received(b'ERROR\nmessage:test-error\n\n\x00')
+    # transport.write.assert_not_called()
+    # transport.close.assert_called_once()
+    # transport.close.reset_mock()
+    # assert c._connected
+    # assert c._done
+
+    # # Receive data on a closed connection.
+    # c.data_received(b'XXX\n\n\x00')
+    # transport.write.assert_not_called()
+    # transport.close.assert_not_called()
+    # assert c._connected
+    # assert c._done
+
+    # # Send message to a closed connection.
+    # c._send_frame(m)
+    # transport.write.assert_not_called()
+    # transport.close.assert_not_called()
+    # assert c._connected
+    # assert c._done
+
+    # # The connection has been lost.
+    # c.connection_lost(None)
+    # assert output_queue.get_nowait() is None
+    # assert c._writer_task is None
+    # assert c._watchdog_task is None
+    # transport.write.assert_not_called()
+    # transport.close.assert_not_called()

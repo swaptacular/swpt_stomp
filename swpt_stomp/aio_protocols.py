@@ -126,7 +126,6 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
             self._close_with_error('Received invalid heart-beat value.')
             return
 
-        self._connected = True
         self._hb_send = _calc_heartbeat(self._hb_send_min, hb_recv_desired)
         self._hb_recv = _calc_heartbeat(hb_send_min, self._hb_recv_desired)
         loop = self._loop
@@ -139,6 +138,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
             self._watchdog_task = loop.create_task(self._check_aliveness())
 
         self._writer_task = loop.create_task(self._process_input_queue())
+        self._connected = True
 
     def _detect_connected_timeout(self) -> None:
         if not self._connected:
@@ -404,6 +404,18 @@ class StompServer(_BaseStompProtocol[str, Message]):
             return
 
         self._connect(frame.headers.get('heart-beat', '0,0'))
+
+        if self._connected:
+            connected_frame = StompFrame(
+                command='CONNECTED',
+                headers={
+                    'version': '1.2',
+                    'heart-beat': f'{self._hb_send_min},{self._hb_recv_desired}',
+                },
+            )
+            assert self._transport
+            self._transport
+            self._transport.write(bytes(connected_frame))
 
     def _received_send_command(self, frame: StompFrame) -> None:
         if not self._connected:
