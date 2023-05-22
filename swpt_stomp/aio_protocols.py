@@ -36,6 +36,10 @@ class ServerError:
     receipt_id: Union[str, None]
 
 
+_U = TypeVar('_U')
+_V = TypeVar('_V')
+
+
 class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
     """Implements functionality common for STOMP clients and servers.
     """
@@ -161,6 +165,17 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
                     f'No data received for {watchdog_seconds:.3f} seconds.')
                 return
 
+    async def _process_input_queue(self) -> None:
+        queue = self.input_queue
+        while await self._start_sending.wait():
+            obj = await queue.get()
+            if obj is None or isinstance(obj, ServerError):
+                self._close_gracefully(obj)
+                return
+
+            self._send_frame(obj)
+            queue.task_done()
+
     def _close(self) -> None:
         assert self._transport
         self._transport.close()
@@ -174,17 +189,6 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
 
     def _send_frame(self, content: _U) -> None:
         raise NotImplementedError()  # pragma: nocover
-
-    async def _process_input_queue(self) -> None:
-        queue = self.input_queue
-        while await self._start_sending.wait():
-            obj = await queue.get()
-            if obj is None or isinstance(obj, ServerError):
-                self._close_gracefully(obj)
-                return
-
-            self._send_frame(obj)
-            queue.task_done()
 
 
 class StompClient(_BaseStompProtocol[Message, str]):
