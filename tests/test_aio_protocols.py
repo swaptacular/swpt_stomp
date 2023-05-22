@@ -350,7 +350,8 @@ def test_client_graceful_disconnect():
 # `StompServer` tests #
 #######################
 
-def test_server_connection():
+@pytest.mark.parametrize("cmd", [b'CONNECT', b'STOMP'])
+def test_server_connection(cmd):
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
 
@@ -366,7 +367,7 @@ def test_server_connection():
     assert c.output_queue is output_queue
 
     # Receive a connection from the client.
-    transport = NonCallableMock()
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
     c.connection_made(transport)
     transport.write.assert_not_called()
     transport.close.assert_not_called()
@@ -375,9 +376,9 @@ def test_server_connection():
     assert c._writer_task is None
     assert c._watchdog_task is None
 
-    # Received "CONNECT" from the client.
+    # Received "CONNECT" or "STOMP" from the client.
     c.data_received(
-        b'CONNECT\naccept-version:1.2\nhost:my\nheart-beat:500,8000\n\n\x00')
+        cmd + b'\naccept-version:1.1,1.2\nhost:my\nheart-beat:500,8000\n\n\x00')
     transport.write.assert_called_with(
         b'CONNECTED\nversion:1.2\nheart-beat:1000,90\n\n\x00')
     transport.write.reset_mock()
@@ -454,3 +455,90 @@ def test_server_connection():
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_for_cancelation())
+    assert c._writer_task.cancelled()
+    assert c._watchdog_task.cancelled()
+
+
+@pytest.mark.parametrize("data", [
+    b'protocol error',
+    b'INVALIDCMD\n\n\x00',
+    b'CONNECT\naccept-version:1.0\nheart-beat:500,8000\n\n\x00',
+    b'CONNECT\naccept-version:1.0,1.1\nheart-beat:500,8000\n\n\x00',
+    b'CONNECT\naccept-version:1.2\nheart-beat:invalid\n\n\x00',
+    b'CONNECT\naccept-version:1.2\nheart-beat:-10,0\n\n\x00',
+    b'DISCONNECT\nreceipt:m1\n\n\x00',
+    b'SEND\ndestination:dest\nreceipt:m1\n\n\body\x00',
+])
+def test_server_connection_error(data):
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(input_queue, output_queue)
+    c.connection_made(transport)
+    assert not c._connected
+    assert not c._done
+
+    c.data_received(data)
+    transport.write.assert_called_once()
+    assert b'ERROR' in transport.write.call_args[0][0]
+    transport.close.assert_called_once()
+    assert not c._connected
+    assert c._done
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait() is None
+
+
+@pytest.mark.parametrize("data", [
+    b'protocol error',
+    b'INVALIDCMD\n\n\x00',
+    b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00',
+    b'SEND\ndestination:smp\n\nbody\x00',
+    b'SEND\ndestination:xxx\nreceipt:m1\n\nbody\x00',
+    b'DISCONNECT\n\n\x00',
+])
+def test_server_post_connection_error(data):
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(input_queue, output_queue)
+    c.connection_made(transport)
+    c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
+    transport.write.reset_mock()
+    assert c._connected
+    assert not c._done
+
+    c.data_received(data)
+    transport.write.assert_called_once()
+    assert b'ERROR' in transport.write.call_args[0][0]
+    transport.close.assert_called_once()
+    assert c._connected
+    assert c._done
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait() is None
+
+
+def test_server_command_after_disconnect():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(input_queue, output_queue)
+    c.connection_made(transport)
+    c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
+    transport.write.reset_mock()
+    c.data_received(b'SEND\ndestination:smp\nreceipt:m1\n\n\body\x00',)
+    c.data_received(b'DISCONNECT\nreceipt:m1\n\n\x00')
+    transport.write.assert_not_called()
+    assert c._connected
+    assert not c._done
+
+    c.data_received(b'SEND\ndestination:smp\nreceipt:m2\n\n\body\x00',)
+    transport.write.assert_called_once()
+    assert (
+        b'ERROR\nmessage:Received command after DISCONNECT.\n\n\x00'
+        == transport.write.call_args[0][0]
+    )
+    transport.close.assert_called_once()
+    assert c._connected
+    assert c._done
