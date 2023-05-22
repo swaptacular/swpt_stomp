@@ -320,11 +320,13 @@ class StompClient(_BaseStompProtocol[Message, str]):
         self._last_message_id = message.id
 
     def _close_gracefully(self, error: Union[None, ServerError]) -> None:
-        if self._last_message_id is None:
-            self._last_message_id = 'disconnect'
+        last_msg_id = self._last_message_id
+        if last_msg_id is None or last_msg_id == self._last_receipt_id:
+            # All sent messages (if any) have been confirmed.
+            self._close()
+            return
 
-        disconnect_frame = StompFrame(
-            'DISCONNECT', {'receipt': self._last_message_id})
+        disconnect_frame = StompFrame('DISCONNECT', {'receipt': last_msg_id})
         assert self._transport
         self._transport.write(bytes(disconnect_frame))
         self._sent_disconnect = True
