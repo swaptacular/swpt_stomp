@@ -241,7 +241,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
             host = 'default' if (peername is None) else peername[0]
 
         connect_frame = StompFrame(
-            command='CONNECT',
+            command='STOMP',
             headers={
                 'accept-version': '1.2',
                 'host': host,

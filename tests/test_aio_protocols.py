@@ -28,7 +28,7 @@ def test_client_connection():
     transport = NonCallableMock(get_extra_info=Mock(return_value=('my',)))
     c.connection_made(transport)
     transport.write.assert_called_with(
-        b'CONNECT\naccept-version:1.2\nhost:my\nheart-beat:1000,90\n\n\x00')
+        b'STOMP\naccept-version:1.2\nhost:my\nheart-beat:1000,90\n\n\x00')
     transport.write.reset_mock()
     transport.close.assert_not_called()
     assert not c._connected
