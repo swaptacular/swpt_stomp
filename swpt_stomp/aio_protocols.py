@@ -33,7 +33,8 @@ class ServerError:
     must be closed.
     """
     message: str
-    receipt_id: Union[str, None]
+    receipt_id: Optional[str] = None
+    context: Optional[bytes] = None
 
 
 _U = TypeVar('_U')
@@ -181,7 +182,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
         self._transport.close()
         self._done = True
 
-    def _close_gracefully(self, error: Union[None, ServerError]) -> None:
+    def _close_gracefully(self, error: Optional[ServerError]) -> None:
         raise NotImplementedError()  # pragma: nocover
 
     def _close_with_error(self, message: str) -> None:
@@ -218,8 +219,8 @@ class StompClient(_BaseStompProtocol[Message, str]):
         )
         self._host = host
         self._send_destination = send_destination
-        self._last_message_id: Union[str, None] = None
-        self._last_receipt_id: Union[str, None] = None
+        self._last_message_id: Optional[str] = None
+        self._last_receipt_id: Optional[str] = None
         self._sent_disconnect = False
 
     def connection_made(
@@ -319,7 +320,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
         self._transport.write(bytes(message_frame))
         self._last_message_id = message.id
 
-    def _close_gracefully(self, error: Union[None, ServerError]) -> None:
+    def _close_gracefully(self, error: Optional[ServerError]) -> None:
         last_msg_id = self._last_message_id
         if last_msg_id is None or last_msg_id == self._last_receipt_id:
             # All sent messages (if any) have been confirmed.
@@ -361,9 +362,9 @@ class StompServer(_BaseStompProtocol[str, Message]):
             max_network_delay=max_network_delay,
         )
         self._recv_destination = recv_destination
-        self._last_message_id: Union[str, None] = None
-        self._last_receipt_id: Union[str, None] = None
-        self._disconnect_receipt_id: Union[str, None] = None
+        self._last_message_id: Optional[str] = None
+        self._last_receipt_id: Optional[str] = None
+        self._disconnect_receipt_id: Optional[str] = None
 
     def data_received(self, data: bytes) -> None:
         super().data_received(data)
@@ -478,9 +479,9 @@ class StompServer(_BaseStompProtocol[str, Message]):
         self._send_receipt_command(receipt_id)
         self._last_receipt_id = receipt_id
 
-    def _close_gracefully(self, error: Union[None, ServerError]) -> None:
+    def _close_gracefully(self, error: Optional[ServerError]) -> None:
         if isinstance(error, ServerError):
-            self._close_with_error(error.message, error.receipt_id)
+            self._close_with_error(error.message, error.receipt_id, error.context)
             return
 
         self._close_with_error('The connection has been closed by the server.')
@@ -489,6 +490,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             self,
             message: str,
             receipt_id: Optional[str] = None,
+            context: Optional[bytes] = None,
     ) -> None:
         transport = self._transport
         assert transport
@@ -497,7 +499,8 @@ class StompServer(_BaseStompProtocol[str, Message]):
             if receipt_id is not None:
                 headers['receipt-id'] = receipt_id
 
-            error_frame = StompFrame('ERROR', headers)
+            body = bytearray() if context is None else bytearray(context)
+            error_frame = StompFrame('ERROR', headers, body)
             transport.write(bytes(error_frame))
 
         _logger.warning('Protocol error: %s', message)
