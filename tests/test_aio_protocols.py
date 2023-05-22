@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import NonCallableMock, Mock, patch
 from swpt_stomp.common import WatermarkQueue, Message
-from swpt_stomp.aio_protocols import StompClient, StompServer
+from swpt_stomp.aio_protocols import ServerError, StompClient, StompServer
 
 
 #######################
@@ -542,3 +542,62 @@ def test_server_command_after_disconnect():
     transport.close.assert_called_once()
     assert c._connected
     assert c._done
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait().id == 'm1'
+    assert output_queue.get_nowait() is None
+
+
+def test_server_close_gracefully():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(input_queue, output_queue)
+    c.connection_made(transport)
+    c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
+    transport.write.reset_mock()
+    assert c._connected
+    assert not c._done
+
+    input_queue.put_nowait(None)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(input_queue.join())
+    transport.write.assert_called_once()
+    assert (
+        b'ERROR\nmessage:The connection has been closed by the server.\n\n\x00'
+        == transport.write.call_args[0][0]
+    )
+    transport.close.assert_called_once()
+    assert c._connected
+    assert c._done
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait() is None
+
+
+def test_server_close_gracefully_with_error():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(input_queue, output_queue)
+    c.connection_made(transport)
+    c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
+    transport.write.reset_mock()
+    assert c._connected
+    assert not c._done
+
+    input_queue.put_nowait(ServerError('err1', 'm1', b'c1'))
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(input_queue.join())
+    transport.write.assert_called_once()
+    error_frame = transport.write.call_args[0][0]
+    assert error_frame.startswith(b'ERROR\n')
+    assert error_frame.endswith(b'\n\nc1\x00')
+    assert b'message:err1\n' in error_frame
+    assert b'receipt-id:m1\n' in error_frame
+    transport.close.assert_called_once()
+    assert c._connected
+    assert c._done
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait() is None

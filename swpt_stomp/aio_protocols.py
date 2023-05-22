@@ -170,6 +170,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
             obj = await queue.get()
             if obj is None or isinstance(obj, ServerError):
                 self._close_gracefully(obj)
+                queue.task_done()
                 return
 
             self._send_frame(obj)
