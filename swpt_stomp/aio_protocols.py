@@ -24,10 +24,6 @@ def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
     return max(send_min, recv_desired)
 
 
-_U = TypeVar('_U')
-_V = TypeVar('_V')
-
-
 @dataclass
 class ServerError:
     """Indicates that the server connection should be closed.
