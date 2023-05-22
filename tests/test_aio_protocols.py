@@ -414,7 +414,7 @@ def test_server_connection():
     assert c._connected
     assert not c._done
 
-    # # Receive a disconnect command.
+    # Receive a disconnect command.
     c.data_received(b'DISCONNECT\nreceipt:m1\n\n\x00')
     transport.write.assert_called_with(b'RECEIPT\nreceipt-id:m1\n\n\x00')
     transport.write.reset_mock()
@@ -427,6 +427,7 @@ def test_server_connection():
     c.data_received(b'XXX\n\n\x00')
     transport.write.assert_not_called()
     transport.close.assert_not_called()
+    assert output_queue.empty()
     assert c._connected
     assert c._done
 
