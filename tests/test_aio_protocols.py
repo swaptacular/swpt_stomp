@@ -354,35 +354,34 @@ def test_server_connection():
     c = StompServer(
         input_queue,
         output_queue,
-        hb_send_min=500,
-        hb_recv_desired=8000,
+        hb_send_min=1000,
+        hb_recv_desired=90,
         recv_destination='dest',
     )
     assert c.input_queue is input_queue
     assert c.output_queue is output_queue
 
-    # Make a connection to the server.
-    transport = NonCallableMock(get_extra_info=Mock(return_value=('my',)))
+    # Receive a connection from the client.
+    transport = NonCallableMock()
     c.connection_made(transport)
     transport.write.assert_not_called()
-    transport.write.reset_mock()
     transport.close.assert_not_called()
     assert not c._connected
     assert not c._done
     assert c._writer_task is None
     assert c._watchdog_task is None
 
-    # Received "CONNECT" from the server.
+    # Received "CONNECT" from the client.
     c.data_received(
-        b'CONNECT\naccept-version:1.2\nhost:my\nheart-beat:1000,90\n\n\x00')
+        b'CONNECT\naccept-version:1.2\nhost:my\nheart-beat:500,8000\n\n\x00')
     transport.write.assert_called_with(
-        b'CONNECTED\nversion:1.2\nheart-beat:500,8000\n\n\x00')
+        b'CONNECTED\nversion:1.2\nheart-beat:1000,90\n\n\x00')
     transport.write.reset_mock()
     transport.close.assert_not_called()
     assert c._connected
     assert not c._done
-    assert c._hb_send == 500
-    assert c._hb_recv == 8000
+    assert c._hb_send == 8000
+    assert c._hb_recv == 500
     assert isinstance(c._writer_task, asyncio.Task)
     assert isinstance(c._watchdog_task, asyncio.Task)
 
