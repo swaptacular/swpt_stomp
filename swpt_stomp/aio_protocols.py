@@ -192,7 +192,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
 
 
 class StompClient(_BaseStompProtocol[Message, str]):
-    """STOMP client that sends messages to a STOMP server.
+    """STOMP 1.2 client that sends messages to a STOMP server.
 
     The input queue must contain an ordered sequence of messages, which will
     be sent to the server. Putting `None` in the input message queue will
@@ -204,6 +204,8 @@ class StompClient(_BaseStompProtocol[Message, str]):
     confirmation will not be received for the given message, or the
     preceding messages. Also, when the connection is closed, a `None` will
     automatically be added to the output queue.
+
+    STOMP subscriptions and transactions are not supported.
     """
     def __init__(
             self,
@@ -344,7 +346,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
 
 
 class StompServer(_BaseStompProtocol[str, Message]):
-    """STOMP server that receives messages from a STOMP client.
+    """STOMP 1.2 server that receives messages from a STOMP client.
 
     The output queue will contain an ordered sequence of messages, received
     from the client. Also, when the connection is closed, a `None` will be
@@ -356,6 +358,10 @@ class StompServer(_BaseStompProtocol[str, Message]):
     confirmation will not be received for the given message, or the
     preceding messages. Putting `None`, or a `ServerError` instance, in the
     input queue will close the connection.
+
+    STOMP subscriptions and transactions are not supported. If a
+    "SUBSCRIBE", "UNSUBSCRIBE", "ACK", "NACK", "BEGIN", "COMMIT", or "ABORT"
+    command is received, the server will reply with an error.
     """
     def __init__(
             self,
