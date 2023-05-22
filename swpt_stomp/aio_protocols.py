@@ -193,9 +193,16 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
 class StompClient(_BaseStompProtocol[Message, str]):
     """STOMP client that sends messages to a STOMP server.
 
-    Putting `None` in the input message queue will close the connection.
-    Also, when the connection is closed, a `None` will be added to the
-    output queue.
+    The input queue must contain an ordered sequence of messages, which will
+    be sent to the server. Putting `None` in the input message queue will
+    close the connection.
+
+    The output queue will contain an ordered sequence of confirmed message
+    IDs. When a given message is confirmed, this also implicitly confirms
+    all preceding messages. In fact, it is guaranteed that another
+    confirmation will not be received for the given message, or the
+    preceding messages. Also, when the connection is closed, a `None` will
+    automatically be added to the output queue.
     """
     def __init__(
             self,
@@ -338,9 +345,16 @@ class StompClient(_BaseStompProtocol[Message, str]):
 class StompServer(_BaseStompProtocol[str, Message]):
     """STOMP server that receives messages from a STOMP client.
 
-    Putting `None`, or a `ServerError` instance, in the input queue will
-    close the connection. Also, when the connection is closed, a `None` will
-    be added to the output queue.
+    The output queue will contain an ordered sequence of messages, received
+    from the client. Also, when the connection is closed, a `None` will be
+    automatically added to the output queue.
+
+    The input queue must contain an ordered sequence of confirmed message
+    IDs. When a given message is confirmed, this also implicitly confirms
+    all preceding messages. In fact, it must be guaranteed that another
+    confirmation will not be received for the given message, or the
+    preceding messages. Putting `None`, or a `ServerError` instance, in the
+    input queue will close the connection.
     """
     def __init__(
             self,

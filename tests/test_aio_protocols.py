@@ -212,7 +212,7 @@ def test_client_pause_reading():
     transport.resume_reading.assert_not_called()
 
     # The second message causes a pause.
-    c.data_received(b'RECEIPT\nreceipt-id:m1\n\n\x00')
+    c.data_received(b'RECEIPT\nreceipt-id:m2\n\n\x00')
     transport.pause_reading.assert_called_once()
     transport.resume_reading.assert_not_called()
 
