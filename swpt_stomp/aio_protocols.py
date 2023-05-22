@@ -474,7 +474,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
         try:
             self._disconnect_receipt_id = frame.headers['receipt']
         except KeyError:
-            self._close_with_error('DISCONNECT command without a receipt ID.')
+            self._close()
             return
 
         last_msg_id = self._last_message_id

@@ -501,7 +501,6 @@ def test_server_connection_error(data):
     b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00',
     b'SEND\ndestination:smp\n\nbody\x00',
     b'SEND\ndestination:xxx\nreceipt:m1\n\nbody\x00',
-    b'DISCONNECT\n\n\x00',
 ])
 def test_server_post_connection_error(data):
     input_queue = asyncio.Queue()
@@ -617,6 +616,24 @@ def test_server_immediate_disconnect():
     c.data_received(b'DISCONNECT\nreceipt:x\n\n\x00')
     transport.write.assert_called_once()
     transport.write.called_with((b'RECEIPT\nreceipt-id:x\n\n\x00'))
+    transport.close.assert_called_once()
+    assert c._connected
+    assert c._done
+
+    c.connection_lost(None)
+    assert output_queue.get_nowait() is None
+
+
+def test_server_disconnect_without_receipt():
+    input_queue = asyncio.Queue()
+    output_queue = WatermarkQueue(10)
+    transport = NonCallableMock(is_closing=Mock(return_value=False))
+    c = StompServer(input_queue, output_queue)
+    c.connection_made(transport)
+    c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
+    transport.write.reset_mock()
+    c.data_received(b'DISCONNECT\n\n\x00')
+    transport.write.assert_not_called()
     transport.close.assert_called_once()
     assert c._connected
     assert c._done
