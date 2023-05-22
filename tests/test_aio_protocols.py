@@ -385,58 +385,62 @@ def test_server_connection():
     assert isinstance(c._writer_task, asyncio.Task)
     assert isinstance(c._watchdog_task, asyncio.Task)
 
-    # # Put a message in the input queue.
-    # m = Message(id='m1', content_type='text/plain', body=bytearray(b'1'))
-    # input_queue.put_nowait(m)
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(input_queue.join())
-    # transport.write.assert_called_with(
-    #     b'SEND\n'
-    #     b'destination:dest\n'
-    #     b'content-type:text/plain\n'
-    #     b'receipt:m1\n'
-    #     b'content-length:1\n'
-    #     b'\n'
-    #     b'1\x00')
-    # transport.write.reset_mock()
-    # transport.close.assert_not_called()
-    # assert c._connected
-    # assert not c._done
+    # Receive a message.
+    c.data_received(
+        b'SEND\n'
+        b'destination:dest\n'
+        b'content-type:text/plain\n'
+        b'receipt:m1\n'
+        b'content-length:1\n'
+        b'\n'
+        b'1\x00'
+    )
+    m = output_queue.get_nowait()
+    assert m.id == 'm1'
+    assert m.content_type == 'text/plain'
+    assert m.body == b'1'
+    transport.write.assert_not_called()
+    transport.close.assert_not_called()
+    assert c._connected
+    assert not c._done
 
-    # # Get a receipt confirmation from the server.
-    # c.data_received(b'RECEIPT\nreceipt-id:m1\n\n\x00')
-    # transport.write.assert_not_called()
-    # transport.close.assert_not_called()
-    # assert output_queue.get_nowait() == 'm1'
-    # assert c._connected
-    # assert not c._done
+    # Send a confirmation to the client.
+    input_queue.put_nowait('m1')
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(input_queue.join())
+    transport.write.assert_called_with(b'RECEIPT\nreceipt-id:m1\n\n\x00')
+    transport.write.reset_mock()
+    transport.close.assert_not_called()
+    assert c._connected
+    assert not c._done
 
-    # # Receive a server error.
-    # c.data_received(b'ERROR\nmessage:test-error\n\n\x00')
-    # transport.write.assert_not_called()
-    # transport.close.assert_called_once()
-    # transport.close.reset_mock()
-    # assert c._connected
-    # assert c._done
+    # # Receive a disconnect command.
+    c.data_received(b'DISCONNECT\nreceipt:m1\n\n\x00')
+    transport.write.assert_called_with(b'RECEIPT\nreceipt-id:m1\n\n\x00')
+    transport.write.reset_mock()
+    transport.close.assert_called_once()
+    transport.close.reset_mock()
+    assert c._connected
+    assert c._done
 
-    # # Receive data on a closed connection.
-    # c.data_received(b'XXX\n\n\x00')
-    # transport.write.assert_not_called()
-    # transport.close.assert_not_called()
-    # assert c._connected
-    # assert c._done
+    # Receive data on a closed connection.
+    c.data_received(b'XXX\n\n\x00')
+    transport.write.assert_not_called()
+    transport.close.assert_not_called()
+    assert c._connected
+    assert c._done
 
-    # # Send message to a closed connection.
-    # c._send_frame(m)
-    # transport.write.assert_not_called()
-    # transport.close.assert_not_called()
-    # assert c._connected
-    # assert c._done
+    # Send message to a closed connection.
+    c._send_frame('x')
+    transport.write.assert_not_called()
+    transport.close.assert_not_called()
+    assert c._connected
+    assert c._done
 
-    # # The connection has been lost.
-    # c.connection_lost(None)
-    # assert output_queue.get_nowait() is None
-    # assert c._writer_task is None
-    # assert c._watchdog_task is None
-    # transport.write.assert_not_called()
-    # transport.close.assert_not_called()
+    # The connection has been lost.
+    c.connection_lost(None)
+    assert output_queue.get_nowait() is None
+    assert c._writer_task is None
+    assert c._watchdog_task is None
+    transport.write.assert_not_called()
+    transport.close.assert_not_called()
