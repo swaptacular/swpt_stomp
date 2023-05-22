@@ -68,7 +68,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
         self._done = False
         self._hb_send = 0
         self._hb_recv = 0
-        self._connection_made_at = 0.0
+        self._connection_started_at = 0.0
         self._data_receved_at = 0.0
         self._loop = asyncio.get_event_loop()
         self._parser = StompParser()
@@ -83,7 +83,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
             transport: asyncio.Transport,  # type: ignore[override]
     ) -> None:
         loop = self._loop
-        self._connection_made_at = loop.time()
+        self._connection_started_at = loop.time()
         self._transport = transport
         self.output_queue.add_high_watermark_callback(transport.pause_reading)
         self.output_queue.add_low_watermark_callback(transport.resume_reading)
@@ -98,11 +98,9 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
 
         if self._writer_task:
             self._writer_task.cancel('connection lost')
-            self._writer_task = None
 
         if self._watchdog_task:
             self._watchdog_task.cancel('connection lost')
-            self._watchdog_task = None
 
         t = self._transport
         assert t
@@ -132,7 +130,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
         loop = self._loop
 
         if self._hb_send != 0:
-            loop.call_at(self._connection_made_at + self._hb_send / 1000,
+            loop.call_at(self._connection_started_at + self._hb_send / 1000,
                          self._send_heartbeat)
 
         if self._hb_recv != 0:
@@ -406,6 +404,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             self._close_with_error('STOMP 1.2 is not supported by the client.')
             return
 
+        self._connection_started_at = self._loop.time()
         self._connect(frame.headers.get('heart-beat', '0,0'))
 
         if self._connected:

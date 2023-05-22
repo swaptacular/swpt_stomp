@@ -98,10 +98,15 @@ def test_client_connection():
     # The connection has been lost.
     c.connection_lost(None)
     assert output_queue.get_nowait() is None
-    assert c._writer_task is None
-    assert c._watchdog_task is None
     transport.write.assert_not_called()
     transport.close.assert_not_called()
+
+    async def wait_for_cancelation():
+        while not (c._writer_task.cancelled() and c._watchdog_task.cancelled()):
+            await asyncio.sleep(0)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_for_cancelation())
 
 
 @pytest.mark.parametrize("data", [
@@ -440,7 +445,12 @@ def test_server_connection():
     # The connection has been lost.
     c.connection_lost(None)
     assert output_queue.get_nowait() is None
-    assert c._writer_task is None
-    assert c._watchdog_task is None
     transport.write.assert_not_called()
     transport.close.assert_not_called()
+
+    async def wait_for_cancelation():
+        while not (c._writer_task.cancelled() and c._watchdog_task.cancelled()):
+            await asyncio.sleep(0)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_for_cancelation())
