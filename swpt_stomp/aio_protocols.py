@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional, Union, Generic, TypeVar
 import asyncio
 import logging
+from dataclasses import dataclass
 from swpt_stomp.common import Message, WatermarkQueue
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 
@@ -27,15 +28,27 @@ _U = TypeVar('_U')
 _V = TypeVar('_V')
 
 
-class BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
+@dataclass
+class ServerError:
+    """Indicates that the server connection should be closed.
+
+    Instances of this class are intended to be added to `StompServer`'s
+    input queue, indicating that an error has occurred, and the connection
+    must be closed.
+    """
+    message: str
+    receipt_id: Union[str, None]
+
+
+class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
     """Implements functionality common for STOMP clients and servers.
     """
-    input_queue: asyncio.Queue[Union[_U, None]]
+    input_queue: asyncio.Queue[Union[_U, None, ServerError]]
     output_queue: WatermarkQueue[Union[_V, None]]
 
     def __init__(
             self,
-            input_queue: asyncio.Queue[Union[_U, None]],
+            input_queue: asyncio.Queue[Union[_U, None, ServerError]],
             output_queue: WatermarkQueue[Union[_V, None]],
             *,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
@@ -157,7 +170,7 @@ class BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
         self._transport.close()
         self._done = True
 
-    def _close_gracefully(self) -> None:
+    def _close_gracefully(self, error: Union[None, ServerError]) -> None:
         raise NotImplementedError()  # pragma: nocover
 
     def _close_with_error(self, message: str) -> None:
@@ -170,16 +183,16 @@ class BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
         queue = self.input_queue
         while await self._start_sending.wait():
             obj = await queue.get()
-            if obj is None:  # TODO: Allow passing an error object.
-                self._close_gracefully()
+            if obj is None or isinstance(obj, ServerError):
+                self._close_gracefully(obj)
                 return
 
             self._send_frame(obj)
             queue.task_done()
 
 
-class StompClient(BaseStompProtocol[Message, str]):
-    """STOMP client that sends messages to STOMP server.
+class StompClient(_BaseStompProtocol[Message, str]):
+    """STOMP client that sends messages to a STOMP server.
 
     Putting `None` in the input message queue will close the connection.
     Also, when the connection is closed, a `None` will be added to the
@@ -187,7 +200,7 @@ class StompClient(BaseStompProtocol[Message, str]):
     """
     def __init__(
             self,
-            input_queue: asyncio.Queue[Union[Message, None]],
+            input_queue: asyncio.Queue[Union[Message, None, ServerError]],
             output_queue: WatermarkQueue[Union[str, None]],
             *,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
@@ -306,7 +319,7 @@ class StompClient(BaseStompProtocol[Message, str]):
         self._transport.write(bytes(message_frame))
         self._last_message_id = message.id
 
-    def _close_gracefully(self) -> None:
+    def _close_gracefully(self, error: Union[None, ServerError]) -> None:
         if self._last_message_id is None:
             self._last_message_id = 'disconnect'
 
@@ -321,16 +334,16 @@ class StompClient(BaseStompProtocol[Message, str]):
         self._close()
 
 
-class StompServer(BaseStompProtocol[str, Message]):
-    """STOMP server that receives messages from STOMP client.
+class StompServer(_BaseStompProtocol[str, Message]):
+    """STOMP server that receives messages from a STOMP client.
 
-    Putting `None` in the input message queue will close the connection.
-    Also, when the connection is closed, a `None` will be added to the
-    output queue.
+    Putting `None`, or a `ServerError` instance, in the input queue will
+    close the connection. Also, when the connection is closed, a `None` will
+    be added to the output queue.
     """
     def __init__(
             self,
-            input_queue: asyncio.Queue[Union[str, None]],
+            input_queue: asyncio.Queue[Union[str, None, ServerError]],
             output_queue: WatermarkQueue[Union[Message, None]],
             *,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
@@ -451,7 +464,11 @@ class StompServer(BaseStompProtocol[str, Message]):
         self._send_receipt_command(receipt_id)
         self._last_receipt_id = receipt_id
 
-    def _close_gracefully(self) -> None:
+    def _close_gracefully(self, error: Union[None, ServerError]) -> None:
+        if isinstance(error, ServerError):
+            self._close_with_error(error.message, error.receipt_id)
+            return
+
         self._close_with_error('The connection has been closed by the server.')
 
     def _close_with_error(
