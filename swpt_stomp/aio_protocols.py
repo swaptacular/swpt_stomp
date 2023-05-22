@@ -35,6 +35,7 @@ class ServerError:
     message: str
     receipt_id: Optional[str] = None
     context: Optional[bytes] = None
+    context_content_type: Optional[str] = None
 
 
 _U = TypeVar('_U')
@@ -502,7 +503,12 @@ class StompServer(_BaseStompProtocol[str, Message]):
 
     def _close_gracefully(self, error: Optional[ServerError]) -> None:
         if isinstance(error, ServerError):
-            self._close_with_error(error.message, error.receipt_id, error.context)
+            self._close_with_error(
+                error.message,
+                error.receipt_id,
+                error.context,
+                error.context_content_type,
+            )
             return
 
         self._close_with_error('The connection has been closed by the server.')
@@ -512,6 +518,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             message: str,
             receipt_id: Optional[str] = None,
             context: Optional[bytes] = None,
+            context_content_type: Optional[str] = None,
     ) -> None:
         transport = self._transport
         assert transport
@@ -519,6 +526,8 @@ class StompServer(_BaseStompProtocol[str, Message]):
             headers = {'message': message}
             if receipt_id is not None:
                 headers['receipt-id'] = receipt_id
+            if context is not None and context_content_type is not None:
+                headers['content-type'] = context_content_type
 
             body = bytearray() if context is None else bytearray(context)
             error_frame = StompFrame('ERROR', headers, body)
