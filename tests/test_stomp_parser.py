@@ -19,6 +19,11 @@ def test_regexps():
     assert m[2] == b"h1:v1\nh2:v2\n"
     assert m[3] == b"\n"
 
+    m = _HEAD_RE.match(b"""CONNECT\nh1:\xa0\xff\n\n""")
+    assert m[1] == b"CONNECT"
+    assert m[2] == b"h1:\xa0\xff\n"
+    assert m[3] == b"\n"
+
     m = _HEAD_RE.match(b"""CONNECT\r\nh1:v1\r\nh2:v2\r\n\r\n""")
     assert m[1] == b"CONNECT"
     assert m[2] == b"h1:v1\r\nh2:v2\r\n"
