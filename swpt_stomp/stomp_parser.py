@@ -57,8 +57,11 @@ def _parse_headers(s: bytes) -> dict[str, str]:
         if not line:
             break
         k_bytes, v_bytes = line.split(b':')
-        k = _substitute_header_escape_chars(k_bytes).decode('utf8')
-        v = _substitute_header_escape_chars(v_bytes).decode('utf8')
+        try:
+            k = _substitute_header_escape_chars(k_bytes).decode('utf8')
+            v = _substitute_header_escape_chars(v_bytes).decode('utf8')
+        except UnicodeDecodeError:
+            raise ProtocolError('UTF-8 decode error.')
         if k not in headers:
             headers[k] = v
     return headers

@@ -147,6 +147,16 @@ def test_heartbeats():
     assert len(p.frames) == 3
 
 
+def test_header_utf8_encoding():
+    p = StompParser()
+    p.add_bytes(b'SEND\nnon-ascii:\xd0\xa9\n\n\x00')
+    frame = p.pop_frame()
+    assert frame.headers['non-ascii'] == 'Щ'
+
+    with pytest.raises(ProtocolError):
+        p.add_bytes(b'SEND\nnon-ascii:\xd0\n\n\x00')
+
+
 def test_reset():
     p = StompParser()
     p.add_bytes(b"SEND\nkey:value\n\nbody\0")
