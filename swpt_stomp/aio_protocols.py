@@ -193,7 +193,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
 
 
 class StompClient(_BaseStompProtocol[Message, str]):
-    """STOMP 1.2 client that sends messages to a STOMP server.
+    """STOMP 1.2 client that sends messages to a STOMP 1.2 server.
 
     The input queue must contain an ordered sequence of messages, which will
     be sent to the server. Putting `None` in the input message queue will
@@ -347,7 +347,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
 
 
 class StompServer(_BaseStompProtocol[str, Message]):
-    """STOMP 1.2 server that receives messages from a STOMP client.
+    """STOMP 1.2 server that receives messages from a STOMP 1.2 client.
 
     The output queue will contain an ordered sequence of messages, received
     from the client. Also, when the connection is closed, a `None` will be
@@ -360,9 +360,12 @@ class StompServer(_BaseStompProtocol[str, Message]):
     preceding messages. Putting `None`, or a `ServerError` instance, in the
     input queue will close the connection.
 
-    STOMP subscriptions and transactions are not supported. If a
+    NOTE: STOMP subscriptions and transactions are not supported. If a
     "SUBSCRIBE", "UNSUBSCRIBE", "ACK", "NACK", "BEGIN", "COMMIT", or "ABORT"
-    command is received, the server will reply with an error.
+    command is received, the server will reply with an error. Also, this
+    implementation requires all "SEND" frames to have a "receipt" header.
+    Sending a message without requiring a confirmation from the server
+    simply does not make sense in Swaptacular's context.
     """
     def __init__(
             self,
