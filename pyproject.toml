@@ -15,6 +15,7 @@ python-lsp-server = {extras = ["all"], version = "^1.7.1"}
 pytest = "^7.3.1"
 pytest-cov = "^4.0.0"
 pylsp-mypy = "^0.6.6"
+pytest-asyncio = "^0.21.0"
 
 [tool.pylsp-mypy]
 enabled = true

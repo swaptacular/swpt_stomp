@@ -702,3 +702,67 @@ def test_server_connected_timeout():
 
     c.connection_lost(None)
     assert output_queue.get_nowait() is None
+
+
+###################################
+# Client-server integration tests #
+###################################
+
+
+@pytest.mark.asyncio
+async def test_simple_communication():
+    loop = asyncio.get_running_loop()
+
+    # Start a server.
+    server_input = asyncio.Queue(10)
+    server_output = WatermarkQueue(10)
+    server = await loop.create_server(
+        lambda: StompServer(server_input, server_output),
+        host='127.0.0.1',
+    )
+    server_host, server_port = server.sockets[0].getsockname()
+    server_task = loop.create_task(server.serve_forever())
+
+    async def confirm_messages():
+        while m := await server_output.get():
+            await server_input.put(m.id)
+            server_output.task_done()
+
+    server_confirm_task = loop.create_task(confirm_messages())
+
+    # Connect a client.
+    client_input = asyncio.Queue(10)
+    client_output = WatermarkQueue(10)
+    transport, protocol = await loop.create_connection(
+        lambda: StompClient(client_input, client_output),
+        host=server_host,
+        port=server_port,
+    )
+    client_acks = []
+
+    async def publish_messages():
+        for i in range(100):
+            m = Message(id=str(i), content_type='text/plain', body=bytearray(i))
+            await client_input.put(m)
+        await client_input.put(None)
+
+    async def process_message_acks():
+        while message_id := await client_output.get():
+            client_acks.append(message_id)
+            client_output.task_done()
+
+    client_publish_task = loop.create_task(publish_messages())
+    client_ack_task = loop.create_task(process_message_acks())
+
+    # Stop the server once all messages have been processed.
+    await asyncio.wait([
+        server_confirm_task,
+        client_publish_task,
+        client_ack_task,
+    ])
+    server_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await server_task
+
+    assert server_task.cancelled()
+    assert client_acks == [str(i) for i in range(100)]
