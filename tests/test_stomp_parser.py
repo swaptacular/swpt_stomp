@@ -266,3 +266,29 @@ def test_frame_serialization():
     assert f.command == frame3.command
     assert f.headers == {'content-length': '3'}
     assert f.body == frame3.body
+
+
+def test_parse_long_data():
+    p = StompParser()
+    p.add_bytes(b'SEND\n\n\0S')
+    p.add_bytes(b'SEND\n\n\0SEND\n\n\0')
+    p.add_bytes(b'SEND\n\n\x00SEND\n\n\x00')
+    p.add_bytes(b'SEND\nreceipt:0\n\n\x00SEND\nreceipt:0\n\n\x00')
+    p.add_bytes(
+        b'SEND\ndestination:smp\ncontent-type:text/plain\nreceipt:0\n\n\x00'
+        + b'SEND\ndestination:smp\ncontent-type:text/plain\nreceipt:0\n\n\x00'
+    )
+    p.add_bytes(
+        b'SEND\ndestination:smp\ncontent-type:text/plain\nreceipt:0\n\n\x00'
+        + b'SEND\ndestination:smp\ncontent-type:text/plain\nreceipt:1\nconten'
+        + b't-length:1\n\n\x00\x00')
+    p.add_bytes(
+        b'SEND\ndestination:smp\ncontent-type:text/plain\nreceipt:0\n\n\x00'
+        + b'SEND\ndestination:smp\ncontent-type:text/plain\nreceipt:1\nconten'
+        + b't-length:1\n\n\x00\x00SEND\ndestination:smp\ncontent-type:text/pl'
+        + b'ain\nreceipt:2\ncontent-length:2\n\n\x00\x00\x00SEND\ndestination'
+        + b':smp\ncontent-type:text/plain\nreceipt:3\ncontent-length:3\n\n'
+        + b'\x00\x00\x00\x00SEND\ndestination:smp\ncontent-type:text/plain\nr'
+        + b'eceipt:4\ncontent-length:4\n\n\x00\x00\x00\x00\x00DISCONNECT\nrec'
+        + b'eipt:4\n\n\x00'
+    )

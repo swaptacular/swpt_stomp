@@ -4,11 +4,11 @@ from collections import deque
 import re
 
 _HEARTBEAT_RE = re.compile(
-    rb"""\A(?:\r?\n)+    # empty lines""",
+    rb"""(?:\r?\n)+    # empty lines""",
     re.VERBOSE)
 
 _HEAD_RE = re.compile(
-    rb"""\A(?:\Z|
+    rb"""(?:\Z|
     ([A-Z]{1,50})(?:\Z|                                       # command
     \r?(?:\Z|                                                 # optional \r
     \n((?:[^\n\r:]{1,500}:[^\n\r:]{0,500}\r?\n){0,50})(?:\Z|  # header lines
