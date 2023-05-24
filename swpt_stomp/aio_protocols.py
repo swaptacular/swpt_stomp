@@ -525,7 +525,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             self,
             message: str,
             receipt_id: Optional[str] = None,
-            context: Optional[bytes] = None,
+            context: Union[bytes, bytearray, None] = None,
             context_content_type: Optional[str] = None,
     ) -> None:
         transport = self._transport
