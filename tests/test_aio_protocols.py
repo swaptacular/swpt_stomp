@@ -588,7 +588,8 @@ def test_server_close_gracefully_with_error():
     assert c._connected
     assert not c._done
 
-    input_queue.put_nowait(ServerError('err1', 'm1', b'c1', 'text/plain'))
+    input_queue.put_nowait(
+        ServerError('err1', 'm1', bytearray(b'c1'), 'text/plain'))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(input_queue.join())
     transport.write.assert_called_once()

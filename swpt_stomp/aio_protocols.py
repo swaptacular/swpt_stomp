@@ -33,7 +33,7 @@ class ServerError:
     """
     error_message: str
     receipt_id: Optional[str] = None
-    context: Optional[bytes] = None
+    context: Optional[bytearray] = None
     context_content_type: Optional[str] = None
 
 
@@ -525,7 +525,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             self,
             message: str,
             receipt_id: Optional[str] = None,
-            context: Union[bytes, bytearray, None] = None,
+            context: Optional[bytearray] = None,
             context_content_type: Optional[str] = None,
     ) -> None:
         transport = self._transport
@@ -537,7 +537,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             if context is not None and context_content_type is not None:
                 headers['content-type'] = context_content_type
 
-            body = bytearray() if context is None else bytearray(context)
+            body = bytearray() if context is None else context
             error_frame = StompFrame('ERROR', headers, body)
             transport.write(bytes(error_frame))
 
