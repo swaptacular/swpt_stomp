@@ -8,9 +8,6 @@ from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 DEFAULT_HB_SEND_MIN = 5_000  # 5 seconds
 DEFAULT_HB_RECV_DESIRED = 30_000  # 30 seconds
 DEFAULT_MAX_NETWORK_DELAY = 10_000  # 10 seconds
-
-# TODO: Configure an async logging handler, as explained here:
-#       https://stackoverflow.com/questions/45842926/python-asynchronous-logging
 _logger = logging.getLogger(__name__)
 
 

@@ -555,6 +555,18 @@ pytest = ">=4.6"
 testing = ["fields", "hunter", "process-tests", "pytest-xdist", "six", "virtualenv"]
 
 [[package]]
+name = "python-json-logger"
+version = "2.0.7"
+description = "A python library adding a json log formatter"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "python-json-logger-2.0.7.tar.gz", hash = "sha256:23e7ec02d34237c5aa1e29a070193a4ea87583bb4e7f8fd06d3de8264c4b2e1c"},
+    {file = "python_json_logger-2.0.7-py3-none-any.whl", hash = "sha256:f380b826a991ebbe3de4d897aeec42760035ac760345e57b812938dc8b35e2bd"},
+]
+
+[[package]]
 name = "python-lsp-jsonrpc"
 version = "1.0.0"
 description = "JSON RPC 2.0 server library"
@@ -923,4 +935,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "74f5b5513b1288185c18624a7c8316ae8477ef6a9b8c7be97e55c750bcef7875"
+content-hash = "c6a5bbc233ec5fd7cf6c6a5d72db4ffe3fb4eab52190777ffdfe1eaca6365882"
