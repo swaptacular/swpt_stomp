@@ -1,10 +1,8 @@
-from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, List, Any, Optional, TypeVar
 import asyncio
 
 _T = TypeVar("_T")
-
 Callback = Callable[[], Any]
 
 
@@ -39,14 +37,14 @@ class WatermarkQueue(asyncio.Queue[_T]):
         self.low_watermark: int = low_watermark
         self.high_watermark: int = high_watermark
 
-    def put_nowait(self, item):
+    def put_nowait(self, item) -> None:
         super().put_nowait(item)
         if not self.__paused and self.qsize() >= self.high_watermark:
             self.__paused = True
             for cb in self.__hw_callbacks:
                 cb()
 
-    def task_done(self):
+    def task_done(self) -> None:
         super().task_done()
         if self.__paused and self.qsize() <= self.low_watermark:
             self.__paused = False

@@ -725,6 +725,8 @@ async def test_simple_communication():
 
     async def confirm_messages():
         while m := await server_output.get():
+            assert m.content_type == 'text/plain'
+            assert m.body == bytearray(int(m.id))
             await server_input.put(m.id)
             server_output.task_done()
 

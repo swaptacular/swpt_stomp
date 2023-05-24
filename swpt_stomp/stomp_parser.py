@@ -1,5 +1,5 @@
-from __future__ import annotations
 from dataclasses import dataclass, field
+from typing import Iterator
 from collections import deque
 import re
 
@@ -23,6 +23,7 @@ _HEAD_RE = re.compile(
     ))))""",
     re.VERBOSE)
 
+_HEADER_SEPARATOR_RE = re.compile(rb'\r?\n|:')
 _HEADER_UNESCAPE_RE = re.compile(rb'\\.')
 _HEADER_UNESCAPE_CHARS = {
     rb'\r': b'\r',
@@ -50,20 +51,16 @@ def _substitute_header_escape_chars(s: bytes) -> bytes:
 
 def _parse_headers(s: bytes) -> dict[str, str]:
     headers = {}
-    lines = s.split(b'\n')
-    for line in lines:
-        if line.endswith(b'\r'):
-            line = line[:-1]
-        if not line:
-            break
-        k_bytes, v_bytes = line.split(b':')
-        try:
-            k = _substitute_header_escape_chars(k_bytes).decode('utf8')
-            v = _substitute_header_escape_chars(v_bytes).decode('utf8')
-        except UnicodeDecodeError:
-            raise ProtocolError('UTF-8 decode error.')
-        if k not in headers:
-            headers[k] = v
+    parts = _HEADER_SEPARATOR_RE.split(s)
+    try:
+        for i in range(0, len(parts) - 1, 2):
+            key = _substitute_header_escape_chars(parts[i]).decode('utf8')
+            value = _substitute_header_escape_chars(parts[i + 1]).decode('utf8')
+            if key not in headers:
+                headers[key] = value
+    except UnicodeDecodeError:
+        raise ProtocolError('UTF-8 decode error.')
+
     return headers
 
 
@@ -95,7 +92,7 @@ class StompFrame:
     headers: dict[str, str] = field(default_factory=dict)
     body: bytearray = field(default_factory=bytearray)
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         t = _HEADER_ESCAPE_TABLE
         body = self.body
         headers = self.headers
@@ -127,7 +124,7 @@ class StompParser:
         self._command = ''
         self._headers: dict[str, str] = {}
         self._body_end = 0
-        self.frames = deque()
+        self.frames: deque[StompFrame] = deque()
 
     def add_bytes(self, data: bytes) -> None:
         """Feed bytes to the parser.
@@ -164,7 +161,7 @@ class StompParser:
         except IndexError:
             raise EmptyQueue()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[StompFrame]:
         """Iterate over available frames, removing them from the queue.
         """
         while True:
