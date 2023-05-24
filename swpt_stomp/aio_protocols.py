@@ -448,23 +448,24 @@ class StompServer(_BaseStompProtocol[str, Message]):
             return
 
         headers = frame.headers
+        content_type = headers.get('content-type', 'application/octet-stream')
         try:
             message_id = headers['receipt']
-        except KeyError:
-            self._close_with_error('SEND command without a receipt header.')
-            return
-
-        try:
             destination = headers['destination']
-        except KeyError:
-            self._close_with_error('SEND command without a destination header.')
+        except KeyError as e:
+            header = e.args[0]
+            self._close_with_error(f'SEND command without a {header} header.')
             return
 
         if destination != self._recv_destination:
-            self._close_with_error(f'Invalid SEND destination "{destination}".')
+            self._close_with_error(
+                f'Invalid SEND destination "{destination}".',
+                message_id,
+                frame.body,
+                content_type,
+            )
             return
 
-        content_type = headers.get('content-type', 'application/octet-stream')
         message = Message(
             id=message_id,
             content_type=content_type,
