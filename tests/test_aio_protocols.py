@@ -499,6 +499,7 @@ def test_server_connection_error(data):
     b'protocol error',
     b'INVALIDCMD\n\n\x00',
     b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00',
+    b'SEND\nreceipt:m1\n\nbody\x00',
     b'SEND\ndestination:smp\n\nbody\x00',
     b'SEND\ndestination:xxx\nreceipt:m1\n\nbody\x00',
 ])

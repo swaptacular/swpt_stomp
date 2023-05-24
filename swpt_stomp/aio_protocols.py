@@ -31,7 +31,7 @@ class ServerError:
     input queue, indicating that an error has occurred, and the connection
     must be closed.
     """
-    message: str
+    error_message: str
     receipt_id: Optional[str] = None
     context: Optional[bytes] = None
     context_content_type: Optional[str] = None
@@ -142,9 +142,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
     def _detect_connected_timeout(self) -> None:
         if not self._connected:
             _logger.warning('Protocol error: No response from peer.')
-            assert self._transport
-            self._transport.close()
-            self._done = True
+            self._close()
 
     def _send_heartbeat(self) -> None:
         if not self._done:
@@ -177,9 +175,10 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
             queue.task_done()
 
     def _close(self) -> None:
-        assert self._transport
-        self._transport.close()
-        self._done = True
+        if not self._done:
+            assert self._transport
+            self._transport.close()
+            self._done = True
 
     def _close_gracefully(self, error: Optional[ServerError]) -> None:
         raise NotImplementedError()  # pragma: nocover
@@ -405,7 +404,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             cmd = frame.command
             if self._disconnect_receipt_id is not None:
                 self._close_with_error('Received command after DISCONNECT.')
-            elif cmd == 'CONNECT' or cmd == 'STOMP':
+            elif cmd == 'STOMP' or cmd == 'CONNECT':
                 self._received_connect_command(frame)
             elif cmd == 'SEND':
                 self._received_send_command(frame)
@@ -423,7 +422,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             return
 
         accept_version = frame.headers.get('accept-version', '')
-        versions = set(v for v in accept_version.split(',', 20))
+        versions = set(v for v in accept_version.split(',', 10))
         if '1.2' not in versions:
             self._close_with_error('STOMP 1.2 is not supported by the client.')
             return
@@ -455,8 +454,14 @@ class StompServer(_BaseStompProtocol[str, Message]):
             self._close_with_error('SEND command without a receipt header.')
             return
 
-        if headers.get('destination') != self._recv_destination:
-            self._close_with_error('Invalid SEND destination.', message_id)
+        try:
+            destination = headers['destination']
+        except KeyError:
+            self._close_with_error('SEND command without a destination header.')
+            return
+
+        if destination != self._recv_destination:
+            self._close_with_error(f'Invalid SEND destination "{destination}".')
             return
 
         content_type = headers.get('content-type', 'application/octet-stream')
@@ -480,7 +485,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             return
 
         last_msg_id = self._last_message_id
-        if (last_msg_id is None or last_msg_id == self._last_receipt_id):
+        if last_msg_id is None or last_msg_id == self._last_receipt_id:
             # All received messages have been confirmed.
             self._send_receipt_command(self._disconnect_receipt_id)
             self._close()
@@ -495,7 +500,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             return
 
         disconnect_id = self._disconnect_receipt_id
-        if (disconnect_id is not None and receipt_id == self._last_message_id):
+        if disconnect_id is not None and receipt_id == self._last_message_id:
             self._send_receipt_command(disconnect_id)
             self._close()
             return
@@ -506,7 +511,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
     def _close_gracefully(self, error: Optional[ServerError]) -> None:
         if isinstance(error, ServerError):
             self._close_with_error(
-                error.message,
+                error.error_message,
                 error.receipt_id,
                 error.context,
                 error.context_content_type,
