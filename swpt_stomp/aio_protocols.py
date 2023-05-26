@@ -211,8 +211,8 @@ class StompClient(_BaseStompProtocol[Message, str]):
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
-            host: Optional[str] = None,
-            send_destination: str = 'smp',
+            host: str = '/',
+            send_destination: str = '/exchange/smp',
     ):
         super().__init__(
             input_queue,
@@ -232,17 +232,11 @@ class StompClient(_BaseStompProtocol[Message, str]):
             transport: asyncio.Transport,  # type: ignore[override]
     ) -> None:
         super().connection_made(transport)
-
-        host = self._host
-        if host is None:
-            peername = transport.get_extra_info('peername')
-            host = 'default' if (peername is None) else peername[0]
-
         connect_frame = StompFrame(
             command='STOMP',
             headers={
                 'accept-version': '1.2',
-                'host': host,
+                'host': self._host,
                 'heart-beat': f'{self._hb_send_min},{self._hb_recv_desired}',
             },
         )
@@ -316,6 +310,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
             headers={
                 'destination': self._send_destination,
                 'content-type': message.content_type,
+                'persistent': 'true',
                 'receipt': message.id,
             },
             body=message.body,
@@ -370,7 +365,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
-            recv_destination: str = 'smp'
+            recv_destination: str = '/exchange/smp'
     ):
         super().__init__(
             input_queue,

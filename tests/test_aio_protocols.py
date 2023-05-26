@@ -25,10 +25,10 @@ def test_client_connection():
     assert c.output_queue is output_queue
 
     # Make a connection to the server.
-    transport = NonCallableMock(get_extra_info=Mock(return_value=('my',)))
+    transport = NonCallableMock()
     c.connection_made(transport)
     transport.write.assert_called_with(
-        b'STOMP\naccept-version:1.2\nhost:my\nheart-beat:1000,90\n\n\x00')
+        b'STOMP\naccept-version:1.2\nhost:/\nheart-beat:1000,90\n\n\x00')
     transport.write.reset_mock()
     transport.close.assert_not_called()
     assert not c._connected
@@ -52,14 +52,15 @@ def test_client_connection():
     input_queue.put_nowait(m)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(input_queue.join())
-    transport.write.assert_called_with(
-        b'SEND\n'
-        b'destination:dest\n'
-        b'content-type:text/plain\n'
-        b'receipt:m1\n'
-        b'content-length:1\n'
-        b'\n'
-        b'1\x00')
+    transport.write.assert_called_once()
+    frame = transport.write.call_args[0][0]
+    assert frame.startswith(b'SEND\n')
+    assert frame.endswith(b'\n1\x00')
+    assert b'destination:dest\n' in frame
+    assert b'content-type:text/plain\n' in frame
+    assert b'receipt:m1\n' in frame
+    assert b'persistent:true\n' in frame
+    assert b'content-length:1\n' in frame
     transport.write.reset_mock()
     transport.close.assert_not_called()
     assert c._connected
@@ -120,7 +121,7 @@ def test_client_connection():
 def test_client_connection_error(data):
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
-    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    transport = NonCallableMock()
     c = StompClient(input_queue, output_queue)
     c.connection_made(transport)
     transport.write.reset_mock()
@@ -143,7 +144,7 @@ def test_client_connection_error(data):
 def test_client_post_connection_error(data):
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
-    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    transport = NonCallableMock()
     c = StompClient(input_queue, output_queue, hb_send_min=0, hb_recv_desired=0)
     c.connection_made(transport)
     transport.write.reset_mock()
@@ -172,7 +173,7 @@ def test_client_pause_writing():
     # Make a proper connection.
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
-    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    transport = NonCallableMock()
     c = StompClient(input_queue, output_queue)
     c.connection_made(transport)
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
@@ -199,7 +200,7 @@ def test_client_pause_writing():
 def test_client_pause_reading():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(2)
-    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    transport = NonCallableMock()
     c = StompClient(input_queue, output_queue)
     c.connection_made(transport)
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
@@ -231,7 +232,7 @@ def test_client_pause_reading():
 def test_client_send_heartbeats():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
-    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    transport = NonCallableMock()
     c = StompClient(input_queue, output_queue, hb_send_min=1)
     c.connection_made(transport)
     c.data_received(b'CONNECTED\nversion:1.2\nheart-beat:0,1\n\n\x00')
@@ -255,7 +256,7 @@ def test_client_send_heartbeats():
 def test_client_recv_heartbeats():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
-    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    transport = NonCallableMock()
     c = StompClient(
         input_queue, output_queue, hb_recv_desired=1, max_network_delay=1)
     c.connection_made(transport)
@@ -275,7 +276,7 @@ def test_client_recv_heartbeats():
 def test_client_connected_timeout():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
-    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    transport = NonCallableMock()
     c = StompClient(input_queue, output_queue, max_network_delay=1)
     c.connection_made(transport)
 
@@ -293,7 +294,7 @@ def test_client_connected_timeout():
 def test_client_graceful_disconnect_no_messages():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
-    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    transport = NonCallableMock()
     c = StompClient(input_queue, output_queue, hb_send_min=0, hb_recv_desired=0)
     c.connection_made(transport)
     transport.write.reset_mock()
@@ -316,7 +317,7 @@ def test_client_graceful_disconnect_no_messages():
 def test_client_graceful_disconnect():
     input_queue = asyncio.Queue()
     output_queue = WatermarkQueue(10)
-    transport = NonCallableMock(get_extra_info=Mock(return_value=None))
+    transport = NonCallableMock()
     c = StompClient(input_queue, output_queue, hb_send_min=0, hb_recv_desired=0)
     c.connection_made(transport)
     transport.write.reset_mock()
@@ -378,7 +379,7 @@ def test_server_connection(cmd):
 
     # Received "CONNECT" or "STOMP" from the client.
     c.data_received(
-        cmd + b'\naccept-version:1.1,1.2\nhost:my\nheart-beat:500,8000\n\n\x00')
+        cmd + b'\naccept-version:1.1,1.2\nhost:/\nheart-beat:500,8000\n\n\x00')
     transport.write.assert_called_with(
         b'CONNECTED\nversion:1.2\nheart-beat:1000,90\n\n\x00')
     transport.write.reset_mock()
@@ -500,7 +501,7 @@ def test_server_connection_error(data):
     b'INVALIDCMD\n\n\x00',
     b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00',
     b'SEND\nreceipt:m1\n\nbody\x00',
-    b'SEND\ndestination:smp\n\nbody\x00',
+    b'SEND\ndestination:/exchange/smp\n\nbody\x00',
     b'SEND\ndestination:xxx\nreceipt:m1\n\nbody\x00',
 ])
 def test_server_post_connection_error(data):
@@ -533,13 +534,15 @@ def test_server_command_after_disconnect():
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
-    c.data_received(b'SEND\ndestination:smp\nreceipt:m1\n\n\body\x00',)
+    c.data_received(
+        b'SEND\ndestination:/exchange/smp\nreceipt:m1\n\n\body\x00',)
     c.data_received(b'DISCONNECT\nreceipt:m1\n\n\x00')
     transport.write.assert_not_called()
     assert c._connected
     assert not c._done
 
-    c.data_received(b'SEND\ndestination:smp\nreceipt:m2\n\n\body\x00',)
+    c.data_received(
+        b'SEND\ndestination:/exchange/smp\nreceipt:m2\n\n\body\x00',)
     transport.write.assert_called_once()
     transport.write.assert_called_with(
         b'ERROR\nmessage:Received command after DISCONNECT.\n\n\x00')
