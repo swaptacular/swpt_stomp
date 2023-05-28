@@ -9,8 +9,9 @@ Callback = Callable[[], Any]
 @dataclass
 class Message:
     id: str
-    content_type: str
+    type: str
     body: bytearray
+    content_type: str = 'application/octet-stream'
 
 
 class WatermarkQueue(asyncio.Queue[_T]):

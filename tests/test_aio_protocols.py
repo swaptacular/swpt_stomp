@@ -48,7 +48,8 @@ def test_client_connection():
     assert isinstance(c._watchdog_task, asyncio.Task)
 
     # Put a message in the input queue.
-    m = Message(id='m1', content_type='text/plain', body=bytearray(b'1'))
+    m = Message(id='m1', type='t1',
+                content_type='text/plain', body=bytearray(b'1'))
     input_queue.put_nowait(m)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(input_queue.join())
@@ -57,6 +58,7 @@ def test_client_connection():
     assert frame.startswith(b'SEND\n')
     assert frame.endswith(b'\n1\x00')
     assert b'destination:dest\n' in frame
+    assert b'type:t1\n' in frame
     assert b'content-type:text/plain\n' in frame
     assert b'receipt:m1\n' in frame
     assert b'persistent:true\n' in frame
@@ -181,7 +183,8 @@ def test_client_pause_writing():
 
     # Pause writing and queue a message.
     c.pause_writing()
-    m = Message(id='m1', content_type='text/plain', body=bytearray(b'1'))
+    m = Message(id='m1', type='t1',
+                content_type='text/plain', body=bytearray(b'1'))
     input_queue.put_nowait(m)
     run_once()
     run_once()
@@ -322,7 +325,8 @@ def test_client_graceful_disconnect():
     c.connection_made(transport)
     transport.write.reset_mock()
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
-    m = Message(id='m1', content_type='text/plain', body=bytearray(b'1'))
+    m = Message(id='m1', type='t1',
+                content_type='text/plain', body=bytearray(b'1'))
     input_queue.put_nowait(m)
 
     async def wait_disconnect():
@@ -397,6 +401,7 @@ def test_server_connection(cmd):
         b'destination:dest\n'
         b'content-type:text/plain\n'
         b'receipt:m1\n'
+        b'type:t1\n'
         b'content-length:1\n'
         b'\n'
         b'1\x00'
@@ -406,6 +411,7 @@ def test_server_connection(cmd):
         b'destination:dest\n'
         b'content-type:text/plain\n'
         b'receipt:m2\n'
+        b'type:t1\n'
         b'content-length:1\n'
         b'\n'
         b'1\x00'
@@ -448,7 +454,11 @@ def test_server_connection(cmd):
 
     # The connection has been lost.
     c.connection_lost(None)
-    assert output_queue.get_nowait().id == 'm1'
+    message1 = output_queue.get_nowait()
+    assert message1.id == 'm1'
+    assert message1.type == 't1'
+    assert message1.content_type == 'text/plain'
+    assert message1.body == b'1'
     assert output_queue.get_nowait().id == 'm2'
     assert output_queue.get_nowait() is None
     transport.write.assert_not_called()
@@ -474,7 +484,7 @@ def test_server_connection(cmd):
     b'CONNECT\naccept-version:1.2\nheart-beat:invalid\n\n\x00',
     b'CONNECT\naccept-version:1.2\nheart-beat:-10,0\n\n\x00',
     b'DISCONNECT\nreceipt:m1\n\n\x00',
-    b'SEND\ndestination:dest\nreceipt:m1\n\n\body\x00',
+    b'SEND\ndestination:dest\nreceipt:m1\ntype:t1\n\n\body\x00',
 ])
 def test_server_connection_error(data):
     input_queue = asyncio.Queue()
@@ -500,9 +510,9 @@ def test_server_connection_error(data):
     b'protocol error',
     b'INVALIDCMD\n\n\x00',
     b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00',
-    b'SEND\nreceipt:m1\n\nbody\x00',
-    b'SEND\ndestination:/exchange/smp\n\nbody\x00',
-    b'SEND\ndestination:xxx\nreceipt:m1\n\nbody\x00',
+    b'SEND\nreceipt:m1\ntype:t1\n\nbody\x00',
+    b'SEND\ndestination:/exchange/smp\ntype:t1\n\nbody\x00',
+    b'SEND\ndestination:xxx\nreceipt:m1\ntype:t1\n\nbody\x00',
 ])
 def test_server_post_connection_error(data):
     input_queue = asyncio.Queue()
@@ -535,14 +545,14 @@ def test_server_command_after_disconnect():
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
     c.data_received(
-        b'SEND\ndestination:/exchange/smp\nreceipt:m1\n\n\body\x00',)
+        b'SEND\ndestination:/exchange/smp\nreceipt:m1\ntype:t1\n\n\body\x00',)
     c.data_received(b'DISCONNECT\nreceipt:m1\n\n\x00')
     transport.write.assert_not_called()
     assert c._connected
     assert not c._done
 
     c.data_received(
-        b'SEND\ndestination:/exchange/smp\nreceipt:m2\n\n\body\x00',)
+        b'SEND\ndestination:/exchange/smp\nreceipt:m2\ntype:t1\n\n\body\x00',)
     transport.write.assert_called_once()
     transport.write.assert_called_with(
         b'ERROR\nmessage:Received command after DISCONNECT.\n\n\x00')
@@ -749,7 +759,8 @@ async def test_simple_communication():
 
     async def publish_messages():
         for i in range(100):
-            m = Message(id=str(i), content_type='text/plain', body=bytearray(i))
+            m = Message(id=str(i), type='t1',
+                        content_type='text/plain', body=bytearray(i))
             await client_input.put(m)
         await client_input.put(None)
 

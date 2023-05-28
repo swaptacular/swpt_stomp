@@ -316,6 +316,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
             command='SEND',
             headers={
                 'destination': self._send_destination,
+                'type': message.type,
                 'content-type': message.content_type,
                 'persistent': 'true',
                 'receipt': message.id,
@@ -360,9 +361,10 @@ class StompServer(_BaseStompProtocol[str, Message]):
     NOTE: STOMP subscriptions and transactions are not supported. If a
     "SUBSCRIBE", "UNSUBSCRIBE", "ACK", "NACK", "BEGIN", "COMMIT", or "ABORT"
     command is received, the server will reply with an error. Also, this
-    implementation requires all "SEND" frames to have a "receipt" header.
-    Sending a message without requiring a confirmation from the server
-    simply does not make sense in Swaptacular's context.
+    implementation requires all "SEND" frames to have "receipt" and "type"
+    headers. Sending a message without a "type", or not requiring a
+    confirmation from the server, simply does not make sense in
+    Swaptacular's context.
     """
     def __init__(
             self,
@@ -450,6 +452,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
         content_type = headers.get('content-type', 'application/octet-stream')
         try:
             message_id = headers['receipt']
+            message_type = headers['type']
             destination = headers['destination']
         except KeyError as e:
             header = e.args[0]
@@ -467,6 +470,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
 
         message = Message(
             id=message_id,
+            type=message_type,
             content_type=content_type,
             body=frame.body,
         )
