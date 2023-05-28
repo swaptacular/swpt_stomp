@@ -219,7 +219,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
             host: str = '/',
-            send_destination: str = '/topic/smp',
+            send_destination: str = '/exchange/smp',
     ):
         super().__init__(
             input_queue,
@@ -372,7 +372,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
-            recv_destination: str = '/topic/smp'
+            recv_destination: str = '/exchange/smp'
     ):
         super().__init__(
             input_queue,
