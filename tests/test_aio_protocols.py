@@ -501,7 +501,7 @@ def test_server_connection_error(data):
     b'INVALIDCMD\n\n\x00',
     b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00',
     b'SEND\nreceipt:m1\n\nbody\x00',
-    b'SEND\ndestination:/exchange/smp\n\nbody\x00',
+    b'SEND\ndestination:/topic/smp\n\nbody\x00',
     b'SEND\ndestination:xxx\nreceipt:m1\n\nbody\x00',
 ])
 def test_server_post_connection_error(data):
@@ -535,14 +535,14 @@ def test_server_command_after_disconnect():
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
     c.data_received(
-        b'SEND\ndestination:/exchange/smp\nreceipt:m1\n\n\body\x00',)
+        b'SEND\ndestination:/topic/smp\nreceipt:m1\n\n\body\x00',)
     c.data_received(b'DISCONNECT\nreceipt:m1\n\n\x00')
     transport.write.assert_not_called()
     assert c._connected
     assert not c._done
 
     c.data_received(
-        b'SEND\ndestination:/exchange/smp\nreceipt:m2\n\n\body\x00',)
+        b'SEND\ndestination:/topic/smp\nreceipt:m2\n\n\body\x00',)
     transport.write.assert_called_once()
     transport.write.assert_called_with(
         b'ERROR\nmessage:Received command after DISCONNECT.\n\n\x00')
