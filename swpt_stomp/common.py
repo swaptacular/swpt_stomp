@@ -28,7 +28,7 @@ class WatermarkQueue(asyncio.Queue[_T]):
             low_watermark = high_watermark // 4
 
         if not 0 <= low_watermark <= high_watermark:
-            raise ValueError()
+            raise ValueError
 
         super().__init__()
         self.__paused = False

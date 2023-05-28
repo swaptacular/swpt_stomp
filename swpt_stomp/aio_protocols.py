@@ -1,6 +1,7 @@
 from typing import Optional, Union, Generic, TypeVar
 import asyncio
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from swpt_stomp.common import Message, WatermarkQueue
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
@@ -38,7 +39,7 @@ _U = TypeVar('_U')
 _V = TypeVar('_V')
 
 
-class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
+class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
     """Implements functionality common for STOMP clients and servers.
     """
     input_queue: asyncio.Queue[Union[_U, None, ServerError]]
@@ -117,7 +118,7 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
                 int(n) for n in peer_heartbeat.split(',', 2)
             ]
             if hb_send_min < 0 or hb_recv_desired < 0:
-                raise ValueError()
+                raise ValueError
         except ValueError:
             self._close_with_error('Received invalid heart-beat value.')
             return
@@ -177,14 +178,17 @@ class _BaseStompProtocol(asyncio.Protocol, Generic[_U, _V]):
             self._transport.close()
             self._done = True
 
+    @abstractmethod
     def _close_gracefully(self, error: Optional[ServerError]) -> None:
-        raise NotImplementedError()  # pragma: nocover
+        raise NotImplementedError  # pragma: nocover
 
+    @abstractmethod
     def _close_with_error(self, message: str) -> None:
-        raise NotImplementedError()  # pragma: nocover
+        raise NotImplementedError  # pragma: nocover
 
+    @abstractmethod
     def _send_frame(self, content: _U) -> None:
-        raise NotImplementedError()  # pragma: nocover
+        raise NotImplementedError  # pragma: nocover
 
 
 class StompClient(_BaseStompProtocol[Message, str]):
