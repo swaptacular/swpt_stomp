@@ -566,7 +566,9 @@ class StompServer(_BaseStompProtocol[str, Message]):
             context: Optional[bytearray] = None,
             context_content_type: Optional[str] = None,
     ) -> None:
-        _logger.error('Protocol error: %s', message)
+        # Log this as a warning, since this is client's problem, not ours.
+        _logger.warning('Protocol error: %s', message)
+
         self._send_error(message, receipt_id, context, context_content_type)
         self._close()
 
