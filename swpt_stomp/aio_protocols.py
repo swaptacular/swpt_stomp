@@ -32,6 +32,7 @@ class ServerError:
     error_message: str
     receipt_id: Optional[str] = None
     context: Optional[bytearray] = None
+    context_type: Optional[str] = None
     context_content_type: Optional[str] = None
 
 
@@ -527,11 +528,12 @@ class StompServer(_BaseStompProtocol[str, Message]):
         self._send_receipt_command(receipt_id)
         self._last_receipt_id = receipt_id
 
-    def _send_error(
+    def _send_error_frame(
             self,
             message: str,
             receipt_id: Optional[str] = None,
             context: Optional[bytearray] = None,
+            context_type: Optional[str] = None,
             context_content_type: Optional[str] = None,
     ) -> None:
         transport = self._transport
@@ -540,6 +542,8 @@ class StompServer(_BaseStompProtocol[str, Message]):
             headers = {'message': message}
             if receipt_id is not None:
                 headers['receipt-id'] = receipt_id
+            if context is not None and context_type is not None:
+                headers['type'] = context_type
             if context is not None and context_content_type is not None:
                 headers['content-type'] = context_content_type
 
@@ -553,6 +557,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
                 error.error_message,
                 error.receipt_id,
                 error.context,
+                error.context_type,
                 error.context_content_type,
             )
             return
@@ -564,15 +569,22 @@ class StompServer(_BaseStompProtocol[str, Message]):
             message: str,
             receipt_id: Optional[str] = None,
             context: Optional[bytearray] = None,
+            context_type: Optional[str] = None,
             context_content_type: Optional[str] = None,
     ) -> None:
         # Log this as a warning, since this is client's problem, not ours.
         _logger.warning('Protocol error: %s', message)
 
-        self._send_error(message, receipt_id, context, context_content_type)
+        self._send_error_frame(
+            message,
+            receipt_id,
+            context,
+            context_type,
+            context_content_type,
+        )
         self._close()
 
     def _close_with_warning(self, message: str) -> None:
         _logger.warning('Protocol warning: %s', message)
-        self._send_error(message)
+        self._send_error_frame(message)
         self._close()

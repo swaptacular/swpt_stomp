@@ -605,7 +605,7 @@ def test_server_close_gracefully_with_error():
     assert not c._done
 
     input_queue.put_nowait(
-        ServerError('err1', 'm1', bytearray(b'c1'), 'text/plain'))
+        ServerError('err1', 'm1', bytearray(b'c1'), 'msg-type', 'text/plain'))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(input_queue.join())
     transport.write.assert_called_once()
@@ -614,6 +614,7 @@ def test_server_close_gracefully_with_error():
     assert error_frame.endswith(b'\n\nc1\x00')
     assert b'message:err1\n' in error_frame
     assert b'receipt-id:m1\n' in error_frame
+    assert b'type:msg-type\n' in error_frame
     assert b'content-type:text/plain\n' in error_frame
     transport.close.assert_called_once()
     assert c._connected
