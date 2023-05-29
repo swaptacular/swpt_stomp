@@ -25,9 +25,9 @@ def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
 class ServerError:
     """Indicates that the server connection should be closed.
 
-    Instances of this class are intended to be added to `StompServer`'s
-    input queue, indicating that an error has occurred, and the connection
-    must be closed.
+    Instances of this class are intended to be added to `StompServer`'s send
+    queue, indicating that an error has occurred, and the connection must be
+    closed.
     """
     error_message: str
     receipt_id: Optional[str] = None
@@ -43,13 +43,13 @@ _V = TypeVar('_V')
 class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
     """Implements functionality common for STOMP clients and servers.
     """
-    input_queue: asyncio.Queue[Union[_U, None, ServerError]]
-    output_queue: WatermarkQueue[Union[_V, None]]
+    send_queue: asyncio.Queue[Union[_U, None, ServerError]]
+    recv_queue: WatermarkQueue[Union[_V, None]]
 
     def __init__(
             self,
-            input_queue: asyncio.Queue[Union[_U, None, ServerError]],
-            output_queue: WatermarkQueue[Union[_V, None]],
+            send_queue: asyncio.Queue[Union[_U, None, ServerError]],
+            recv_queue: WatermarkQueue[Union[_V, None]],
             *,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
@@ -58,8 +58,8 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         assert hb_send_min >= 0
         assert hb_recv_desired >= 0
 
-        self.input_queue = input_queue
-        self.output_queue = output_queue
+        self.send_queue = send_queue
+        self.recv_queue = recv_queue
         self._hb_send_min = hb_send_min
         self._hb_recv_desired = hb_recv_desired
         self._max_network_delay = max_network_delay
@@ -84,8 +84,8 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         loop = self._loop
         self._connection_started_at = loop.time()
         self._transport = transport
-        self.output_queue.add_high_watermark_callback(transport.pause_reading)
-        self.output_queue.add_low_watermark_callback(transport.resume_reading)
+        self.recv_queue.add_high_watermark_callback(transport.pause_reading)
+        self.recv_queue.add_low_watermark_callback(transport.resume_reading)
         loop.call_later(self._max_network_delay / 1000,
                         self._detect_connected_timeout)
 
@@ -103,9 +103,9 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
 
         t = self._transport
         assert t
-        self.output_queue.remove_high_watermark_callback(t.pause_reading)
-        self.output_queue.remove_low_watermark_callback(t.resume_reading)
-        self.output_queue.put_nowait(None)  # Marks the end.
+        self.recv_queue.remove_high_watermark_callback(t.pause_reading)
+        self.recv_queue.remove_low_watermark_callback(t.resume_reading)
+        self.recv_queue.put_nowait(None)  # Marks the end.
 
     def pause_writing(self) -> None:
         self._start_sending.clear()
@@ -135,7 +135,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         if self._hb_recv != 0:
             self._watchdog_task = loop.create_task(self._check_aliveness())
 
-        self._writer_task = loop.create_task(self._process_input_queue())
+        self._writer_task = loop.create_task(self._process_send_queue())
         self._connected = True
 
     def _detect_connected_timeout(self) -> None:
@@ -161,8 +161,8 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
                     f'No data received for {watchdog_seconds:.3f} seconds.')
                 return
 
-    async def _process_input_queue(self) -> None:
-        queue = self.input_queue
+    async def _process_send_queue(self) -> None:
+        queue = self.send_queue
         while await self._start_sending.wait():
             obj = await queue.get()
             if obj is None or isinstance(obj, ServerError):
@@ -199,16 +199,16 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
 class StompClient(_BaseStompProtocol[Message, str]):
     """STOMP 1.2 client that sends messages to a STOMP 1.2 server.
 
-    The input queue must contain an ordered sequence of messages, which will
-    be sent to the server. Putting `None` in the input message queue will
+    The send queue must contain an ordered sequence of messages, which will
+    be sent to the server. Putting `None` in the send message queue will
     close the connection.
 
-    The output queue will contain an ordered sequence of confirmed message
+    The receive queue will contain an ordered sequence of confirmed message
     IDs. When a given message is confirmed, this also implicitly confirms
     all preceding messages. In fact, it is guaranteed that another
     confirmation will not be received for the given message, or the
     preceding messages. Also, when the connection is closed, a `None` will
-    automatically be added to the output queue.
+    automatically be added to the receive queue.
 
     STOMP subscriptions and transactions are not supported. Also, this
     implementation sets a "persistent:true" header to all "SEND" frames, so
@@ -217,8 +217,8 @@ class StompClient(_BaseStompProtocol[Message, str]):
     """
     def __init__(
             self,
-            input_queue: asyncio.Queue[Union[Message, None, ServerError]],
-            output_queue: WatermarkQueue[Union[str, None]],
+            send_queue: asyncio.Queue[Union[Message, None, ServerError]],
+            recv_queue: WatermarkQueue[Union[str, None]],
             *,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
@@ -229,8 +229,8 @@ class StompClient(_BaseStompProtocol[Message, str]):
             send_destination: str = '/exchange/smp',
     ):
         super().__init__(
-            input_queue,
-            output_queue,
+            send_queue,
+            recv_queue,
             hb_send_min=hb_send_min,
             hb_recv_desired=hb_recv_desired,
             max_network_delay=max_network_delay,
@@ -310,7 +310,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
             self._close_with_error('RECEIPT command without a receipt ID.')
             return
 
-        self.output_queue.put_nowait(receipt_id)
+        self.recv_queue.put_nowait(receipt_id)
         self._last_receipt_id = receipt_id
 
         if self._sent_disconnect and receipt_id == self._last_message_id:
@@ -363,16 +363,16 @@ class StompClient(_BaseStompProtocol[Message, str]):
 class StompServer(_BaseStompProtocol[str, Message]):
     """STOMP 1.2 server that receives messages from a STOMP 1.2 client.
 
-    The output queue will contain an ordered sequence of messages, received
+    The receive queue will contain an ordered sequence of messages, received
     from the client. Also, when the connection is closed, a `None` will be
-    automatically added to the output queue.
+    automatically added to the receive queue.
 
-    The input queue must contain an ordered sequence of confirmed message
+    The send queue must contain an ordered sequence of confirmed message
     IDs. When a given message is confirmed, this also implicitly confirms
     all preceding messages. In fact, it must be guaranteed that another
     confirmation will not be received for the given message, or the
     preceding messages. Putting `None`, or a `ServerError` instance, in the
-    input queue will close the connection.
+    send queue will close the connection.
 
     NOTE: STOMP subscriptions and transactions are not supported. If a
     "SUBSCRIBE", "UNSUBSCRIBE", "ACK", "NACK", "BEGIN", "COMMIT", or "ABORT"
@@ -384,8 +384,8 @@ class StompServer(_BaseStompProtocol[str, Message]):
     """
     def __init__(
             self,
-            input_queue: asyncio.Queue[Union[str, None, ServerError]],
-            output_queue: WatermarkQueue[Union[Message, None]],
+            send_queue: asyncio.Queue[Union[str, None, ServerError]],
+            recv_queue: WatermarkQueue[Union[Message, None]],
             *,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
@@ -393,8 +393,8 @@ class StompServer(_BaseStompProtocol[str, Message]):
             recv_destination: str = '/exchange/smp'
     ):
         super().__init__(
-            input_queue,
-            output_queue,
+            send_queue,
+            recv_queue,
             hb_send_min=hb_send_min,
             hb_recv_desired=hb_recv_desired,
             max_network_delay=max_network_delay,
@@ -490,7 +490,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             content_type=content_type,
             body=frame.body,
         )
-        self.output_queue.put_nowait(message)
+        self.recv_queue.put_nowait(message)
         self._last_message_id = message_id
 
     def _received_disconnect_command(self, frame: StompFrame) -> None:
