@@ -730,14 +730,14 @@ test = ["coverage", "pycodestyle", "pyflakes", "pylint", "pytest", "pytest-cov"]
 
 [[package]]
 name = "python-lsp-server"
-version = "1.7.2"
+version = "1.7.3"
 description = "Python Language Server for the Language Server Protocol"
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "python-lsp-server-1.7.2.tar.gz", hash = "sha256:b2433467d0fcb8fd45828463ff1cc805837c08731fcea5d7d953d9be776881e1"},
-    {file = "python_lsp_server-1.7.2-py3-none-any.whl", hash = "sha256:eb57ce2f119b8f952eb0af4566b5251b5e6ff14150b6180ba9828966e0e4faaa"},
+    {file = "python-lsp-server-1.7.3.tar.gz", hash = "sha256:a31b0525be6ec831c7d2b476b744e5aa5074633e1d1b77ee97f332cde15983ea"},
+    {file = "python_lsp_server-1.7.3-py3-none-any.whl", hash = "sha256:f4ae64834da1d4312067a8ee05a76c7652167c3c90d1cef44022366d695c4c0e"},
 ]
 
 [package.dependencies]
@@ -754,13 +754,12 @@ pylint = {version = ">=2.5.0,<3", optional = true, markers = "extra == \"all\""}
 python-lsp-jsonrpc = ">=1.0.0"
 rope = {version = ">1.2.0", optional = true, markers = "extra == \"all\""}
 setuptools = ">=39.0.0"
-toml = {version = "*", optional = true, markers = "extra == \"all\""}
 ujson = ">=3.0.0"
 whatthepatch = {version = ">=1.0.2,<2.0.0", optional = true, markers = "extra == \"all\""}
-yapf = {version = "<=0.32.0", optional = true, markers = "extra == \"all\""}
+yapf = {version = ">=0.33.0", optional = true, markers = "extra == \"all\""}
 
 [package.extras]
-all = ["autopep8 (>=1.6.0,<2.1.0)", "flake8 (>=5.0.0,<7)", "mccabe (>=0.7.0,<0.8.0)", "pycodestyle (>=2.9.0,<2.11.0)", "pydocstyle (>=6.3.0,<6.4.0)", "pyflakes (>=2.5.0,<3.1.0)", "pylint (>=2.5.0,<3)", "rope (>1.2.0)", "toml", "whatthepatch (>=1.0.2,<2.0.0)", "yapf (<=0.32.0)"]
+all = ["autopep8 (>=1.6.0,<2.1.0)", "flake8 (>=5.0.0,<7)", "mccabe (>=0.7.0,<0.8.0)", "pycodestyle (>=2.9.0,<2.11.0)", "pydocstyle (>=6.3.0,<6.4.0)", "pyflakes (>=2.5.0,<3.1.0)", "pylint (>=2.5.0,<3)", "rope (>1.2.0)", "whatthepatch (>=1.0.2,<2.0.0)", "yapf (>=0.33.0)"]
 autopep8 = ["autopep8 (>=1.6.0,<2.1.0)"]
 flake8 = ["flake8 (>=5.0.0,<7)"]
 mccabe = ["mccabe (>=0.7.0,<0.8.0)"]
@@ -771,7 +770,7 @@ pylint = ["pylint (>=2.5.0,<3)"]
 rope = ["rope (>1.2.0)"]
 test = ["coverage", "flaky", "matplotlib", "numpy", "pandas", "pylint (>=2.5.0,<3)", "pyqt5", "pytest", "pytest-cov"]
 websockets = ["websockets (>=10.3)"]
-yapf = ["toml", "whatthepatch (>=1.0.2,<2.0.0)", "yapf (<=0.32.0)"]
+yapf = ["whatthepatch (>=1.0.2,<2.0.0)", "yapf (>=0.33.0)"]
 
 [[package]]
 name = "pytoolconfig"
@@ -842,18 +841,6 @@ python-versions = "*"
 files = [
     {file = "snowballstemmer-2.2.0-py2.py3-none-any.whl", hash = "sha256:c8e1716e83cc398ae16824e5572ae04e0d9fc2c6b985fb0f900f5f0c96ecba1a"},
     {file = "snowballstemmer-2.2.0.tar.gz", hash = "sha256:09b16deb8547d3412ad7b590689584cd0fe25ec8db3be37788be3810cbf19cb1"},
-]
-
-[[package]]
-name = "toml"
-version = "0.10.2"
-description = "Python Library for Tom's Obvious, Minimal Language"
-category = "dev"
-optional = false
-python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
-files = [
-    {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
-    {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
 ]
 
 [[package]]
@@ -1066,15 +1053,18 @@ files = [
 
 [[package]]
 name = "yapf"
-version = "0.32.0"
+version = "0.33.0"
 description = "A formatter for Python code."
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "yapf-0.32.0-py2.py3-none-any.whl", hash = "sha256:8fea849025584e486fd06d6ba2bed717f396080fd3cc236ba10cb97c4c51cf32"},
-    {file = "yapf-0.32.0.tar.gz", hash = "sha256:a3f5085d37ef7e3e004c4ba9f9b3e40c54ff1901cd111f05145ae313a7c67d1b"},
+    {file = "yapf-0.33.0-py2.py3-none-any.whl", hash = "sha256:4c2b59bd5ffe46f3a7da48df87596877189148226ce267c16e8b44240e51578d"},
+    {file = "yapf-0.33.0.tar.gz", hash = "sha256:da62bdfea3df3673553351e6246abed26d9fe6780e548a5af9e70f6d2b4f5b9a"},
 ]
+
+[package.dependencies]
+tomli = ">=2.0.1"
 
 [[package]]
 name = "yarl"
