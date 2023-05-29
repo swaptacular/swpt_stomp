@@ -20,6 +20,8 @@ def test_client_connection():
         hb_send_min=1000,
         hb_recv_desired=90,
         send_destination='dest',
+        login='user',
+        passcode='password',
     )
     assert c.input_queue is input_queue
     assert c.output_queue is output_queue
@@ -28,7 +30,8 @@ def test_client_connection():
     transport = NonCallableMock()
     c.connection_made(transport)
     transport.write.assert_called_with(
-        b'STOMP\naccept-version:1.2\nhost:/\nheart-beat:1000,90\n\n\x00')
+        b'STOMP\naccept-version:1.2\nhost:/\nheart-beat:1000,90\n'
+        + b'login:user\npasscode:password\n\n\x00')
     transport.write.reset_mock()
     transport.close.assert_not_called()
     assert not c._connected

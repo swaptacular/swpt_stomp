@@ -223,6 +223,8 @@ class StompClient(_BaseStompProtocol[Message, str]):
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
             host: str = '/',
+            login: Optional[str] = None,
+            passcode: Optional[str] = None,
             send_destination: str = '/exchange/smp',
     ):
         super().__init__(
@@ -233,6 +235,8 @@ class StompClient(_BaseStompProtocol[Message, str]):
             max_network_delay=max_network_delay,
         )
         self._host = host
+        self._login = login
+        self._passcode = passcode
         self._send_destination = send_destination
         self._last_message_id: Optional[str] = None
         self._last_receipt_id: Optional[str] = None
@@ -243,14 +247,17 @@ class StompClient(_BaseStompProtocol[Message, str]):
             transport: asyncio.Transport,  # type: ignore[override]
     ) -> None:
         super().connection_made(transport)
-        connect_frame = StompFrame(
-            command='STOMP',
-            headers={
-                'accept-version': '1.2',
-                'host': self._host,
-                'heart-beat': f'{self._hb_send_min},{self._hb_recv_desired}',
-            },
-        )
+        headers = {
+            'accept-version': '1.2',
+            'host': self._host,
+            'heart-beat': f'{self._hb_send_min},{self._hb_recv_desired}',
+        }
+        if self._login is not None:
+            headers['login'] = self._login
+        if self._passcode is not None:
+            headers['passcode'] = self._passcode
+
+        connect_frame = StompFrame(command='STOMP', headers=headers)
         transport.write(bytes(connect_frame))
 
     def data_received(self, data: bytes) -> None:
