@@ -156,7 +156,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         while not self._done:
             await asyncio.sleep(sleep_seconds)
             if loop.time() - self._data_receved_at > watchdog_seconds:
-                self._close_with_error(
+                self._close_with_warning(
                     f'No data received for {watchdog_seconds:.3f} seconds.')
                 return
 
@@ -184,6 +184,10 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
 
     @abstractmethod
     def _close_with_error(self, message: str) -> None:
+        raise NotImplementedError  # pragma: nocover
+
+    @abstractmethod
+    def _close_with_warning(self, message: str) -> None:
         raise NotImplementedError  # pragma: nocover
 
     @abstractmethod
@@ -340,7 +344,11 @@ class StompClient(_BaseStompProtocol[Message, str]):
         self._sent_disconnect = True
 
     def _close_with_error(self, message: str) -> None:
-        _logger.warning('Protocol error: %s', message)
+        _logger.error('Protocol error: %s', message)
+        self._close()
+
+    def _close_with_warning(self, message: str) -> None:
+        _logger.warning('Protocol warning: %s', message)
         self._close()
 
 
@@ -512,19 +520,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
         self._send_receipt_command(receipt_id)
         self._last_receipt_id = receipt_id
 
-    def _close_gracefully(self, error: Optional[ServerError]) -> None:
-        if isinstance(error, ServerError):
-            self._close_with_error(
-                error.error_message,
-                error.receipt_id,
-                error.context,
-                error.context_content_type,
-            )
-            return
-
-        self._close_with_error('The connection has been closed by the server.')
-
-    def _close_with_error(
+    def _send_error(
             self,
             message: str,
             receipt_id: Optional[str] = None,
@@ -544,5 +540,30 @@ class StompServer(_BaseStompProtocol[str, Message]):
             error_frame = StompFrame('ERROR', headers, body)
             transport.write(bytes(error_frame))
 
-        _logger.warning('Protocol error: %s', message)
+    def _close_gracefully(self, error: Optional[ServerError]) -> None:
+        if isinstance(error, ServerError):
+            self._close_with_error(
+                error.error_message,
+                error.receipt_id,
+                error.context,
+                error.context_content_type,
+            )
+            return
+
+        self._close_with_error('The connection has been closed by the server.')
+
+    def _close_with_error(
+            self,
+            message: str,
+            receipt_id: Optional[str] = None,
+            context: Optional[bytearray] = None,
+            context_content_type: Optional[str] = None,
+    ) -> None:
+        _logger.error('Protocol error: %s', message)
+        self._send_error(message, receipt_id, context, context_content_type)
+        self._close()
+
+    def _close_with_warning(self, message: str) -> None:
+        _logger.warning('Protocol warning: %s', message)
+        self._send_error(message)
         self._close()
