@@ -354,6 +354,52 @@ def test_client_graceful_disconnect():
     assert output_queue.get_nowait() is None
 
 
+@pytest.mark.skip('Requires external STOMP server.')
+@pytest.mark.asyncio
+async def test_client_with_external_server():
+    loop = asyncio.get_running_loop()
+
+    # Connect a client.
+    client_input = asyncio.Queue(10)
+    client_output = WatermarkQueue(10)
+    transport, protocol = await loop.create_connection(
+        lambda: StompClient(
+            client_input,
+            client_output,
+            host='/',
+            login='guest',
+            passcode='guest',
+            send_destination='/queue/test_stomp',
+        ),
+        host='127.0.0.1',
+        port=61613,
+    )
+    client_acks = []
+
+    async def publish_messages():
+        for i in range(100):
+            m = Message(id=str(i), type='t1',
+                        content_type='text/plain', body=bytearray(i))
+            await client_input.put(m)
+
+        await client_input.put(None)
+
+    async def process_message_acks():
+        while message_id := await client_output.get():
+            client_acks.append(message_id)
+            client_output.task_done()
+
+    client_publish_task = loop.create_task(publish_messages())
+    client_ack_task = loop.create_task(process_message_acks())
+
+    # Stop the server once all messages have been confirmed.
+    await asyncio.wait([
+        client_publish_task,
+        client_ack_task,
+    ])
+    assert '99' in client_acks
+
+
 #######################
 # `StompServer` tests #
 #######################
