@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import aio_pika
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 from swpt_stomp.common import Message, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY
 from swpt_stomp.aio_protocols import ServerError
 
@@ -16,6 +16,7 @@ async def consume_rabbitmq_queue(
         queue_name: str,
         prefetch_size: int = 0,
         timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        transform_message_body: Callable[[bytes], bytearray] = bytearray,
 ) -> None:
     loop = asyncio.get_event_loop()
     connection = await aio_pika.connect(rmq_url, timeout=timeout)
@@ -45,11 +46,12 @@ async def consume_rabbitmq_queue(
                     if delivery_tag is None:
                         raise RuntimeError('Message without a delivery tag.')
 
+                    body = transform_message_body(message.body)
                     await send_queue.put(
                         Message(
                             id=str(delivery_tag),
                             type=message_type,
-                            body=bytearray(message.body),  # TODO: parse?
+                            body=body,
                             content_type=message_content_type,
                         ))
 
