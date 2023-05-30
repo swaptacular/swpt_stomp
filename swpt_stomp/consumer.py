@@ -32,7 +32,7 @@ async def consume_rabbitmq_queue(
 
         async def consume_queue() -> None:
             queue = await channel.get_queue(queue_name, ensure=False)
-            async with queue.iterator(timeout=timeout) as queue_iter:
+            async with queue.iterator() as queue_iter:
                 async for message in queue_iter:
                     message_type = message.type
                     if message_type is None:
