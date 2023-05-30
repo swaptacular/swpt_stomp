@@ -46,12 +46,12 @@ async def consume_rabbitmq_queue(
                     if delivery_tag is None:
                         raise RuntimeError('Message without a delivery tag.')
 
-                    body = transform_message_body(message.body)
+                    message_body = transform_message_body(message.body)
                     await send_queue.put(
                         Message(
                             id=str(delivery_tag),
                             type=message_type,
-                            body=body,
+                            body=message_body,
                             content_type=message_content_type,
                         ))
 
