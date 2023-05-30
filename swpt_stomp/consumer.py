@@ -72,6 +72,8 @@ async def consume_rabbitmq_queue(
         send_acks_task = loop.create_task(send_acks())
         try:
             await asyncio.gather(consume_queue_task, send_acks_task)
+        except asyncio.CancelledError:
+            _logger.info('Cancelled consuming from %s.', queue_name)
         finally:
             consume_queue_task.cancel()
             send_acks_task.cancel()
