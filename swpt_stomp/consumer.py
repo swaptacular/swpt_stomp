@@ -22,7 +22,7 @@ async def consume_rabbitmq_queue(
     connection = await aio_pika.connect(rmq_url, timeout=timeout)
 
     async with connection:
-        channel = await connection.channel()
+        channel = await asyncio.wait_for(connection.channel(), timeout)
 
         await channel.set_qos(
             prefetch_count=max(send_queue.maxsize, 1),
