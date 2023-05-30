@@ -3,12 +3,11 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from swpt_stomp.common import Message, WatermarkQueue
+from swpt_stomp.common import Message, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 
 DEFAULT_HB_SEND_MIN = 5_000  # 5 seconds
 DEFAULT_HB_RECV_DESIRED = 30_000  # 30 seconds
-DEFAULT_MAX_NETWORK_DELAY = 10_000  # 10 seconds
 _logger = logging.getLogger(__name__)
 
 

@@ -4,6 +4,7 @@ import asyncio
 
 _T = TypeVar("_T")
 Callback = Callable[[], Any]
+DEFAULT_MAX_NETWORK_DELAY = 10_000  # 10 seconds
 
 
 @dataclass

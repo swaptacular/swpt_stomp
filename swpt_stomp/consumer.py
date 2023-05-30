@@ -2,7 +2,7 @@ import logging
 import asyncio
 import aio_pika
 from typing import Optional, Union
-from swpt_stomp.common import Message, WatermarkQueue
+from swpt_stomp.common import Message, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY
 from swpt_stomp.aio_protocols import ServerError
 
 _logger = logging.getLogger(__name__)
@@ -12,27 +12,26 @@ async def consume_rabbitmq_queue(
         send_queue: asyncio.Queue[Union[Message, None, ServerError]],
         recv_queue: WatermarkQueue[Union[str, None]],
         *,
-        rabbitmq_url: str,
+        rmq_url: str,
         queue_name: str,
-        prefetch_count: int = 0,
         prefetch_size: int = 0,
-        timeout: Optional[float] = None,
+        timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
     loop = asyncio.get_event_loop()
-    connection = await aio_pika.connect(rabbitmq_url, timeout=timeout)
+    connection = await aio_pika.connect(rmq_url, timeout=timeout)
 
     async with connection:
         channel = await connection.channel()
 
         await channel.set_qos(
-            prefetch_count=prefetch_count,
+            prefetch_count=max(send_queue.maxsize, 1),
             prefetch_size=prefetch_size,
             timeout=timeout,
         )
 
         async def consume_queue() -> None:
             queue = await channel.get_queue(queue_name, ensure=False)
-            async with queue.iterator() as queue_iter:
+            async with queue.iterator(timeout=timeout) as queue_iter:
                 async for message in queue_iter:
                     message_type = message.type
                     if message_type is None:
