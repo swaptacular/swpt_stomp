@@ -287,6 +287,12 @@ class StompClient(_BaseStompProtocol[Message, str]):
             if self._done:
                 break
 
+    def connection_lost(self, exc: Optional[Exception]) -> None:
+        if not self._done:
+            _logger.warning('The connection to the STOMP server has been lost.')
+
+        super().connection_lost(exc)
+
     def _received_connected_command(self, frame: StompFrame) -> None:
         if self._connected:
             self._close_with_error('Received CONNECTED command more than once.')
