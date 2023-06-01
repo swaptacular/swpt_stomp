@@ -60,7 +60,6 @@ async def _consume_rmq_queue(
         transform_message_body: Callable[[bytes], bytearray] = bytearray,
 ) -> None:
     _logger.info('Connecting to %s.', rmq_url)
-    loop = asyncio.get_event_loop()
     connection = await aio_pika.connect(rmq_url, timeout=timeout)
 
     async with connection:
@@ -115,6 +114,7 @@ async def _consume_rmq_queue(
 
             consume_queue_task.cancel()
 
+        loop = asyncio.get_event_loop()
         consume_queue_task = loop.create_task(consume_queue())
         send_acks_task = loop.create_task(send_acks())
         try:
