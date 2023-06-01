@@ -7,7 +7,8 @@ from swpt_stomp.common import Message, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY
 from swpt_stomp.aio_protocols import ServerError
 
 _logger = logging.getLogger(__name__)
-_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
+_RMQ_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
+_RMQ_RECONNECT_ATTEMPT_SECONDS = 10.0
 
 
 async def consume_rmq_queue(
@@ -20,18 +21,33 @@ async def consume_rmq_queue(
         timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
         transform_message_body: Callable[[bytes], bytearray] = bytearray,
 ) -> None:
-    try:
-        await _consume_rmq_queue(
-            send_queue,
-            recv_queue,
-            rmq_url=rmq_url,
-            queue_name=queue_name,
-            prefetch_size=prefetch_size,
-            timeout=timeout,
-            transform_message_body=transform_message_body,
-        )
-    except _CONNECTION_ERRORS:  # This catches several error types.
-        _logger.exception('Lost connection to the RabbitMQ server.')
+    """Consumes from a RabbitMQ queue until the STOMP connection is closed.
+
+    If the connection to the RabbitMQ server has been lost for some reason,
+    attempts to reconnect will be made ad infinitum. `send_queue.maxsize`
+    will determine the queue's prefetch count. If passed, the
+    `transform_message_body` function may change the message body before
+    sending it over the STOMP connection.
+    """
+
+    while True:
+        try:
+            await _consume_rmq_queue(
+                send_queue,
+                recv_queue,
+                rmq_url=rmq_url,
+                queue_name=queue_name,
+                prefetch_size=prefetch_size,
+                timeout=timeout,
+                transform_message_body=transform_message_body,
+            )
+        except _RMQ_CONNECTION_ERRORS:  # This catches several error types.
+            _logger.exception('Lost connection to %s.', rmq_url)
+            await asyncio.sleep(_RMQ_RECONNECT_ATTEMPT_SECONDS)
+        else:
+            # `None` has been posted to the `recv_queue`, which means that
+            # the STOMP connection has been closed.
+            break
 
 
 async def _consume_rmq_queue(
@@ -44,6 +60,7 @@ async def _consume_rmq_queue(
         timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
         transform_message_body: Callable[[bytes], bytearray] = bytearray,
 ) -> None:
+    _logger.info('Connecting to %s.', rmq_url)
     loop = asyncio.get_event_loop()
     connection = await aio_pika.connect(rmq_url, timeout=timeout)
 
@@ -59,6 +76,7 @@ async def _consume_rmq_queue(
         async def consume_queue() -> None:
             queue = await channel.get_queue(queue_name, ensure=False)
             async with queue.iterator() as queue_iter:
+                _logger.info('Started consuming from %s.', queue_name)
                 async for message in queue_iter:
                     message_type = message.type
                     if message_type is None:
@@ -103,7 +121,9 @@ async def _consume_rmq_queue(
         try:
             await asyncio.gather(consume_queue_task, send_acks_task)
         except asyncio.CancelledError:
-            _logger.info('Cancelled consuming from %s.', queue_name)
+            pass
         finally:
             consume_queue_task.cancel()
             send_acks_task.cancel()
+
+    _logger.info('Disconnected from %s.', rmq_url)
