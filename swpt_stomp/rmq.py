@@ -29,7 +29,6 @@ async def consume_rmq_queue(
     `transform_message_body` function may change the message body before
     sending it over the STOMP connection.
     """
-
     while True:
         try:
             await _consume_rmq_queue(
