@@ -132,15 +132,15 @@ async def _consume_rmq_queue(
                         # here, but this would be erroneously treated as a
                         # connection error, because RuntimeError is in
                         # aio_pika's CONNECTION_EXCEPTIONS.
-                        raise ValueError('Message without a type.')
+                        raise Exception('Message without a type.')
 
                     message_content_type = message.content_type
                     if message_content_type is None:
-                        raise ValueError('Message without a content-type.')
+                        raise Exception('Message without a content-type.')
 
                     delivery_tag = message.delivery_tag
                     if delivery_tag is None:
-                        raise ValueError('Message without a delivery tag.')
+                        raise Exception('Message without a delivery tag.')
 
                     message_body = transform_message_body(message.body)
                     await send_queue.put(
@@ -239,7 +239,7 @@ async def _publish_to_rmq_exchange(
             while message := await recv_queue.get():
                 delivery = _Delivery(message.id, False)
 
-                # TODO: Pause if too much deliveries are waiting.
+                # TODO: Pause if too many deliveries are waiting.
                 deliveries.append(delivery)
 
                 confirmation = asyncio.ensure_future(publish(message))
@@ -247,6 +247,9 @@ async def _publish_to_rmq_exchange(
                     partial(on_confirmation, delivery))
                 pending_confirmations.add(confirmation)
                 recv_queue.task_done()
+
+            send_receipts_task.cancel()
+            report_errors_task.cancel()
 
         async def send_receipts() -> None:
             while await has_confirmed_deliveries.wait():
