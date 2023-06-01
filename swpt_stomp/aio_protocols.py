@@ -485,6 +485,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
                 f'Invalid SEND destination "{destination}".',
                 message_id,
                 frame.body,
+                message_type,
                 content_type,
             )
             return
