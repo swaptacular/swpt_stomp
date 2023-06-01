@@ -1,14 +1,40 @@
 import logging
 import asyncio
 import aio_pika
+from aio_pika.exceptions import CONNECTION_EXCEPTIONS
 from typing import Optional, Union, Callable
 from swpt_stomp.common import Message, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY
 from swpt_stomp.aio_protocols import ServerError
 
 _logger = logging.getLogger(__name__)
+_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
 
 
-async def consume_rabbitmq_queue(
+async def consume_rmq_queue(
+        send_queue: asyncio.Queue[Union[Message, None, ServerError]],
+        recv_queue: WatermarkQueue[Union[str, None]],
+        *,
+        rmq_url: str,
+        queue_name: str,
+        prefetch_size: int = 0,
+        timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        transform_message_body: Callable[[bytes], bytearray] = bytearray,
+) -> None:
+    try:
+        await _consume_rmq_queue(
+            send_queue,
+            recv_queue,
+            rmq_url=rmq_url,
+            queue_name=queue_name,
+            prefetch_size=prefetch_size,
+            timeout=timeout,
+            transform_message_body=transform_message_body,
+        )
+    except _CONNECTION_ERRORS:  # This catches several error types.
+        _logger.exception('Lost connection to the RabbitMQ server.')
+
+
+async def _consume_rmq_queue(
         send_queue: asyncio.Queue[Union[Message, None, ServerError]],
         recv_queue: WatermarkQueue[Union[str, None]],
         *,
@@ -36,15 +62,19 @@ async def consume_rabbitmq_queue(
                 async for message in queue_iter:
                     message_type = message.type
                     if message_type is None:
-                        raise RuntimeError('Message without a type.')
+                        # It would be more natural to raise a RuntimeError
+                        # here, but this would be erroneously treated as a
+                        # connection error, because RuntimeError is in
+                        # aio_pika's CONNECTION_EXCEPTIONS.
+                        raise ValueError('Message without a type.')
 
                     message_content_type = message.content_type
                     if message_content_type is None:
-                        raise RuntimeError('Message without a content-type.')
+                        raise ValueError('Message without a content-type.')
 
                     delivery_tag = message.delivery_tag
                     if delivery_tag is None:
-                        raise RuntimeError('Message without a delivery tag.')
+                        raise ValueError('Message without a delivery tag.')
 
                     message_body = transform_message_body(message.body)
                     await send_queue.put(
