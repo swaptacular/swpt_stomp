@@ -16,11 +16,12 @@ _RMQ_RECONNECT_ATTEMPT_SECONDS = 10.0
 _PERSISTENT = aio_pika.DeliveryMode.PERSISTENT
 
 
-@dataclass
 class _Delivery:
     __slots__ = ('message_id', 'confirmed')
-    message_id: str
-    confirmed: bool
+
+    def __init__(self, message_id: str):
+        self.message_id = message_id
+        self.confirmed = False
 
 
 @dataclass
@@ -214,16 +215,16 @@ async def _publish_to_rmq_exchange(
                 delivery: _Delivery,
                 confirmation: asyncio.Future,
         ) -> None:
-            nonlocal failed_confirmation
             pending_confirmations.remove(confirmation)
-            if confirmation.cancelled() or confirmation.exception():
+            failed = confirmation.cancelled() or confirmation.exception()
+            if failed:
+                nonlocal failed_confirmation
                 if failed_confirmation is None:
                     failed_confirmation = confirmation
                     has_failed_confirmations.set()
-                return
-
-            delivery.confirmed = True
-            has_confirmed_deliveries.set()
+            else:
+                delivery.confirmed = True
+                has_confirmed_deliveries.set()
 
         async def deliver(message: Message) -> None:
             m = transform_message(message)
@@ -242,7 +243,7 @@ async def _publish_to_rmq_exchange(
 
         async def publish_messages() -> None:
             while message := await recv_queue.get():
-                delivery = _Delivery(message.id, False)
+                delivery = _Delivery(message.id)
                 mark_as_confirmed = partial(on_confirmation, delivery)
 
                 await can_make_deliveries.wait()
@@ -261,10 +262,8 @@ async def _publish_to_rmq_exchange(
 
         async def send_receipts() -> None:
             while True:
+                receipt_id = None
                 await has_confirmed_deliveries.wait()
-                has_confirmed_deliveries.clear()
-
-                receipt_id: Optional[str] = None
                 while deliveries:
                     first = deliveries[0]
                     if not first.confirmed:
@@ -272,6 +271,7 @@ async def _publish_to_rmq_exchange(
                     receipt_id = first.message_id
                     deliveries.popleft()
 
+                has_confirmed_deliveries.clear()
                 if receipt_id is not None:
                     if len(deliveries) < max_parallel_deliveries:
                         can_make_deliveries.set()
@@ -279,7 +279,7 @@ async def _publish_to_rmq_exchange(
 
         async def report_failed_confirmations() -> None:
             await has_failed_confirmations.wait()
-            assert failed_confirmation
+            assert failed_confirmation is not None
             try:
                 await failed_confirmation
             except ServerError as e:
