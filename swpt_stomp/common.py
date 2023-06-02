@@ -15,7 +15,6 @@ class Message:
     content_type: str = 'application/octet-stream'
 
 
-@dataclass
 class ServerError(Exception):
     """Indicates that the server connection should be closed.
 
@@ -23,11 +22,20 @@ class ServerError(Exception):
     queue, indicating that an error has occurred, and the connection must be
     closed.
     """
-    error_message: str
-    receipt_id: Optional[str] = None
-    context: Optional[bytearray] = None
-    context_type: Optional[str] = None
-    context_content_type: Optional[str] = None
+    def __init__(
+            self,
+            error_message: str,
+            receipt_id: Optional[str] = None,
+            context: Optional[bytearray] = None,
+            context_type: Optional[str] = None,
+            context_content_type: Optional[str] = None,
+    ):
+        super().__init__(error_message)
+        self.error_message = error_message
+        self.receipt_id = receipt_id
+        self.context = context
+        self.context_type = context_type
+        self.context_content_type = context_content_type
 
 
 class WatermarkQueue(asyncio.Queue[_T]):
