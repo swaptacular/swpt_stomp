@@ -72,7 +72,7 @@ async def publish_to_exchange(
         *,
         rmq_url: str,
         exchange_name: str,
-        transform_message: Callable[[Message], Awaitable[RmqMessage]],
+        preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
     """Publishes to a RabbitMQ exchange until the STOMP connection is closed.
@@ -81,7 +81,7 @@ async def publish_to_exchange(
     attempts to reconnect will be made ad infinitum. `send_queue.maxsize`
     will determine how many messages are allowed to be published in "a
     batch", without receiving publish confirmations for them. The
-    `transform_message` coroutine may validate the message, change the
+    `preprocess_message` coroutine may validate the message, change the
     message body, add message headers, or raise a `ServerError`. But most
     importantly, it generates a routing key, before publishing the message
     to the RabbitMQ exchange.
@@ -93,7 +93,7 @@ async def publish_to_exchange(
                 recv_queue,
                 rmq_url=rmq_url,
                 exchange_name=exchange_name,
-                transform_message=transform_message,
+                preprocess_message=preprocess_message,
                 timeout=timeout,
             )
         except _RMQ_CONNECTION_ERRORS:
@@ -189,7 +189,7 @@ async def _publish_to_exchange(
         *,
         rmq_url: str,
         exchange_name: str,
-        transform_message: Callable[[Message], Awaitable[RmqMessage]],
+        preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
     _logger.info('Connecting to %s.', rmq_url)
@@ -223,7 +223,7 @@ async def _publish_to_exchange(
                 has_confirmed_deliveries.set()
 
         async def deliver(message: Message) -> None:
-            m = await transform_message(message)
+            m = await preprocess_message(message)
             await exchange.publish(
                 aio_pika.Message(
                     m.body,
