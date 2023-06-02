@@ -3,7 +3,7 @@ import asyncio
 import aio_pika
 from functools import partial
 from dataclasses import dataclass
-from typing import Optional, Union, Callable
+from typing import Optional, Union, Callable, Awaitable
 from collections import deque
 from aio_pika.abc import HeadersType
 from aio_pika.exceptions import CONNECTION_EXCEPTIONS
@@ -72,7 +72,7 @@ async def publish_to_exchange(
         *,
         rmq_url: str,
         exchange_name: str,
-        transform_message: Callable[[Message], RmqMessage],
+        transform_message: Callable[[Message], Awaitable[RmqMessage]],
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
     """Publishes to a RabbitMQ exchange until the STOMP connection is closed.
@@ -81,10 +81,10 @@ async def publish_to_exchange(
     attempts to reconnect will be made ad infinitum. `send_queue.maxsize`
     will determine how many messages are allowed to be published in "a
     batch", without receiving publish confirmations for them. The
-    `transform_message` function may change the message body, add message
-    headers, or raise a `ServerError`. But most importantly, it should
-    generate a routing key, before publishing the message to the RabbitMQ
-    exchange.
+    `transform_message` coroutine may validate the message, change the
+    message body, add message headers, or raise a `ServerError`. But most
+    importantly, it generates a routing key, before publishing the message
+    to the RabbitMQ exchange.
     """
     while True:
         try:
@@ -189,7 +189,7 @@ async def _publish_to_exchange(
         *,
         rmq_url: str,
         exchange_name: str,
-        transform_message: Callable[[Message], RmqMessage],
+        transform_message: Callable[[Message], Awaitable[RmqMessage]],
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
     _logger.info('Connecting to %s.', rmq_url)
@@ -223,7 +223,7 @@ async def _publish_to_exchange(
                 has_confirmed_deliveries.set()
 
         async def deliver(message: Message) -> None:
-            m = transform_message(message)
+            m = await transform_message(message)
             await exchange.publish(
                 aio_pika.Message(
                     m.body,
