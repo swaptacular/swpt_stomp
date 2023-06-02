@@ -43,31 +43,27 @@ async def consume_from_queue(
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
         prefetch_size: int = 0,
 ) -> None:
-    """Consumes from a RabbitMQ queue until the STOMP connection is closed.
+    """Consumes from a RabbitMQ queue until the STOMP connection is closed,
+    or the connection to the RabbitMQ server is lost.
 
     If the connection to the RabbitMQ server has been lost for some reason,
-    attempts to reconnect will be made ad infinitum. `send_queue.maxsize`
-    will determine the queue's prefetch count. If passed, the
+    no attempts to reconnect will be made. `send_queue.maxsize` will
+    determine the queue's prefetch count. If passed, the
     `transform_message_body` function may change the message body before
     sending it over the STOMP connection.
     """
-    while True:
-        try:
-            await _consume_from_queue(
-                send_queue,
-                recv_queue,
-                rmq_url=rmq_url,
-                queue_name=queue_name,
-                transform_message_body=transform_message_body,
-                timeout=timeout,
-                prefetch_size=prefetch_size,
-            )
-        except _RMQ_CONNECTION_ERRORS:  # This catches several error types.
-            _logger.exception('Lost connection to %s.', rmq_url)
-            await asyncio.sleep(_RMQ_RECONNECT_ATTEMPT_SECONDS)
-        else:
-            # The STOMP connection has been closed.
-            break
+    try:
+        await _consume_from_queue(
+            send_queue,
+            recv_queue,
+            rmq_url=rmq_url,
+            queue_name=queue_name,
+            transform_message_body=transform_message_body,
+            timeout=timeout,
+            prefetch_size=prefetch_size,
+        )
+    except _RMQ_CONNECTION_ERRORS:  # This catches several error types.
+        _logger.exception('Lost connection to %s.', rmq_url)
 
 
 async def publish_to_exchange(
@@ -100,7 +96,7 @@ async def publish_to_exchange(
                 transform_message=transform_message,
                 timeout=timeout,
             )
-        except _RMQ_CONNECTION_ERRORS:  # This catches several error types.
+        except _RMQ_CONNECTION_ERRORS:
             _logger.exception('Lost connection to %s.', rmq_url)
             await asyncio.sleep(_RMQ_RECONNECT_ATTEMPT_SECONDS)
         else:
