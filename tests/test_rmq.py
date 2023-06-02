@@ -2,12 +2,12 @@ import pytest
 import asyncio
 from contextlib import suppress
 from swpt_stomp.common import WatermarkQueue
-from swpt_stomp.rmq import consume_rmq_queue
+from swpt_stomp.rmq import consume_from_queue
 
 
 @pytest.mark.skip('Requires external STOMP server.')
 @pytest.mark.asyncio
-async def test_consume_rmq_queue():
+async def test_consume_from_queue():
     loop = asyncio.get_running_loop()
     send_queue = asyncio.Queue(5)
     recv_queue = WatermarkQueue(5)
@@ -22,7 +22,7 @@ async def test_consume_rmq_queue():
         await recv_queue.put(None)
 
     consume_task = loop.create_task(
-        consume_rmq_queue(
+        consume_from_queue(
             send_queue,
             recv_queue,
             rmq_url='amqp://guest:guest@127.0.0.1/',

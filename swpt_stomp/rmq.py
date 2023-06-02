@@ -33,7 +33,7 @@ class RmqMessage:
     routing_key: str
 
 
-async def consume_rmq_queue(
+async def consume_from_queue(
         send_queue: asyncio.Queue[Union[Message, None, ServerError]],
         recv_queue: WatermarkQueue[Union[str, None]],
         *,
@@ -53,7 +53,7 @@ async def consume_rmq_queue(
     """
     while True:
         try:
-            await _consume_rmq_queue(
+            await _consume_from_queue(
                 send_queue,
                 recv_queue,
                 rmq_url=rmq_url,
@@ -70,7 +70,7 @@ async def consume_rmq_queue(
             break
 
 
-async def publish_to_rmq_exchange(
+async def publish_to_exchange(
         send_queue: asyncio.Queue[Union[str, None, ServerError]],
         recv_queue: WatermarkQueue[Union[Message, None]],
         *,
@@ -92,7 +92,7 @@ async def publish_to_rmq_exchange(
     """
     while True:
         try:
-            await _publish_to_rmq_exchange(
+            await _publish_to_exchange(
                 send_queue,
                 recv_queue,
                 rmq_url=rmq_url,
@@ -108,7 +108,7 @@ async def publish_to_rmq_exchange(
             break
 
 
-async def _consume_rmq_queue(
+async def _consume_from_queue(
         send_queue: asyncio.Queue[Union[Message, None, ServerError]],
         recv_queue: WatermarkQueue[Union[str, None]],
         *,
@@ -187,7 +187,7 @@ async def _consume_rmq_queue(
     _logger.info('Disconnected from %s.', rmq_url)
 
 
-async def _publish_to_rmq_exchange(
+async def _publish_to_exchange(
         send_queue: asyncio.Queue[Union[str, None, ServerError]],
         recv_queue: WatermarkQueue[Union[Message, None]],
         *,
