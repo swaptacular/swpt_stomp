@@ -103,8 +103,7 @@ async def publish_to_rmq_exchange(
             _logger.exception('Lost connection to %s.', rmq_url)
             await asyncio.sleep(_RMQ_RECONNECT_ATTEMPT_SECONDS)
         else:
-            # `None` has been posted to the `recv_queue`, which means that
-            # the STOMP connection has been closed.
+            # The STOMP connection has been closed.
             break
 
 
