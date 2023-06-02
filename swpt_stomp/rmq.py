@@ -24,7 +24,7 @@ class _Delivery:
 
 
 @dataclass
-class SmpMessage:
+class RmqMessage:
     body: bytearray
     headers: HeadersType
     type: str
@@ -38,9 +38,9 @@ async def consume_rmq_queue(
         *,
         rmq_url: str,
         queue_name: str,
-        prefetch_size: int = 0,
-        timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
         transform_message_body: Callable[[bytes], bytearray] = bytearray,
+        timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        prefetch_size: int = 0,
 ) -> None:
     """Consumes from a RabbitMQ queue until the STOMP connection is closed.
 
@@ -57,9 +57,9 @@ async def consume_rmq_queue(
                 recv_queue,
                 rmq_url=rmq_url,
                 queue_name=queue_name,
-                prefetch_size=prefetch_size,
-                timeout=timeout,
                 transform_message_body=transform_message_body,
+                timeout=timeout,
+                prefetch_size=prefetch_size,
             )
         except _RMQ_CONNECTION_ERRORS:  # This catches several error types.
             _logger.exception('Lost connection to %s.', rmq_url)
@@ -75,8 +75,8 @@ async def publish_to_rmq_exchange(
         *,
         rmq_url: str,
         exchange_name: str,
-        transform_message: Callable[[Message], SmpMessage],
-        timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        transform_message: Callable[[Message], RmqMessage],
+        timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
     """Publishes to a RabbitMQ exchange until the STOMP connection is closed.
 
@@ -113,9 +113,9 @@ async def _consume_rmq_queue(
         *,
         rmq_url: str,
         queue_name: str,
-        prefetch_size: int = 0,
-        timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
         transform_message_body: Callable[[bytes], bytearray] = bytearray,
+        timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        prefetch_size: int = 0,
 ) -> None:
     _logger.info('Connecting to %s.', rmq_url)
     connection = await aio_pika.connect(rmq_url, timeout=timeout)
@@ -192,8 +192,8 @@ async def _publish_to_rmq_exchange(
         *,
         rmq_url: str,
         exchange_name: str,
-        transform_message: Callable[[Message], SmpMessage],
-        timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        transform_message: Callable[[Message], RmqMessage],
+        timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
     _logger.info('Connecting to %s.', rmq_url)
     connection = await aio_pika.connect(rmq_url, timeout=timeout)
@@ -202,9 +202,9 @@ async def _publish_to_rmq_exchange(
         channel = await asyncio.wait_for(connection.channel(), timeout)
         exchange = await channel.get_exchange(exchange_name, ensure=False)
         deliveries: deque[_Delivery] = deque()
-        delivery_slots_count = max(send_queue.maxsize, 1)
-        has_free_delivery_slots = asyncio.Event()
-        has_free_delivery_slots.set()
+        max_parallel_deliveries = max(send_queue.maxsize, 1)
+        can_make_deliveries = asyncio.Event()
+        can_make_deliveries.set()
         pending_confirmations: set[asyncio.Future] = set()
         has_confirmed_deliveries = asyncio.Event()
         has_failed_confirmations = asyncio.Event()
@@ -216,7 +216,6 @@ async def _publish_to_rmq_exchange(
         ) -> None:
             nonlocal failed_confirmation
             pending_confirmations.remove(confirmation)
-
             if confirmation.cancelled() or confirmation.exception():
                 if failed_confirmation is None:
                     failed_confirmation = confirmation
@@ -226,41 +225,45 @@ async def _publish_to_rmq_exchange(
             delivery.confirmed = True
             has_confirmed_deliveries.set()
 
+        async def deliver(message: Message) -> None:
+            m = transform_message(message)
+            await exchange.publish(
+                aio_pika.Message(
+                    m.body,
+                    headers=m.headers,
+                    type=m.type,
+                    content_type=m.content_type,
+                    delivery_mode=_PERSISTENT,
+                    app_id='swpt_stomp',
+                ),
+                m.routing_key,
+                mandatory=True,
+            )
+
         async def publish_messages() -> None:
             while message := await recv_queue.get():
                 delivery = _Delivery(message.id, False)
-                mark_as_delivered = partial(on_confirmation, delivery)
+                mark_as_confirmed = partial(on_confirmation, delivery)
 
-                await has_free_delivery_slots.wait()
+                await can_make_deliveries.wait()
                 deliveries.append(delivery)
-                if len(deliveries) >= delivery_slots_count:
-                    has_free_delivery_slots.clear()
+                if len(deliveries) >= max_parallel_deliveries:
+                    can_make_deliveries.clear()
 
-                m = transform_message(message)
-                confirmation = asyncio.ensure_future(
-                    exchange.publish(
-                        aio_pika.Message(
-                            m.body,
-                            headers=m.headers,
-                            type=m.type,
-                            content_type=m.content_type,
-                            delivery_mode=_PERSISTENT,
-                            app_id='swpt_stomp',
-                        ),
-                        m.routing_key,
-                        mandatory=True,
-                    ))
-                confirmation.add_done_callback(mark_as_delivered)
+                confirmation = asyncio.ensure_future(deliver(message))
+                confirmation.add_done_callback(mark_as_confirmed)
                 pending_confirmations.add(confirmation)
                 recv_queue.task_done()
 
             # The STOMP connection has been closed by the client.
             send_receipts_task.cancel()
-            report_errors_task.cancel()
+            report_task.cancel()
 
         async def send_receipts() -> None:
-            while await has_confirmed_deliveries.wait():
+            while True:
+                await has_confirmed_deliveries.wait()
                 has_confirmed_deliveries.clear()
+
                 receipt_id: Optional[str] = None
                 while deliveries:
                     first = deliveries[0]
@@ -270,11 +273,11 @@ async def _publish_to_rmq_exchange(
                     deliveries.popleft()
 
                 if receipt_id is not None:
-                    if len(deliveries) < delivery_slots_count:
-                        has_free_delivery_slots.set()
+                    if len(deliveries) < max_parallel_deliveries:
+                        can_make_deliveries.set()
                     await send_queue.put(receipt_id)
 
-        async def report_errors() -> None:
+        async def report_failed_confirmations() -> None:
             await has_failed_confirmations.wait()
             assert failed_confirmation
             try:
@@ -283,24 +286,24 @@ async def _publish_to_rmq_exchange(
                 # Close the STOMP connection with a server error.
                 send_queue.put_nowait(e)
                 send_receipts_task.cancel()
-                report_errors_task.cancel()
+                report_task.cancel()
 
         loop = asyncio.get_event_loop()
         publish_messages_task = loop.create_task(publish_messages())
         send_receipts_task = loop.create_task(send_receipts())
-        report_errors_task = loop.create_task(report_errors())
+        report_task = loop.create_task(report_failed_confirmations())
         try:
             await asyncio.gather(
                 publish_messages_task,
                 send_receipts_task,
-                report_errors_task,
+                report_task,
             )
         except asyncio.CancelledError:
             pass
         finally:
             publish_messages_task.cancel()
             send_receipts_task.cancel()
-            report_errors_task.cancel()
+            report_task.cancel()
             for c in pending_confirmations:
                 c.cancel()
 
