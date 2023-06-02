@@ -88,6 +88,10 @@ def test_parse_headers():
     with pytest.raises(ProtocolError):
         _parse_headers(m[2])
 
+    # Headers are too long.
+    with pytest.raises(ProtocolError):
+        _parse_headers(1000 * b"key:value\n")
+
 
 def test_add_all_bytes_at_once():
     p = StompParser()

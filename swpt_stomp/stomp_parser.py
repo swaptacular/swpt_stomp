@@ -50,6 +50,9 @@ def _substitute_header_escape_chars(s: bytes) -> bytes:
 
 
 def _parse_headers(s: bytes) -> dict[str, str]:
+    if len(s) > HEADER_MAX_LENGTH:
+        raise ProtocolError('The frame header is too big.')
+
     headers = {}
     parts = _HEADER_SEPARATOR_RE.split(s)
     try:
@@ -64,7 +67,8 @@ def _parse_headers(s: bytes) -> dict[str, str]:
     return headers
 
 
-BODY_MAX_LENGTH = 50_000
+HEADER_MAX_LENGTH = 4_096
+BODY_MAX_LENGTH = 8_192
 
 
 class ProtocolError(Exception):
