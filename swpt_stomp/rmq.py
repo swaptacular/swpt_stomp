@@ -7,7 +7,6 @@ from typing import Optional, Union, Callable
 from collections import deque
 from aio_pika.abc import HeadersType
 from aio_pika.exceptions import CONNECTION_EXCEPTIONS
-from pamqp.commands import Basic
 from swpt_stomp.common import (
     Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY)
 
@@ -194,6 +193,9 @@ async def _publish_to_rmq_exchange(
         channel = await asyncio.wait_for(connection.channel(), timeout)
         exchange = await channel.get_exchange(exchange_name, ensure=False)
         deliveries: deque[_Delivery] = deque()
+        delivery_slots_count = max(send_queue.maxsize, 1)
+        has_free_delivery_slots = asyncio.Event()
+        has_free_delivery_slots.set()
         pending_confirmations: set[asyncio.Future] = set()
         has_confirmed_deliveries = asyncio.Event()
         has_failed_confirmations = asyncio.Event()
@@ -215,36 +217,31 @@ async def _publish_to_rmq_exchange(
             delivery.confirmed = True
             has_confirmed_deliveries.set()
 
-        async def publish(message: Message) -> None:
-            m = transform_message(message)
-            result = await exchange.publish(
-                aio_pika.Message(
-                    m.body,
-                    headers=m.headers,
-                    type=m.type,
-                    content_type=m.content_type,
-                    delivery_mode=_PERSISTENT,
-                    app_id='swpt_stomp',
-                ),
-                routing_key=m.routing_key,
-                mandatory=True,
-                timeout=timeout,  # TODO: is this too small?
-            )
-            if result != Basic.Ack:
-                raise Exception(
-                    'Did not receive acknowledgement for message %s.',
-                    message.id)
-
         async def publish_messages() -> None:
             while message := await recv_queue.get():
                 delivery = _Delivery(message.id, False)
+                mark_as_delivered = partial(on_confirmation, delivery)
 
-                # TODO: Pause if too many deliveries are waiting.
+                await has_free_delivery_slots.wait()
                 deliveries.append(delivery)
+                if len(deliveries) >= delivery_slots_count:
+                    has_free_delivery_slots.clear()
 
-                confirmation = asyncio.ensure_future(publish(message))
-                confirmation.add_done_callback(
-                    partial(on_confirmation, delivery))
+                m = transform_message(message)
+                confirmation = asyncio.ensure_future(
+                    exchange.publish(
+                        aio_pika.Message(
+                            m.body,
+                            headers=m.headers,
+                            type=m.type,
+                            content_type=m.content_type,
+                            delivery_mode=_PERSISTENT,
+                            app_id='swpt_stomp',
+                        ),
+                        m.routing_key,
+                        mandatory=True,
+                    ))
+                confirmation.add_done_callback(mark_as_delivered)
                 pending_confirmations.add(confirmation)
                 recv_queue.task_done()
 
@@ -264,6 +261,8 @@ async def _publish_to_rmq_exchange(
                     deliveries.popleft()
 
                 if receipt_id is not None:
+                    if len(deliveries) < delivery_slots_count:
+                        has_free_delivery_slots.set()
                     await send_queue.put(receipt_id)
 
         async def report_errors() -> None:
