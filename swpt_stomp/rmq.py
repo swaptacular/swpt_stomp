@@ -65,8 +65,7 @@ async def consume_rmq_queue(
             _logger.exception('Lost connection to %s.', rmq_url)
             await asyncio.sleep(_RMQ_RECONNECT_ATTEMPT_SECONDS)
         else:
-            # `None` has been posted to the `recv_queue`, which means that
-            # the STOMP connection has been closed.
+            # The STOMP connection has been closed.
             break
 
 
@@ -79,6 +78,17 @@ async def publish_to_rmq_exchange(
         transform_message: Callable[[Message], SmpMessage],
         timeout: Optional[float] = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
+    """Publishes to a RabbitMQ exchange until the STOMP connection is closed.
+
+    If the connection to the RabbitMQ server has been lost for some reason,
+    attempts to reconnect will be made ad infinitum. `send_queue.maxsize`
+    will determine how many messages are allowed to be published in "a
+    batch", without receiving publish confirmations for them. The
+    `transform_message` function may change the message body, add message
+    headers, or raise a `ServerError`. But most importantly, it should
+    generate a routing key, before publishing the message to the RabbitMQ
+    exchange.
+    """
     while True:
         try:
             await _publish_to_rmq_exchange(
