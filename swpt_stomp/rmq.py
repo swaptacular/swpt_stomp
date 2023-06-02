@@ -8,8 +8,8 @@ from collections import deque
 from aio_pika.abc import HeadersType
 from aio_pika.exceptions import CONNECTION_EXCEPTIONS
 from pamqp.commands import Basic
-from swpt_stomp.common import Message, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY
-from swpt_stomp.aio_protocols import ServerError
+from swpt_stomp.common import (
+    Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY)
 
 _logger = logging.getLogger(__name__)
 _RMQ_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
@@ -248,6 +248,7 @@ async def _publish_to_rmq_exchange(
                 pending_confirmations.add(confirmation)
                 recv_queue.task_done()
 
+            # The STOMP connection has been closed by the client.
             send_receipts_task.cancel()
             report_errors_task.cancel()
 
@@ -268,7 +269,13 @@ async def _publish_to_rmq_exchange(
         async def report_errors() -> None:
             await has_failed_confirmations.wait()
             assert failed_confirmation
-            await failed_confirmation
+            try:
+                await failed_confirmation
+            except ServerError as e:
+                # Close the STOMP connection with a server error.
+                send_queue.put_nowait(e)
+                send_receipts_task.cancel()
+                report_errors_task.cancel()
 
         loop = asyncio.get_event_loop()
         publish_messages_task = loop.create_task(publish_messages())

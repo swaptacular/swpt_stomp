@@ -2,8 +2,8 @@ from typing import Optional, Union, Generic, TypeVar
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from swpt_stomp.common import Message, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY
+from swpt_stomp.common import (
+    Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY)
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 
 DEFAULT_HB_SEND_MIN = 5_000  # 5 seconds
@@ -18,21 +18,6 @@ def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
         return 0  # no heartbeats
 
     return max(send_min, recv_desired)
-
-
-@dataclass
-class ServerError:
-    """Indicates that the server connection should be closed.
-
-    Instances of this class are intended to be added to `StompServer`'s send
-    queue, indicating that an error has occurred, and the connection must be
-    closed.
-    """
-    error_message: str
-    receipt_id: Optional[str] = None
-    context: Optional[bytearray] = None
-    context_type: Optional[str] = None
-    context_content_type: Optional[str] = None
 
 
 _U = TypeVar('_U')

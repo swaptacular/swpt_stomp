@@ -15,6 +15,21 @@ class Message:
     content_type: str = 'application/octet-stream'
 
 
+@dataclass
+class ServerError(Exception):
+    """Indicates that the server connection should be closed.
+
+    Instances of this class are intended to be added to `StompServer`'s send
+    queue, indicating that an error has occurred, and the connection must be
+    closed.
+    """
+    error_message: str
+    receipt_id: Optional[str] = None
+    context: Optional[bytearray] = None
+    context_type: Optional[str] = None
+    context_content_type: Optional[str] = None
+
+
 class WatermarkQueue(asyncio.Queue[_T]):
     """A queue that can signal when the given watermarks are reached."""
 
