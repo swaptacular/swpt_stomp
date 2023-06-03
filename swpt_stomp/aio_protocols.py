@@ -330,6 +330,10 @@ class StompClient(_BaseStompProtocol[Message, str]):
         self._last_message_id = message.id
 
     def _close_gracefully(self, error: Optional[ServerError]) -> None:
+        if error is not None:
+            self._close_with_error(error.error_message)
+            return
+
         last_msg_id = self._last_message_id
         if last_msg_id is None or last_msg_id == self._last_receipt_id:
             # All sent messages have been confirmed.

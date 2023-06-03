@@ -341,6 +341,7 @@ def test_client_graceful_disconnect():
     loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_disconnect())
     assert not c._done
+    assert transport.write.call_count == 2  # the message, then disconnect
 
     # The connection is closed only after the "m1" receipt.
     c.data_received(b'RECEIPT\nreceipt-id:m0\n\n\x00')
@@ -351,6 +352,33 @@ def test_client_graceful_disconnect():
     c.connection_lost(None)
     assert recv_queue.get_nowait() == 'm0'
     assert recv_queue.get_nowait() == 'm1'
+    assert recv_queue.get_nowait() is None
+
+
+def test_client_error_disconnect():
+    send_queue = asyncio.Queue()
+    recv_queue = WatermarkQueue(10)
+    transport = NonCallableMock()
+    c = StompClient(send_queue, recv_queue, hb_send_min=0, hb_recv_desired=0)
+    c.connection_made(transport)
+    transport.write.reset_mock()
+    c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
+    m = Message(id='m1', type='t1',
+                content_type='text/plain', body=bytearray(b'1'))
+    send_queue.put_nowait(m)
+
+    async def wait_done():
+        while not c._done:
+            await asyncio.sleep(0)
+
+    # The connection is closed immediately.
+    send_queue.put_nowait(ServerError('test client error'))
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wait_done())
+    assert c._done
+    assert transport.write.call_count == 1  # only the message
+
+    c.connection_lost(None)
     assert recv_queue.get_nowait() is None
 
 

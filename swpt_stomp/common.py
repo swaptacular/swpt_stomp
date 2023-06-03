@@ -16,11 +16,11 @@ class Message:
 
 
 class ServerError(Exception):
-    """Indicates that the server connection should be closed.
+    """Indicates that the STOMP connection should be closed.
 
-    Instances of this class are intended to be added to `StompServer`'s send
-    queue, indicating that an error has occurred, and the connection must be
-    closed.
+    Instances of this class are intended to be added to `StompClient`'s and
+    `StompServer`'s send queues, indicating that an error has occurred, and
+    the connection must be closed.
     """
     def __init__(
             self,
