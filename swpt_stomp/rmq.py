@@ -62,8 +62,12 @@ async def consume_from_queue(
             timeout=timeout,
             prefetch_size=prefetch_size,
         )
-    except _RMQ_CONNECTION_ERRORS:  # This catches several error types.
-        _logger.exception('Lost connection to %s.', rmq_url)
+    except Exception as e:
+        send_queue.put_nowait(ServerError('Abruptly closed connection.'))
+        if isinstance(e, _RMQ_CONNECTION_ERRORS):
+            _logger.exception('Lost connection to %s.', rmq_url)
+        else:
+            raise e
 
 
 async def publish_to_exchange(
@@ -75,33 +79,33 @@ async def publish_to_exchange(
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
-    """Publishes to a RabbitMQ exchange until the STOMP connection is closed.
+    """Publishes to a RabbitMQ exchange until the STOMP connection is
+    closed, or the connection to the RabbitMQ server is lost.
 
     If the connection to the RabbitMQ server has been lost for some reason,
-    attempts to reconnect will be made ad infinitum. `send_queue.maxsize`
-    will determine how many messages are allowed to be published in "a
-    batch", without receiving publish confirmations for them. The
-    `preprocess_message` coroutine may validate the message, change the
-    message body, add message headers, or raise a `ServerError`. But most
-    importantly, it generates a routing key, before publishing the message
-    to the RabbitMQ exchange.
+    no attempts to reconnect will be made. `send_queue.maxsize` will
+    determine how many messages are allowed to be published in "a batch",
+    without receiving publish confirmations for them. The
+    `preprocess_message` coroutine function may validate the message, change
+    the message body, add message headers, or raise a `ServerError`. But
+    most importantly, it generates a routing key, before publishing the
+    message to the RabbitMQ exchange.
     """
-    while True:
-        try:
-            await _publish_to_exchange(
-                send_queue,
-                recv_queue,
-                rmq_url=rmq_url,
-                exchange_name=exchange_name,
-                preprocess_message=preprocess_message,
-                timeout=timeout,
-            )
-        except _RMQ_CONNECTION_ERRORS:
+    try:
+        await _publish_to_exchange(
+            send_queue,
+            recv_queue,
+            rmq_url=rmq_url,
+            exchange_name=exchange_name,
+            preprocess_message=preprocess_message,
+            timeout=timeout,
+        )
+    except Exception as e:
+        send_queue.put_nowait(ServerError('Internal server error.'))
+        if isinstance(e, _RMQ_CONNECTION_ERRORS):
             _logger.exception('Lost connection to %s.', rmq_url)
-            await asyncio.sleep(_RMQ_RECONNECT_ATTEMPT_SECONDS)
         else:
-            # The STOMP connection has been closed.
-            break
+            raise e
 
 
 async def _consume_from_queue(
