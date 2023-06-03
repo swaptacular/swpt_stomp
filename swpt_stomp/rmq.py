@@ -64,10 +64,11 @@ async def consume_from_queue(
         )
     except Exception as e:
         send_queue.put_nowait(ServerError('Abruptly closed connection.'))
-        if isinstance(e, _RMQ_CONNECTION_ERRORS):
-            _logger.exception('Lost connection to %s.', rmq_url)
-        else:
+        if not isinstance(e, _RMQ_CONNECTION_ERRORS):
             raise e
+        _logger.exception('Lost connection to %s.', rmq_url)
+    else:
+        send_queue.put_nowait(None)
 
 
 async def publish_to_exchange(
@@ -78,6 +79,7 @@ async def publish_to_exchange(
         exchange_name: str,
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        connection_is_ready: Optional[asyncio.Event] = None,
 ) -> None:
     """Publishes to a RabbitMQ exchange until the STOMP connection is
     closed, or the connection to the RabbitMQ server is lost.
@@ -91,6 +93,9 @@ async def publish_to_exchange(
     most importantly, it generates a routing key, before publishing the
     message to the RabbitMQ exchange.
     """
+    if connection_is_ready is not None:
+        await connection_is_ready.wait()
+
     try:
         await _publish_to_exchange(
             send_queue,
@@ -100,12 +105,15 @@ async def publish_to_exchange(
             preprocess_message=preprocess_message,
             timeout=timeout,
         )
+    except ServerError as e:
+        send_queue.put_nowait(e)
     except Exception as e:
         send_queue.put_nowait(ServerError('Internal server error.'))
-        if isinstance(e, _RMQ_CONNECTION_ERRORS):
-            _logger.exception('Lost connection to %s.', rmq_url)
-        else:
+        if not isinstance(e, _RMQ_CONNECTION_ERRORS):
             raise e
+        _logger.exception('Lost connection to %s.', rmq_url)
+    else:
+        send_queue.put_nowait(None)
 
 
 async def _consume_from_queue(
@@ -280,13 +288,7 @@ async def _publish_to_exchange(
         async def report_failed_confirmations() -> None:
             await has_failed_confirmations.wait()
             assert failed_confirmation is not None
-            try:
-                await failed_confirmation
-            except ServerError as e:
-                # Close the STOMP connection with a server error.
-                send_queue.put_nowait(e)
-                send_receipts_task.cancel()
-                report_task.cancel()
+            await failed_confirmation
 
         loop = asyncio.get_event_loop()
         publish_messages_task = loop.create_task(publish_messages())

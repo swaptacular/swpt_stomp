@@ -34,10 +34,10 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
             self,
             send_queue: asyncio.Queue[Union[_U, None, ServerError]],
             recv_queue: WatermarkQueue[Union[_V, None]],
-            *,
-            hb_send_min: int = DEFAULT_HB_SEND_MIN,
-            hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
-            max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
+            hb_send_min: int,
+            hb_recv_desired: int,
+            max_network_delay: int,
+            connection_made: asyncio.Event,
     ):
         assert hb_send_min >= 0
         assert hb_recv_desired >= 0
@@ -47,6 +47,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self._hb_send_min = hb_send_min
         self._hb_recv_desired = hb_recv_desired
         self._max_network_delay = max_network_delay
+        self._connection_made = connection_made
         self._connected = False
         self._done = False
         self._hb_send = 0
@@ -68,6 +69,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         loop = self._loop
         self._connection_started_at = loop.time()
         self._transport = transport
+        self._connection_made.set()
         self.recv_queue.add_high_watermark_callback(transport.pause_reading)
         self.recv_queue.add_low_watermark_callback(transport.resume_reading)
         loop.call_later(self._max_network_delay / 1000,
@@ -207,6 +209,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
+            connection_made: asyncio.Event = asyncio.Event(),
             host: str = '/',
             login: Optional[str] = None,
             passcode: Optional[str] = None,
@@ -218,6 +221,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
             hb_send_min=hb_send_min,
             hb_recv_desired=hb_recv_desired,
             max_network_delay=max_network_delay,
+            connection_made=connection_made,
         )
         self._host = host
         self._login = login
@@ -384,6 +388,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
+            connection_made: asyncio.Event = asyncio.Event(),
             recv_destination: str = '/exchange/smp'
     ):
         super().__init__(
@@ -392,6 +397,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             hb_send_min=hb_send_min,
             hb_recv_desired=hb_recv_desired,
             max_network_delay=max_network_delay,
+            connection_made=connection_made,
         )
         self._recv_destination = recv_destination
         self._last_message_id: Optional[str] = None
