@@ -8,7 +8,7 @@ from swpt_stomp.aio_protocols import ServerError, StompClient, StompServer
 @pytest.fixture
 def transport():
     return NonCallableMock(
-        get_extra_info=Mock(return_value=('my',)),
+        get_extra_info=Mock(return_value=('127.0.0.1', 1234)),
         is_closing=Mock(return_value=False),
     )
 
