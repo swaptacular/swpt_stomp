@@ -89,7 +89,7 @@ async def publish_to_exchange(
 
     The messages from the `recv_queue`, will be published to the RabbitMQ
     exchange, and when publish confirmations are received for them, the
-    corresponding confirmations will be added to the `recv_queue`. The
+    corresponding confirmations will be added to the `send_queue`. The
     publishing of messages will stop only when the connection to the
     RabbitMQ server is lost, or a `None` is received on the `recv_queue`. At
     the end, a `None` (no error), or a `ServerError` will be added to the
