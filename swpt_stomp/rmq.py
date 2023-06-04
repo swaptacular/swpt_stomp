@@ -43,14 +43,19 @@ async def consume_from_queue(
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
         prefetch_size: int = 0,
 ) -> None:
-    """Consumes from a RabbitMQ queue until the STOMP connection is closed,
-    or the connection to the RabbitMQ server is lost.
+    """Consumes messages from a RabbitMQ queue.
+
+    The consumed messages will be added to the `send_queue`, awaiting
+    receipt confirmations for them on the `recv_queue`. The consumption of
+    messages will stop only when the connection to the RabbitMQ server is
+    lost, or a `None` is received on the `recv_queue`. At the end, a `None`
+    (no error), or a `ServerError` will be added to the `send_queue`.
 
     If the connection to the RabbitMQ server has been lost for some reason,
     no attempts to reconnect will be made. `send_queue.maxsize` will
-    determine the queue's prefetch count. If passed, the
+    determine the RabbitMQ queue's prefetch count. If passed, the
     `transform_message_body` function may change the message body before
-    sending it over the STOMP connection.
+    adding it to the `send_queue`.
     """
     try:
         await _consume_from_queue(
@@ -80,8 +85,15 @@ async def publish_to_exchange(
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
 ) -> None:
-    """Publishes to a RabbitMQ exchange until the STOMP connection is
-    closed, or the connection to the RabbitMQ server is lost.
+    """Publishes messages to a RabbitMQ exchange.
+
+    The messages from the `recv_queue`, will be published to the RabbitMQ
+    exchange, and when publish confirmations are received for them, the
+    corresponding confirmations will be added to the `recv_queue`. The
+    publishing of messages will stop only when the connection to the
+    RabbitMQ server is lost, or a `None` is received on the `recv_queue`. At
+    the end, a `None` (no error), or a `ServerError` will be added to the
+    `send_queue`.
 
     If the connection to the RabbitMQ server has been lost for some reason,
     no attempts to reconnect will be made. `send_queue.maxsize` will
