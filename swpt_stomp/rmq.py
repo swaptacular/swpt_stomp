@@ -51,11 +51,13 @@ async def consume_from_queue(
     lost, or a `None` is received on the `recv_queue`. At the end, a `None`
     (no error), or a `ServerError` will be added to the `send_queue`.
 
-    If the connection to the RabbitMQ server has been lost for some reason,
-    no attempts to reconnect will be made. `send_queue.maxsize` will
-    determine the RabbitMQ queue's prefetch count. If passed, the
-    `transform_message_body` function may change the message body before
-    adding it to the `send_queue`.
+    A new connection will be initiated to the RabbbitMQ server specified by
+    `rmq_url`. If the connection to the RabbitMQ server has been lost for
+    some reason, no attempts to reconnect will be made.
+
+    `send_queue.maxsize` will determine the RabbitMQ queue's prefetch count.
+    If passed, the `transform_message_body` function may change the message
+    body before adding the message to the `send_queue`.
     """
     try:
         await _consume_from_queue(
@@ -84,6 +86,7 @@ async def publish_to_exchange(
         exchange_name: str,
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        channel: Optional[aio_pika.abc.AbstractChannel] = None,
 ) -> None:
     """Publishes messages to a RabbitMQ exchange.
 
@@ -95,14 +98,18 @@ async def publish_to_exchange(
     the end, a `None` (no error), or a `ServerError` will be added to the
     `send_queue`.
 
-    If the connection to the RabbitMQ server has been lost for some reason,
-    no attempts to reconnect will be made. `send_queue.maxsize` will
-    determine how many messages are allowed to be published in "a batch",
-    without receiving publish confirmations for them. The
-    `preprocess_message` coroutine function may validate the message, change
-    the message body, add message headers, or raise a `ServerError`. But
-    most importantly, it generates a routing key, before publishing the
-    message to the RabbitMQ exchange.
+    If an open `channel` is passed, it will be used to communicate with the
+    RabbbitMQ server. If it is `None`, a new connection will be initiated to
+    the RabbbitMQ server specified by `rmq_url`. If the connection to the
+    RabbitMQ server has been lost for some reason, no attempts to reconnect
+    will be made.
+
+    `send_queue.maxsize` will determine how many messages are allowed to be
+    published in "a batch", without receiving publish confirmations for
+    them. The `preprocess_message` coroutine function may validate the
+    message, change the message body, add message headers, or raise a
+    `ServerError`. But most importantly, it generates a routing key, before
+    publishing the message to the RabbitMQ exchange.
     """
     try:
         await _publish_to_exchange(
@@ -112,6 +119,7 @@ async def publish_to_exchange(
             exchange_name=exchange_name,
             preprocess_message=preprocess_message,
             timeout=timeout,
+            channel=channel,
         )
     except ServerError as e:
         send_queue.put_nowait(e)
@@ -130,9 +138,9 @@ async def _consume_from_queue(
         *,
         rmq_url: str,
         queue_name: str,
-        transform_message_body: Callable[[bytes], bytearray] = bytearray,
-        timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
-        prefetch_size: int = 0,
+        transform_message_body: Callable[[bytes], bytearray],
+        timeout: float,
+        prefetch_size: int,
 ) -> None:
     _logger.info('Connecting to %s.', rmq_url)
     connection = await aio_pika.connect(rmq_url, timeout=timeout)
@@ -210,13 +218,10 @@ async def _publish_to_exchange(
         rmq_url: str,
         exchange_name: str,
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
-        timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        timeout: float,
+        channel: Optional[aio_pika.abc.AbstractChannel],
 ) -> None:
-    _logger.info('Connecting to %s.', rmq_url)
-    connection = await aio_pika.connect(rmq_url, timeout=timeout)
-
-    async with connection:
-        channel = await asyncio.wait_for(connection.channel(), timeout)
+    async def publish_messages(channel: aio_pika.abc.AbstractChannel) -> None:
         exchange = await channel.get_exchange(exchange_name, ensure=False)
         deliveries: deque[_Delivery] = deque()
         max_parallel_deliveries = max(send_queue.maxsize, 1)
@@ -272,7 +277,7 @@ async def _publish_to_exchange(
                 pending_confirmations.add(confirmation)
                 recv_queue.task_done()
 
-            # The STOMP connection has been closed by the client.
+            # There are no more messages to publish.
             send_receipts_task.cancel()
             report_task.cancel()
 
@@ -317,7 +322,15 @@ async def _publish_to_exchange(
             for c in pending_confirmations:
                 c.cancel()
 
-    _logger.info('Disconnected from %s.', rmq_url)
+    if channel is None:
+        _logger.info('Connecting to %s.', rmq_url)
+        connection = await aio_pika.connect(rmq_url, timeout=timeout)
+        async with connection:
+            channel = await asyncio.wait_for(connection.channel(), timeout)
+            await publish_messages(channel)
+        _logger.info('Disconnected from %s.', rmq_url)
+    else:
+        await publish_messages(channel)
 
 
 # def _transform_message(m: Message) -> SmpMessage:
