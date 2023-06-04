@@ -18,13 +18,21 @@ def transport():
 #######################
 
 def test_client_connection(transport):
+    loop = asyncio.get_event_loop()
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
+
+    async def do_nothing():
+        await asyncio.sleep(100000000)
+
+    def start_message_processor(transport):
+        return loop.create_task(do_nothing())
 
     # create instance
     c = StompClient(
         send_queue,
         recv_queue,
+        start_message_processor=start_message_processor,
         hb_send_min=1000,
         hb_recv_desired=90,
         send_destination='dest',
@@ -61,7 +69,6 @@ def test_client_connection(transport):
     m = Message(id='m1', type='t1',
                 content_type='text/plain', body=bytearray(b'1'))
     send_queue.put_nowait(m)
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(send_queue.join())
     transport.write.assert_called_once()
     frame = transport.write.call_args[0][0]
@@ -115,7 +122,11 @@ def test_client_connection(transport):
     transport.close.assert_not_called()
 
     async def wait_for_cancelation():
-        while not (c._writer_task.cancelled() and c._watchdog_task.cancelled()):
+        while not (
+                c._writer_task.cancelled()
+                and c._watchdog_task.cancelled()
+                and c._message_processor_task.cancelled()
+        ):
             await asyncio.sleep(0)
 
     loop = asyncio.get_event_loop()

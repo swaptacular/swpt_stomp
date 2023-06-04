@@ -62,7 +62,7 @@ async def consume_from_queue(
             timeout=timeout,
             prefetch_size=prefetch_size,
         )
-    except Exception as e:
+    except (asyncio.CancelledError, Exception) as e:
         send_queue.put_nowait(ServerError('Abruptly closed connection.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
             raise e
@@ -79,7 +79,6 @@ async def publish_to_exchange(
         exchange_name: str,
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
         timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
-        connection_is_ready: Optional[asyncio.Event] = None,
 ) -> None:
     """Publishes to a RabbitMQ exchange until the STOMP connection is
     closed, or the connection to the RabbitMQ server is lost.
@@ -93,9 +92,6 @@ async def publish_to_exchange(
     most importantly, it generates a routing key, before publishing the
     message to the RabbitMQ exchange.
     """
-    if connection_is_ready is not None:
-        await connection_is_ready.wait()
-
     try:
         await _publish_to_exchange(
             send_queue,
@@ -107,7 +103,7 @@ async def publish_to_exchange(
         )
     except ServerError as e:
         send_queue.put_nowait(e)
-    except Exception as e:
+    except (asyncio.CancelledError, Exception) as e:
         send_queue.put_nowait(ServerError('Internal server error.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
             raise e

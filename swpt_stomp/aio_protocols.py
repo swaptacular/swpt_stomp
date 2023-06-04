@@ -1,14 +1,21 @@
 from typing import Optional, Union, Generic, TypeVar
 import asyncio
 import logging
+from typing import Callable
 from abc import ABC, abstractmethod
 from swpt_stomp.common import (
     Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY)
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 
+MessageProcessorStarter = Callable[[asyncio.Transport], Optional[asyncio.Task]]
+
 DEFAULT_HB_SEND_MIN = 5_000  # 5 seconds
 DEFAULT_HB_RECV_DESIRED = 30_000  # 30 seconds
 _logger = logging.getLogger(__name__)
+
+
+def _NO_MP(x: asyncio.Transport) -> None:
+    pass
 
 
 def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
@@ -34,20 +41,20 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
             self,
             send_queue: asyncio.Queue[Union[_U, None, ServerError]],
             recv_queue: WatermarkQueue[Union[_V, None]],
+            start_message_processor: MessageProcessorStarter,
             hb_send_min: int,
             hb_recv_desired: int,
             max_network_delay: int,
-            connection_is_ready: asyncio.Event,
     ):
         assert hb_send_min >= 0
         assert hb_recv_desired >= 0
 
         self.send_queue = send_queue
         self.recv_queue = recv_queue
+        self._start_message_processor = start_message_processor
         self._hb_send_min = hb_send_min
         self._hb_recv_desired = hb_recv_desired
         self._max_network_delay = max_network_delay
-        self._connection_is_ready = connection_is_ready
         self._connected = False
         self._done = False
         self._hb_send = 0
@@ -59,6 +66,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self._transport: Optional[asyncio.Transport] = None
         self._writer_task: Optional[asyncio.Task] = None
         self._watchdog_task: Optional[asyncio.Task] = None
+        self._message_processor_task: Optional[asyncio.Task] = None
         self._start_sending = asyncio.Event()
         self._start_sending.set()
 
@@ -69,7 +77,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         loop = self._loop
         self._connection_started_at = loop.time()
         self._transport = transport
-        self._connection_is_ready.set()
+        self._message_processor_task = self._start_message_processor(transport)
         self.recv_queue.add_high_watermark_callback(transport.pause_reading)
         self.recv_queue.add_low_watermark_callback(transport.resume_reading)
         loop.call_later(self._max_network_delay / 1000,
@@ -88,6 +96,9 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
 
         if self._watchdog_task:
             self._watchdog_task.cancel('connection lost')
+
+        if self._message_processor_task:
+            self._message_processor_task.cancel('connection lost')
 
         t = self._transport
         assert t
@@ -211,10 +222,10 @@ class StompClient(_BaseStompProtocol[Message, str]):
             send_queue: asyncio.Queue[Union[Message, None, ServerError]],
             recv_queue: WatermarkQueue[Union[str, None]],
             *,
+            start_message_processor: MessageProcessorStarter = _NO_MP,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
-            connection_is_ready: asyncio.Event = asyncio.Event(),
             host: str = '/',
             login: Optional[str] = None,
             passcode: Optional[str] = None,
@@ -223,10 +234,10 @@ class StompClient(_BaseStompProtocol[Message, str]):
         super().__init__(
             send_queue,
             recv_queue,
+            start_message_processor=start_message_processor,
             hb_send_min=hb_send_min,
             hb_recv_desired=hb_recv_desired,
             max_network_delay=max_network_delay,
-            connection_is_ready=connection_is_ready,
         )
         self._host = host
         self._login = login
@@ -390,19 +401,19 @@ class StompServer(_BaseStompProtocol[str, Message]):
             send_queue: asyncio.Queue[Union[str, None, ServerError]],
             recv_queue: WatermarkQueue[Union[Message, None]],
             *,
+            start_message_processor: MessageProcessorStarter = _NO_MP,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
-            connection_is_ready: asyncio.Event = asyncio.Event(),
             recv_destination: str = '/exchange/smp'
     ):
         super().__init__(
             send_queue,
             recv_queue,
+            start_message_processor=start_message_processor,
             hb_send_min=hb_send_min,
             hb_recv_desired=hb_recv_desired,
             max_network_delay=max_network_delay,
-            connection_is_ready=connection_is_ready,
         )
         self._recv_destination = recv_destination
         self._last_message_id: Optional[str] = None
