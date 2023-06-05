@@ -261,6 +261,7 @@ async def _publish_to_exchange(
             if failed_confirmation is None:
                 failed_confirmation = confirmation
                 has_failed_confirmations.set()
+                channel.close()
         else:
             delivery.confirmed = True
             has_confirmed_deliveries.set()
