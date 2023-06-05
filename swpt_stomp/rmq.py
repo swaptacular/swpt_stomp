@@ -157,7 +157,13 @@ async def _open_channel(
 
     _logger.info('Connecting to %s.', url)
     async with await aio_pika.connect(url, timeout=timeout) as connection:
-        channel = await asyncio.wait_for(connection.channel(), timeout)
+        channel = await asyncio.wait_for(
+            connection.channel(
+                publisher_confirms=True,
+                on_return_raises=True,
+            ),
+            timeout,
+        )
         if prefetch_count != 0 or prefetch_size != 0:
             await channel.set_qos(
                 prefetch_count=prefetch_count,
