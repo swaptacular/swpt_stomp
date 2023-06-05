@@ -25,7 +25,7 @@ async def test_consume_from_queue():
         consume_from_queue(
             send_queue,
             recv_queue,
-            rmq_url='amqp://guest:guest@127.0.0.1/',
+            url='amqp://guest:guest@127.0.0.1/',
             queue_name='test_stomp',
         ))
     confirm_task = loop.create_task(confirm_sent_messages())

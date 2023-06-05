@@ -2,8 +2,9 @@ import logging
 import asyncio
 import aio_pika
 from functools import partial
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Optional, Union, Callable, Awaitable
+from typing import Optional, Union, Callable, Awaitable, AsyncGenerator
 from collections import deque
 from aio_pika.abc import HeadersType
 from aio_pika.exceptions import CONNECTION_EXCEPTIONS
@@ -12,8 +13,8 @@ from swpt_stomp.common import (
 
 _logger = logging.getLogger(__name__)
 _RMQ_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
-_RMQ_RECONNECT_ATTEMPT_SECONDS = 10.0
 _PERSISTENT = aio_pika.DeliveryMode.PERSISTENT
+DEFAULT_CONFIRMATION_TIMEOUT = 20_000  # 20 seconds
 
 
 class _Delivery:
@@ -37,43 +38,48 @@ async def consume_from_queue(
         send_queue: asyncio.Queue[Union[Message, None, ServerError]],
         recv_queue: WatermarkQueue[Union[str, None]],
         *,
-        rmq_url: str,
+        url: str,
         queue_name: str,
         transform_message_body: Callable[[bytes], bytearray] = bytearray,
-        timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        connection_timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
         prefetch_size: int = 0,
 ) -> None:
     """Consumes messages from a RabbitMQ queue.
 
     The consumed messages will be added to the `send_queue`, awaiting
-    receipt confirmations for them on the `recv_queue`. The consumption of
-    messages will stop only when the connection to the RabbitMQ server is
-    lost, or a `None` is received on the `recv_queue`. At the end, a `None`
-    (no error), or a `ServerError` will be added to the `send_queue`.
+    receipt confirmations for them to arrive on the `recv_queue`. The
+    consumption of messages will stop only when the connection to the
+    RabbitMQ server is lost, or a `None` is received on the `recv_queue`. At
+    the end, a `None` (no error), or a `ServerError` will be added to the
+    `send_queue`.
 
     A new connection will be initiated to the RabbbitMQ server specified by
-    `rmq_url`. If the connection to the RabbitMQ server has been lost for
-    some reason, no attempts to reconnect will be made.
+    `url`. If the connection to the RabbitMQ server has been lost for some
+    reason, no attempts to reconnect will be made.
 
     `send_queue.maxsize` will determine the RabbitMQ queue's prefetch count.
     If passed, the `transform_message_body` function may change the message
     body before adding the message to the `send_queue`.
     """
     try:
-        await _consume_from_queue(
-            send_queue,
-            recv_queue,
-            rmq_url=rmq_url,
-            queue_name=queue_name,
-            transform_message_body=transform_message_body,
-            timeout=timeout,
-            prefetch_size=prefetch_size,
-        )
+        async with _open_channel(
+                url,
+                timeout=connection_timeout,
+                prefetch_count=max(send_queue.maxsize, 1),
+                prefetch_size=prefetch_size,
+        ) as channel:
+            await _consume_from_queue(
+                send_queue,
+                recv_queue,
+                channel=channel,
+                queue_name=queue_name,
+                transform_message_body=transform_message_body,
+            )
     except (asyncio.CancelledError, Exception) as e:
         send_queue.put_nowait(ServerError('Abruptly closed connection.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
-            raise e
-        _logger.exception('Lost connection to %s.', rmq_url)
+            raise e  # an unexpected error
+        _logger.exception('Lost connection to %s.', url)
     else:
         send_queue.put_nowait(None)
 
@@ -82,10 +88,11 @@ async def publish_to_exchange(
         send_queue: asyncio.Queue[Union[str, None, ServerError]],
         recv_queue: WatermarkQueue[Union[Message, None]],
         *,
-        rmq_url: str,
+        url: str,
         exchange_name: str,
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
-        timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
+        confirmation_timeout: float = DEFAULT_CONFIRMATION_TIMEOUT / 1000,
+        connection_timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
         channel: Optional[aio_pika.abc.AbstractChannel] = None,
 ) -> None:
     """Publishes messages to a RabbitMQ exchange.
@@ -100,7 +107,7 @@ async def publish_to_exchange(
 
     If an open `channel` is passed, it will be used to communicate with the
     RabbbitMQ server. If it is `None`, a new connection will be initiated to
-    the RabbbitMQ server specified by `rmq_url`. If the connection to the
+    the RabbbitMQ server specified by `url`. If the connection to the
     RabbitMQ server has been lost for some reason, no attempts to reconnect
     will be made.
 
@@ -111,226 +118,228 @@ async def publish_to_exchange(
     `ServerError`. But most importantly, it generates a routing key, before
     publishing the message to the RabbitMQ exchange.
     """
-    try:
+
+    async def publish_messages(ch: aio_pika.abc.AbstractChannel) -> None:
         await _publish_to_exchange(
             send_queue,
             recv_queue,
-            rmq_url=rmq_url,
+            channel=ch,
             exchange_name=exchange_name,
             preprocess_message=preprocess_message,
-            timeout=timeout,
-            channel=channel,
+            confirmation_timeout=confirmation_timeout,
         )
+
+    try:
+        if channel is None:
+            async with _open_channel(url, connection_timeout) as channel:
+                await publish_messages(channel)
+        else:
+            await publish_messages(channel)
     except ServerError as e:
         send_queue.put_nowait(e)
     except (asyncio.CancelledError, Exception) as e:
         send_queue.put_nowait(ServerError('Internal server error.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
-            raise e
-        _logger.exception('Lost connection to %s.', rmq_url)
+            raise e  # an unexpected error
+        _logger.exception('Lost connection to %s.', url)
     else:
         send_queue.put_nowait(None)
+
+
+@asynccontextmanager
+async def _open_channel(
+        url: str,
+        timeout: float,
+        *,
+        prefetch_count: int = 0,
+        prefetch_size: int = 0,
+) -> AsyncGenerator[aio_pika.abc.AbstractChannel, None]:
+
+    _logger.info('Connecting to %s.', url)
+    async with await aio_pika.connect(url, timeout=timeout) as connection:
+        channel = await asyncio.wait_for(connection.channel(), timeout)
+        if prefetch_count != 0 or prefetch_size != 0:
+            await channel.set_qos(
+                prefetch_count=prefetch_count,
+                prefetch_size=prefetch_size,
+                timeout=timeout,
+            )
+        yield channel
+    _logger.info('Disconnected from %s.', url)
 
 
 async def _consume_from_queue(
         send_queue: asyncio.Queue[Union[Message, None, ServerError]],
         recv_queue: WatermarkQueue[Union[str, None]],
         *,
-        rmq_url: str,
+        channel: aio_pika.abc.AbstractChannel,
         queue_name: str,
         transform_message_body: Callable[[bytes], bytearray],
-        timeout: float,
-        prefetch_size: int,
 ) -> None:
-    _logger.info('Connecting to %s.', rmq_url)
-    connection = await aio_pika.connect(rmq_url, timeout=timeout)
+    async def consume_queue() -> None:
+        queue = await channel.get_queue(queue_name, ensure=False)
+        async with queue.iterator() as queue_iter:
+            _logger.info('Started consuming from %s.', queue_name)
+            async for message in queue_iter:
+                message_type = message.type
+                if message_type is None:
+                    # It would be more natural to raise a RuntimeError
+                    # here, but this would be erroneously treated as a
+                    # connection error, because RuntimeError is in
+                    # aio_pika's CONNECTION_EXCEPTIONS.
+                    raise Exception('Message without a type.')
 
-    async with connection:
-        channel = await asyncio.wait_for(connection.channel(), timeout)
+                message_content_type = message.content_type
+                if message_content_type is None:
+                    raise Exception('Message without a content-type.')
 
-        await channel.set_qos(
-            prefetch_count=max(send_queue.maxsize, 1),
-            prefetch_size=prefetch_size,
-            timeout=timeout,
-        )
+                delivery_tag = message.delivery_tag
+                if delivery_tag is None:
+                    raise Exception('Message without a delivery tag.')
 
-        async def consume_queue() -> None:
-            queue = await channel.get_queue(queue_name, ensure=False)
-            async with queue.iterator() as queue_iter:
-                _logger.info('Started consuming from %s.', queue_name)
-                async for message in queue_iter:
-                    message_type = message.type
-                    if message_type is None:
-                        # It would be more natural to raise a RuntimeError
-                        # here, but this would be erroneously treated as a
-                        # connection error, because RuntimeError is in
-                        # aio_pika's CONNECTION_EXCEPTIONS.
-                        raise Exception('Message without a type.')
+                message_body = transform_message_body(message.body)
+                await send_queue.put(
+                    Message(
+                        id=str(delivery_tag),
+                        type=message_type,
+                        body=message_body,
+                        content_type=message_content_type,
+                    ))
 
-                    message_content_type = message.content_type
-                    if message_content_type is None:
-                        raise Exception('Message without a content-type.')
+    async def send_acks() -> None:
+        aiormq_channel = channel.channel
+        while receipt_id := await recv_queue.get():
+            try:
+                delivery_tag = int(receipt_id)
+            except ValueError:
+                _logger.error('Invalid receipt-id: %s', receipt_id)
+            else:
+                await aiormq_channel.basic_ack(delivery_tag, multiple=True)
+            recv_queue.task_done()
 
-                    delivery_tag = message.delivery_tag
-                    if delivery_tag is None:
-                        raise Exception('Message without a delivery tag.')
+        consume_queue_task.cancel()
 
-                    message_body = transform_message_body(message.body)
-                    await send_queue.put(
-                        Message(
-                            id=str(delivery_tag),
-                            type=message_type,
-                            body=message_body,
-                            content_type=message_content_type,
-                        ))
-
-        async def send_acks() -> None:
-            aiormq_channel = channel.channel
-            while receipt_id := await recv_queue.get():
-                try:
-                    delivery_tag = int(receipt_id)
-                except ValueError:
-                    _logger.error('Invalid receipt-id: %s', receipt_id)
-                else:
-                    await aiormq_channel.basic_ack(delivery_tag, multiple=True)
-                recv_queue.task_done()
-
-            consume_queue_task.cancel()
-
-        loop = asyncio.get_event_loop()
-        consume_queue_task = loop.create_task(consume_queue())
-        send_acks_task = loop.create_task(send_acks())
-        try:
-            await asyncio.gather(consume_queue_task, send_acks_task)
-        except asyncio.CancelledError:
-            pass
-        finally:
-            consume_queue_task.cancel()
-            send_acks_task.cancel()
-
-    _logger.info('Disconnected from %s.', rmq_url)
+    loop = asyncio.get_event_loop()
+    consume_queue_task = loop.create_task(consume_queue())
+    send_acks_task = loop.create_task(send_acks())
+    try:
+        await asyncio.gather(consume_queue_task, send_acks_task)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        consume_queue_task.cancel()
+        send_acks_task.cancel()
 
 
 async def _publish_to_exchange(
         send_queue: asyncio.Queue[Union[str, None, ServerError]],
         recv_queue: WatermarkQueue[Union[Message, None]],
         *,
-        rmq_url: str,
+        channel: aio_pika.abc.AbstractChannel,
         exchange_name: str,
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
-        timeout: float,
-        channel: Optional[aio_pika.abc.AbstractChannel],
+        confirmation_timeout: float,
 ) -> None:
-    async def publish_messages(channel: aio_pika.abc.AbstractChannel) -> None:
-        exchange = await channel.get_exchange(exchange_name, ensure=False)
-        deliveries: deque[_Delivery] = deque()
-        max_parallel_deliveries = max(send_queue.maxsize, 1)
-        can_make_deliveries = asyncio.Event()
-        can_make_deliveries.set()
-        pending_confirmations: set[asyncio.Future] = set()
-        has_confirmed_deliveries = asyncio.Event()
-        has_failed_confirmations = asyncio.Event()
-        failed_confirmation: Optional[asyncio.Future] = None
+    exchange = await channel.get_exchange(exchange_name, ensure=False)
+    deliveries: deque[_Delivery] = deque()
+    max_parallel_deliveries = max(send_queue.maxsize, 1)
+    can_make_deliveries = asyncio.Event()
+    can_make_deliveries.set()
+    pending_confirmations: set[asyncio.Future] = set()
+    has_confirmed_deliveries = asyncio.Event()
+    has_failed_confirmations = asyncio.Event()
+    failed_confirmation: Optional[asyncio.Future] = None
 
-        def on_confirmation(
-                delivery: _Delivery,
-                confirmation: asyncio.Future,
-        ) -> None:
-            pending_confirmations.remove(confirmation)
-            failed = confirmation.cancelled() or confirmation.exception()
-            if failed:
-                nonlocal failed_confirmation
-                if failed_confirmation is None:
-                    failed_confirmation = confirmation
-                    has_failed_confirmations.set()
-            else:
-                delivery.confirmed = True
-                has_confirmed_deliveries.set()
+    def on_confirmation(
+            delivery: _Delivery,
+            confirmation: asyncio.Future,
+    ) -> None:
+        pending_confirmations.remove(confirmation)
+        failed = confirmation.cancelled() or confirmation.exception()
+        if failed:
+            nonlocal failed_confirmation
+            if failed_confirmation is None:
+                failed_confirmation = confirmation
+                has_failed_confirmations.set()
+        else:
+            delivery.confirmed = True
+            has_confirmed_deliveries.set()
 
-        async def deliver(message: Message) -> None:
-            m = await preprocess_message(message)
-            await exchange.publish(
-                aio_pika.Message(
-                    m.body,
-                    headers=m.headers,
-                    type=m.type,
-                    content_type=m.content_type,
-                    delivery_mode=_PERSISTENT,
-                    app_id='swpt_stomp',
-                ),
-                m.routing_key,
-                mandatory=True,
-            )
+    async def deliver_message(message: Message) -> None:
+        m = await preprocess_message(message)
+        await exchange.publish(
+            aio_pika.Message(
+                m.body,
+                headers=m.headers,
+                type=m.type,
+                content_type=m.content_type,
+                delivery_mode=_PERSISTENT,
+                app_id='swpt_stomp',
+            ),
+            m.routing_key,
+            mandatory=True,
+            timeout=confirmation_timeout,
+        )
 
-        async def publish_messages() -> None:
-            while message := await recv_queue.get():
-                delivery = _Delivery(message.id)
-                mark_as_confirmed = partial(on_confirmation, delivery)
+    async def publish_messages() -> None:
+        while message := await recv_queue.get():
+            delivery = _Delivery(message.id)
+            mark_as_confirmed = partial(on_confirmation, delivery)
 
-                await can_make_deliveries.wait()
-                deliveries.append(delivery)
-                if len(deliveries) >= max_parallel_deliveries:
-                    can_make_deliveries.clear()
+            await can_make_deliveries.wait()
+            deliveries.append(delivery)
+            if len(deliveries) >= max_parallel_deliveries:
+                can_make_deliveries.clear()
 
-                confirmation = asyncio.ensure_future(deliver(message))
-                confirmation.add_done_callback(mark_as_confirmed)
-                pending_confirmations.add(confirmation)
-                recv_queue.task_done()
+            confirmation = asyncio.ensure_future(deliver_message(message))
+            confirmation.add_done_callback(mark_as_confirmed)
+            pending_confirmations.add(confirmation)
+            recv_queue.task_done()
 
-            # There are no more messages to publish.
-            send_receipts_task.cancel()
-            report_task.cancel()
+        # The stream of messages has ended.
+        send_receipts_task.cancel()
+        report_task.cancel()
 
-        async def send_receipts() -> None:
-            while True:
-                receipt_id = None
-                await has_confirmed_deliveries.wait()
-                while deliveries:
-                    first = deliveries[0]
-                    if not first.confirmed:
-                        break
-                    receipt_id = first.message_id
-                    deliveries.popleft()
+    async def send_receipts() -> None:
+        while True:
+            receipt_id = None
+            await has_confirmed_deliveries.wait()
+            while deliveries:
+                first = deliveries[0]
+                if not first.confirmed:
+                    break
+                receipt_id = first.message_id
+                deliveries.popleft()
 
-                has_confirmed_deliveries.clear()
-                if receipt_id is not None:
-                    if len(deliveries) < max_parallel_deliveries:
-                        can_make_deliveries.set()
-                    await send_queue.put(receipt_id)
+            has_confirmed_deliveries.clear()
+            if receipt_id is not None:
+                if len(deliveries) < max_parallel_deliveries:
+                    can_make_deliveries.set()
+                await send_queue.put(receipt_id)
 
-        async def report_failed_confirmations() -> None:
-            await has_failed_confirmations.wait()
-            assert failed_confirmation is not None
-            await failed_confirmation
+    async def report_failed_confirmations() -> None:
+        await has_failed_confirmations.wait()
+        assert failed_confirmation is not None
+        await failed_confirmation
 
-        loop = asyncio.get_event_loop()
-        publish_messages_task = loop.create_task(publish_messages())
-        send_receipts_task = loop.create_task(send_receipts())
-        report_task = loop.create_task(report_failed_confirmations())
-        try:
-            await asyncio.gather(
-                publish_messages_task,
-                send_receipts_task,
-                report_task,
-            )
-        except asyncio.CancelledError:
-            pass
-        finally:
-            publish_messages_task.cancel()
-            send_receipts_task.cancel()
-            report_task.cancel()
-            for c in pending_confirmations:
-                c.cancel()
-
-    if channel is None:
-        _logger.info('Connecting to %s.', rmq_url)
-        connection = await aio_pika.connect(rmq_url, timeout=timeout)
-        async with connection:
-            channel = await asyncio.wait_for(connection.channel(), timeout)
-            await publish_messages(channel)
-        _logger.info('Disconnected from %s.', rmq_url)
-    else:
-        await publish_messages(channel)
+    loop = asyncio.get_event_loop()
+    publish_messages_task = loop.create_task(publish_messages())
+    send_receipts_task = loop.create_task(send_receipts())
+    report_task = loop.create_task(report_failed_confirmations())
+    try:
+        await asyncio.gather(
+            publish_messages_task,
+            send_receipts_task,
+            report_task,
+        )
+    except asyncio.CancelledError:
+        pass
+    finally:
+        publish_messages_task.cancel()
+        send_receipts_task.cancel()
+        report_task.cancel()
+        for c in pending_confirmations:
+            c.cancel()
 
 
 # def _transform_message(m: Message) -> SmpMessage:
