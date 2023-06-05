@@ -146,6 +146,29 @@ async def publish_to_exchange(
         send_queue.put_nowait(None)
 
 
+async def open_robust_channel(
+        url: str,
+        timeout: float,
+) -> aio_pika.abc.AbstractChannel:
+    """Returns a robust RabbitMQ channel, suitable for publishing messages.
+
+    If the connection to the RabbitMQ server has been lost for some reason,
+    automatic attempts to reconnect will be made ad-infinitum. To the
+    publisher, the robust channel appears to be perpetually connected to the
+    RabbitMQ. Note, however, that the publish confirmations for some of the
+    published messages may still be lost during an automatic reconnect.
+    """
+    _logger.info('Creating a robust connection to %s.', url)
+    connection = await aio_pika.connect_robust(url, timeout=timeout)
+    return await asyncio.wait_for(
+        connection.channel(
+            publisher_confirms=True,
+            on_return_raises=True,
+        ),
+        timeout,
+    )
+
+
 @asynccontextmanager
 async def _open_channel(
         url: str,
