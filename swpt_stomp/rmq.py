@@ -78,7 +78,7 @@ async def consume_from_queue(
     except (asyncio.CancelledError, Exception) as e:
         send_queue.put_nowait(ServerError('Abruptly closed connection.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
-            raise e  # an unexpected error
+            raise  # an unexpected error
         _logger.exception('Lost connection to %s.', url)
     else:
         send_queue.put_nowait(None)
@@ -140,7 +140,7 @@ async def publish_to_exchange(
     except (asyncio.CancelledError, Exception) as e:
         send_queue.put_nowait(ServerError('Internal server error.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
-            raise e  # an unexpected error
+            raise  # an unexpected error
         _logger.exception('Lost connection to %s.', url)
     else:
         send_queue.put_nowait(None)
@@ -261,13 +261,17 @@ async def _publish_to_exchange(
             confirmation: asyncio.Future,
     ) -> None:
         pending_confirmations.remove(confirmation)
-        failed = confirmation.cancelled() or confirmation.exception()
-        if failed:
+        cancelled = confirmation.cancelled()
+        error = None if cancelled else confirmation.exception()
+
+        if error:
+            channel.close()
+
+        if error or cancelled:
             nonlocal failed_confirmation
             if failed_confirmation is None:
                 failed_confirmation = confirmation
                 has_failed_confirmations.set()
-                channel.close()
         else:
             delivery.confirmed = True
             has_confirmed_deliveries.set()
