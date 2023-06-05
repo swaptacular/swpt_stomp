@@ -261,13 +261,8 @@ async def _publish_to_exchange(
             confirmation: asyncio.Future,
     ) -> None:
         pending_confirmations.remove(confirmation)
-        cancelled = confirmation.cancelled()
-        error = None if cancelled else confirmation.exception()
-
-        if error:
-            channel.close()
-
-        if error or cancelled:
+        failed = confirmation.cancelled() or confirmation.exception()
+        if failed:
             nonlocal failed_confirmation
             if failed_confirmation is None:
                 failed_confirmation = confirmation
