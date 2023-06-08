@@ -236,7 +236,7 @@ async def _consume_from_queue(
                     ))
 
     async def send_acks() -> None:
-        aiormq_channel = channel.channel
+        aiormq_channel = await channel.get_underlay_channel()
         while receipt_id := await recv_queue.get():
             try:
                 delivery_tag = int(receipt_id)
