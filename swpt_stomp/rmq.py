@@ -76,12 +76,12 @@ async def consume_from_queue(
                 transform_message_body=transform_message_body,
             )
     except (asyncio.CancelledError, Exception) as e:
-        send_queue.put_nowait(ServerError('Abruptly closed connection.'))
+        await send_queue.put(ServerError('Abruptly closed connection.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
             raise  # an unexpected error
         _logger.exception('Lost connection to %s.', url)
     else:
-        send_queue.put_nowait(None)
+        await send_queue.put(None)
 
 
 async def publish_to_exchange(
@@ -136,14 +136,14 @@ async def publish_to_exchange(
         else:
             await publish_messages(channel)
     except ServerError as e:
-        send_queue.put_nowait(e)
+        await send_queue.put(e)
     except (asyncio.CancelledError, Exception) as e:
-        send_queue.put_nowait(ServerError('Internal server error.'))
+        await send_queue.put(ServerError('Internal server error.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
             raise  # an unexpected error
         _logger.exception('Lost connection to %s.', url)
     else:
-        send_queue.put_nowait(None)
+        await send_queue.put(None)
 
 
 async def open_robust_channel(
