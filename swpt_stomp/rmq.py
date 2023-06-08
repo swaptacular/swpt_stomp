@@ -7,12 +7,10 @@ from dataclasses import dataclass
 from typing import Optional, Union, Callable, Awaitable, AsyncGenerator
 from collections import deque
 from aio_pika.abc import HeadersType
-from aio_pika.exceptions import CONNECTION_EXCEPTIONS
 from swpt_stomp.common import (
     Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY)
 
 _logger = logging.getLogger(__name__)
-_RMQ_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
 _PERSISTENT = aio_pika.DeliveryMode.PERSISTENT
 DEFAULT_CONFIRMATION_TIMEOUT = 20_000  # 20 seconds
 
@@ -75,11 +73,9 @@ async def consume_from_queue(
                 queue_name=queue_name,
                 transform_message_body=transform_message_body,
             )
-    except (asyncio.CancelledError, Exception) as e:
+    except (asyncio.CancelledError, Exception):  # pragma: nocover
         await send_queue.put(ServerError('Abruptly closed connection.'))
-        if not isinstance(e, _RMQ_CONNECTION_ERRORS):
-            raise  # an unexpected error
-        _logger.exception('Lost connection to %s.', url)
+        raise
     else:
         await send_queue.put(None)
 
@@ -137,11 +133,9 @@ async def publish_to_exchange(
             await publish_messages(channel)
     except ServerError as e:
         await send_queue.put(e)
-    except (asyncio.CancelledError, Exception) as e:
+    except (asyncio.CancelledError, Exception):
         await send_queue.put(ServerError('Internal server error.'))
-        if not isinstance(e, _RMQ_CONNECTION_ERRORS):
-            raise  # an unexpected error
-        _logger.exception('Lost connection to %s.', url)
+        raise
     else:
         await send_queue.put(None)
 
@@ -149,8 +143,9 @@ async def publish_to_exchange(
 async def open_robust_channel(
         url: str,
         timeout: float,
-) -> aio_pika.abc.AbstractChannel:
-    """Returns a robust RabbitMQ channel, suitable for publishing messages.
+) -> tuple[aio_pika.abc.AbstractConnection, aio_pika.abc.AbstractChannel]:
+    """Returns a robust RabbitMQ connection, and a robust RabbitMQ channel
+    suitable for publishing messages.
 
     If the connection to the RabbitMQ server has been lost for some reason,
     automatic attempts to reconnect will be made ad-infinitum. To the
@@ -160,13 +155,14 @@ async def open_robust_channel(
     """
     _logger.info('Creating a robust connection to %s.', url)
     connection = await aio_pika.connect_robust(url, timeout=timeout)
-    return await asyncio.wait_for(
+    channel = await asyncio.wait_for(
         connection.channel(
             publisher_confirms=True,
             on_return_raises=True,
         ),
         timeout,
     )
+    return connection, channel
 
 
 @asynccontextmanager
@@ -211,7 +207,7 @@ async def _consume_from_queue(
             _logger.info('Started consuming from %s.', queue_name)
             async for message in queue_iter:
                 message_type = message.type
-                if message_type is None:
+                if message_type is None:  # pragma: nocover
                     # It would be more natural to raise a RuntimeError
                     # here, but this would be erroneously treated as a
                     # connection error, because RuntimeError is in
@@ -219,11 +215,11 @@ async def _consume_from_queue(
                     raise Exception('Message without a type.')
 
                 message_content_type = message.content_type
-                if message_content_type is None:
+                if message_content_type is None:  # pragma: nocover
                     raise Exception('Message without a content-type.')
 
                 delivery_tag = message.delivery_tag
-                if delivery_tag is None:
+                if delivery_tag is None:  # pragma: nocover
                     raise Exception('Message without a delivery tag.')
 
                 message_body = transform_message_body(message.body)
@@ -240,7 +236,7 @@ async def _consume_from_queue(
         while receipt_id := await recv_queue.get():
             try:
                 delivery_tag = int(receipt_id)
-            except ValueError:
+            except ValueError:  # pragma: nocover
                 _logger.error('Invalid receipt-id: %s', receipt_id)
             else:
                 await aiormq_channel.basic_ack(delivery_tag, multiple=True)
