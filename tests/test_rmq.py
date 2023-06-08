@@ -10,11 +10,12 @@ async def test_consume_from_queue():
     loop = asyncio.get_running_loop()
     send_queue = asyncio.Queue(5)
     recv_queue = WatermarkQueue(5)
+    message_count = 100
     n = 0
 
     async def confirm_sent_messages():
         nonlocal n
-        while n < 20:
+        while n < message_count:
             message = await send_queue.get()
             await recv_queue.put(message.id)
             n += 1
@@ -31,7 +32,7 @@ async def test_consume_from_queue():
     confirm_task = loop.create_task(confirm_sent_messages())
 
     await asyncio.gather(consume_task, confirm_task)
-    assert n == 20
+    assert n == message_count
 
 
 @pytest.mark.skip('Requires external STOMP server.')
