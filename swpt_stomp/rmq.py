@@ -278,6 +278,7 @@ async def _publish_to_exchange(
     has_confirmed_deliveries = asyncio.Event()
     has_failed_confirmations = asyncio.Event()
     failed_confirmation: Optional[asyncio.Future] = None
+    is_publishing: bool = True
 
     def on_confirmation(
             delivery: _Delivery,
@@ -326,11 +327,13 @@ async def _publish_to_exchange(
             recv_queue.task_done()
 
         # The stream of messages has ended.
-        send_receipts_task.cancel()
+        nonlocal is_publishing
+        is_publishing = False
+        await send_receipts_task
         report_task.cancel()
 
     async def send_receipts() -> None:
-        while True:
+        while is_publishing or deliveries:
             receipt_id = None
             await has_confirmed_deliveries.wait()
             while deliveries:
