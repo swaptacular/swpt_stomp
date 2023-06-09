@@ -153,6 +153,10 @@ async def test_publish_returned_message(caplog):
     assert "PublishError" in caplog.text
     assert "RabbitMQ connection error" in caplog.text
 
+    m = await send_queue.get()
+    assert isinstance(m, ServerError)
+    assert m.error_message == 'Internal server error.'
+
 
 @pytest.mark.skip('Requires external STOMP server.')
 @pytest.mark.asyncio
