@@ -247,13 +247,15 @@ async def _consume_from_queue(
     loop = asyncio.get_event_loop()
     consume_queue_task = loop.create_task(consume_queue())
     send_acks_task = loop.create_task(send_acks())
+    tasks = [consume_queue_task, send_acks_task]
     try:
-        await asyncio.gather(consume_queue_task, send_acks_task)
+        await asyncio.gather(*tasks)
     except asyncio.CancelledError:
         pass
     finally:
-        consume_queue_task.cancel()
-        send_acks_task.cancel()
+        for t in tasks:
+            t.cancel()
+        await asyncio.wait(tasks)
 
 
 async def _publish_to_exchange(
@@ -354,20 +356,19 @@ async def _publish_to_exchange(
     publish_messages_task = loop.create_task(publish_messages())
     send_receipts_task = loop.create_task(send_receipts())
     report_task = loop.create_task(report_failed_confirmations())
+    tasks = [publish_messages_task, send_receipts_task, report_task]
     try:
-        await asyncio.gather(
-            publish_messages_task,
-            send_receipts_task,
-            report_task,
-        )
+        await asyncio.gather(*tasks)
     except asyncio.CancelledError:
         pass
     finally:
-        publish_messages_task.cancel()
-        send_receipts_task.cancel()
-        report_task.cancel()
-        for c in pending_confirmations:
-            c.cancel()
+        if pending_confirmations:
+            for c in pending_confirmations:
+                c.cancel()
+            await asyncio.wait(pending_confirmations)
+        for t in tasks:
+            t.cancel()
+        await asyncio.wait(tasks)
 
 
 # def _transform_message(m: Message) -> SmpMessage:
