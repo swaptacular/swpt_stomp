@@ -33,7 +33,8 @@ async def test_consume_from_queue():
         ))
     confirm_task = loop.create_task(confirm_sent_messages())
 
-    await asyncio.gather(consume_task, confirm_task)
+    await consume_task
+    await confirm_task
     assert n == message_count
 
 
@@ -88,9 +89,11 @@ async def test_publish_to_exchange():
             preprocess_message=preprocess_message,
         ))
     generate_task = loop.create_task(generate_messages())
-    read_taks = loop.create_task(read_receipts())
+    read_task = loop.create_task(read_receipts())
 
-    await asyncio.gather(publish_task, generate_task, read_taks)
+    await publish_task
+    await generate_task
+    await read_task
     assert last_receipt == message_count
 
 
