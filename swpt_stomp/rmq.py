@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import aio_pika
+from aio_pika.exceptions import CONNECTION_EXCEPTIONS
 from functools import partial
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from swpt_stomp.common import (
 
 _logger = logging.getLogger(__name__)
 _PERSISTENT = aio_pika.DeliveryMode.PERSISTENT
+_RMQ_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
 DEFAULT_CONFIRMATION_TIMEOUT = 20_000  # 20 seconds
 
 
@@ -73,9 +75,11 @@ async def consume_from_queue(
                 queue_name=queue_name,
                 transform_message_body=transform_message_body,
             )
-    except (asyncio.CancelledError, Exception):  # pragma: nocover
+    except (asyncio.CancelledError, Exception) as e:  # pragma: nocover
         await send_queue.put(ServerError('Abruptly closed connection.'))
-        raise
+        if not isinstance(e, _RMQ_CONNECTION_ERRORS):
+            raise
+        _logger.exception('RabbitMQ connection error')
     else:
         await send_queue.put(None)
 
@@ -133,9 +137,11 @@ async def publish_to_exchange(
             await publish_messages(channel)
     except ServerError as e:
         await send_queue.put(e)
-    except (asyncio.CancelledError, Exception):
+    except (asyncio.CancelledError, Exception) as e:
         await send_queue.put(ServerError('Internal server error.'))
-        raise
+        if not isinstance(e, _RMQ_CONNECTION_ERRORS):  # pragma: nocover
+            raise
+        _logger.exception('RabbitMQ connection error')
     else:
         await send_queue.put(None)
 
@@ -208,19 +214,15 @@ async def _consume_from_queue(
             async for message in queue_iter:
                 message_type = message.type
                 if message_type is None:  # pragma: nocover
-                    # It would be more natural to raise a RuntimeError
-                    # here, but this would be erroneously treated as a
-                    # connection error, because RuntimeError is in
-                    # aio_pika's CONNECTION_EXCEPTIONS.
-                    raise Exception('Message without a type.')
+                    raise RuntimeError('Message without a type.')
 
                 message_content_type = message.content_type
                 if message_content_type is None:  # pragma: nocover
-                    raise Exception('Message without a content-type.')
+                    raise RuntimeError('Message without a content-type.')
 
                 delivery_tag = message.delivery_tag
                 if delivery_tag is None:  # pragma: nocover
-                    raise Exception('Message without a delivery tag.')
+                    raise RuntimeError('Message without a delivery tag.')
 
                 message_body = transform_message_body(message.body)
                 await send_queue.put(

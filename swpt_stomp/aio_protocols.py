@@ -31,6 +31,31 @@ _U = TypeVar('_U')
 _V = TypeVar('_V')
 
 
+class _TaskSet:
+    """Holds references to running asyncio tasks."""
+
+    def __init__(self) -> None:
+        self.tasks: set[asyncio.Task] = set()
+
+    def register(self, task: asyncio.Task) -> None:
+        self.tasks.add(task)
+        task.add_done_callback(self._done_task)
+
+    def _done_task(self, task: asyncio.Task) -> None:
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            _logger.debug('Cancelled %s', task)
+        except Exception:
+            _logger.exception(
+                'An error occurred during the execution of %s.', task)
+
+        self.tasks.remove(task)
+
+
+_tasks = _TaskSet()
+
+
 class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
     """Implements functionality common for STOMP clients and servers.
     """
@@ -78,6 +103,9 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self._connection_started_at = loop.time()
         self._transport = transport
         self._message_processor_task = self._start_message_processor(transport)
+        if self._message_processor_task is not None:
+            _tasks.register(self._message_processor_task)
+
         self.recv_queue.add_high_watermark_callback(transport.pause_reading)
         self.recv_queue.add_low_watermark_callback(transport.resume_reading)
         loop.call_later(self._max_network_delay / 1000,
@@ -136,8 +164,10 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
 
         if self._hb_recv != 0:
             self._watchdog_task = loop.create_task(self._check_aliveness())
+            _tasks.register(self._watchdog_task)
 
         self._writer_task = loop.create_task(self._process_send_queue())
+        _tasks.register(self._writer_task)
         self._connected = True
 
     def _detect_connected_timeout(self) -> None:

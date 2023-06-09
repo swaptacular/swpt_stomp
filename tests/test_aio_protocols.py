@@ -13,6 +13,60 @@ def transport():
     )
 
 
+def test_task_set_error(caplog):
+    import logging
+    from swpt_stomp.aio_protocols import _TaskSet
+
+    async def raise_error():
+        raise Exception('test error')
+
+    caplog.set_level(logging.ERROR)
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(raise_error(), name='MyTestTask')
+    ts = _TaskSet()
+    assert len(ts.tasks) == 0
+    ts.register(task)
+    assert len(ts.tasks) == 1
+
+    try:
+        loop.run_until_complete(task)
+    except Exception:
+        pass
+
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == 'ERROR'
+    assert "An error occurred during the execution of" in caplog.text
+    assert "MyTestTask" in caplog.text
+    assert len(ts.tasks) == 0
+
+
+def test_task_set_cancel(caplog):
+    import logging
+    from swpt_stomp.aio_protocols import _TaskSet
+
+    async def infinite_loop():
+        while True:
+            await asyncio.sleep(0)
+
+    caplog.set_level(logging.ERROR)
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(infinite_loop(), name='MyLoopTask')
+    task.cancel()
+    ts = _TaskSet()
+    assert len(ts.tasks) == 0
+    ts.register(task)
+    assert len(ts.tasks) == 1
+
+    try:
+        loop.run_until_complete(task)
+    except asyncio.CancelledError:
+        pass
+
+    assert len(caplog.records) == 0
+    assert "MyLoopTask" not in caplog.text
+    assert len(ts.tasks) == 0
+
+
 #######################
 # `StompClient` tests #
 #######################

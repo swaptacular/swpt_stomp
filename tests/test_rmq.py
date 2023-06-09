@@ -1,6 +1,5 @@
 import pytest
 import asyncio
-from aio_pika.exceptions import PublishError
 from swpt_stomp.common import WatermarkQueue, Message, ServerError
 from swpt_stomp.rmq import (
     open_robust_channel, consume_from_queue, publish_to_exchange, RmqMessage)
@@ -99,7 +98,10 @@ async def test_publish_to_exchange():
 
 # @pytest.mark.skip('Requires external STOMP server.')
 @pytest.mark.asyncio
-async def test_publish_returned_message():
+async def test_publish_returned_message(caplog):
+    import logging
+
+    caplog.set_level(logging.ERROR)
     loop = asyncio.get_running_loop()
     send_queue = asyncio.Queue(5)
     recv_queue = WatermarkQueue(5)
@@ -142,12 +144,14 @@ async def test_publish_returned_message():
             channel=channel,
         ))
 
-    with pytest.raises(PublishError):
-        await publish_task
-
+    await publish_task
     await generate_task
     await channel.close()
     await connection.close()
+
+    assert len(caplog.records) > 0
+    assert "PublishError" in caplog.text
+    assert "RabbitMQ connection error" in caplog.text
 
 
 @pytest.mark.skip('Requires external STOMP server.')
