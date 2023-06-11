@@ -1,5 +1,5 @@
 import pytest
-from swpt_stomp.peer_data import Subnet, NodeType, NodePeersDatabase
+from swpt_stomp.peer_data import Subnet, NodeType, get_database_instance
 
 
 def test_parse_subnet():
@@ -80,8 +80,7 @@ def test_parse_servers():
 
 def test_db_basics():
     with pytest.raises(ValueError):
-        NodePeersDatabase('http://example.com/db')
+        get_database_instance('http://example.com/db')
 
-    db = NodePeersDatabase('file:///home//user/./db/')
-    assert db.url == 'file:///home//user/./db/'
+    db = get_database_instance('file:///home//user/./db/')
     assert db._root_dir == '/home/user/db'

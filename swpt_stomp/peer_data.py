@@ -1,5 +1,6 @@
 import re
 import os.path
+from abc import ABC, abstractmethod
 from enum import Enum
 from dataclasses import dataclass
 from typing import NamedTuple, Optional
@@ -76,20 +77,37 @@ class PeerData:
     subnet: Optional[Subnet]
 
 
-class NodePeersDatabase:
+class NodePeersDatabase(ABC):
     """A database containing information for the node and its peers."""
 
+    @abstractmethod
+    async def get_node_data(self) -> NodeData:
+        raise NotImplementedError  # pragma: nocover
+
+    @abstractmethod
+    async def get_peer_data(self, node_id: str) -> Optional[PeerData]:
+        raise NotImplementedError  # pragma: nocover
+
+
+def get_database_instance(url: str) -> NodePeersDatabase:
+    """Return an instance of a node-info database.
+
+    The location of the database is determined by the passed `url`
+    parameter. Currently, only the "file://" scheme is supported for the
+    URL, and it must refer to a local directory.
+
+    For example:
+    >>> db = get_database_instance('file:///path/to/the/database/')
+    """
+    if url.startswith('file:///'):
+        return _LocalDirectory(url)
+
+    raise ValueError(f'invalid database URL: {url}')
+
+
+class _LocalDirectory(NodePeersDatabase):
     def __init__(self, url: str):
-        """Currently, only the "file://" scheme is supported for the `url`,
-        and it *must refer to a local directory*.
-
-        For example:
-        >>> db = NodePeersDatabase('file:///path/to/the/database/')
-        """
-        if not url.startswith('file:///'):
-            raise ValueError(f'invalid database URL: {url}')
-
-        self.url = url
+        assert url.startswith('file:///')
         self._root_dir: str = os.path.normpath(url[7:])
 
     async def get_node_data(self) -> NodeData:
