@@ -1,4 +1,5 @@
 import re
+import os.path
 from enum import Enum
 from dataclasses import dataclass
 from typing import NamedTuple, Optional
@@ -43,7 +44,6 @@ class NodeData:
         'root_cert',
         'subnet',
     )
-
     node_type: NodeType
     node_id: str
     root_cert: bytes
@@ -65,7 +65,6 @@ class PeerData:
         'sub_cert',
         'subnet',
     )
-
     node_type: NodeType
     node_id: str
     servers: list[tuple[str, int]]
@@ -75,6 +74,29 @@ class PeerData:
     peer_cert: bytes
     sub_cert: Optional[bytes]
     subnet: Optional[Subnet]
+
+
+class NodePeersDatabase:
+    """A database containing information for the node and its peers."""
+
+    def __init__(self, url: str):
+        """Currently, only the "file://" scheme is supported for the `url`,
+        and it *must refer to a local directory*.
+
+        For example:
+        >>> db = NodePeersDatabase('file:///path/to/the/database/')
+        """
+        if not url.startswith('file:///'):
+            raise ValueError(f'invalid database URL: {url}')
+
+        self.url = url
+        self._root_dir: str = os.path.normpath(url[7:])
+
+    async def get_node_data(self) -> NodeData:
+        raise NotImplementedError
+
+    async def get_peer_data(self, node_id: str) -> Optional[PeerData]:
+        raise NotImplementedError
 
 
 def _parse_node_type(s: str) -> NodeType:

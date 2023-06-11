@@ -1,5 +1,5 @@
 import pytest
-from swpt_stomp.peer_data import Subnet, NodeType
+from swpt_stomp.peer_data import Subnet, NodeType, NodePeersDatabase
 
 
 def test_parse_subnet():
@@ -76,3 +76,12 @@ def test_parse_servers():
     # The host is too long.
     with pytest.raises(ValueError):
         _parse_servers(50 * 'abcdefgh.' + 'com:1234')
+
+
+def test_db_basics():
+    with pytest.raises(ValueError):
+        NodePeersDatabase('http://example.com/db')
+
+    db = NodePeersDatabase('file:///home//user/./db/')
+    assert db.url == 'file:///home//user/./db/'
+    assert db._root_dir == '/home/user/db'
