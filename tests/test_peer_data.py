@@ -8,7 +8,11 @@ def datadir(request):
 
     filename = request.module.__file__
     test_dir, _ = os.path.splitext(filename)
-    return test_dir
+    return {
+        'AA': os.path.join(test_dir, 'AA'),
+        'CA': os.path.join(test_dir, 'CA'),
+        'DA': os.path.join(test_dir, 'DA'),
+    }
 
 
 def test_parse_subnet():
@@ -95,7 +99,7 @@ async def test_db_basics(datadir):
     db = get_database_instance('file:///home//user/./db/')
     assert db._root_dir == '/home/user/db'
 
-    db = get_database_instance(f'file://{datadir}')
+    db = get_database_instance(f'file://{datadir["CA"]}')
     data = await db.get_node_data()
     assert data.node_id == '5921983fe0e6eb987aeedca54ad3c708'
     assert data.node_type == NodeType.CA
