@@ -104,3 +104,4 @@ async def test_db_basics(datadir):
     assert data.node_id == '5921983fe0e6eb987aeedca54ad3c708'
     assert data.node_type == NodeType.CA
     assert data.subnet == Subnet.parse('000001')
+    assert b'-----BEGIN CERTIFICATE-----' in data.root_cert
