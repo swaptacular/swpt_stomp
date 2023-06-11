@@ -11,6 +11,10 @@ from typing import NamedTuple, Optional
 
 _DN_PART_RE = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
 
+# The name of the environment variable that specifies the number of threads
+# for the default `ThreadPoolExecutor`.
+_EXECUTOR_THREADS_ENVVAR = 'EXECUTOR_THREADS'
+
 
 class NodeType(Enum):
     AA = 1  # Accounting Authority
@@ -122,7 +126,7 @@ class _LocalDirectory(NodePeersDatabase):
 
         n = str(os.cpu_count() or 1)
         self._executor = ThreadPoolExecutor(
-            max_workers=int(os.environ.get('APP_EXECUTOR_THREADS', n)))
+            max_workers=int(os.environ.get(_EXECUTOR_THREADS_ENVVAR, n)))
 
     def _read_file(self, filepath: str) -> bytes:
         abspath = os.path.join(self._root_dir, filepath)
