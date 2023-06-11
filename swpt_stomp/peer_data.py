@@ -124,7 +124,7 @@ class _LocalDirectory(NodePeersDatabase):
         self._loop = asyncio.get_event_loop()
         self._node_data: Optional[NodeData] = None
 
-        n = str(os.cpu_count() or 1)
+        n = str(5 * (os.cpu_count() or 1))
         self._executor = ThreadPoolExecutor(
             max_workers=int(os.environ.get(_EXECUTOR_THREADS_ENVVAR, n)))
 
