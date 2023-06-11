@@ -1,5 +1,8 @@
 import re
+import os
 import os.path
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from abc import ABC, abstractmethod
 from enum import Enum
 from dataclasses import dataclass
@@ -77,6 +80,10 @@ class PeerData:
     subnet: Optional[Subnet]
 
 
+class DatabaseError(Exception):
+    """Thrown by `NodePeersDatabase` instances, to indicate an error."""
+
+
 class NodePeersDatabase(ABC):
     """A database containing information for the node and its peers."""
 
@@ -109,9 +116,73 @@ class _LocalDirectory(NodePeersDatabase):
     def __init__(self, url: str):
         assert url.startswith('file:///')
         self._root_dir: str = os.path.normpath(url[7:])
+        self._loop = asyncio.get_event_loop()
+        self._node_data: Optional[NodeData] = None
+        n = str(os.cpu_count() or 1)
+        self._executor = ThreadPoolExecutor(
+            max_workers=int(os.environ.get('APP_EXECUTOR_THREADS', n)))
+
+    def _read_file(self, filepath: str) -> bytes:
+        abspath = os.path.join(self._root_dir, filepath)
+        with open(abspath, 'br') as f:
+            return f.read()
+
+    async def read_file(self, filepath: str) -> bytes:
+        return await self._loop.run_in_executor(
+            self._executor,
+            lambda: self._read_file(filepath),
+        )
+
+    async def read_pem_file(self, filepath: str) -> bytes:
+        return await self.read_file(filepath)
+
+    async def read_line(self, filepath: str) -> str:
+        content = await self.read_file(filepath)
+        if content.endswith(b'\r\n'):
+            content = content[:-2]
+        elif content.endswith(b'\n'):
+            content = content[:-1]
+
+        try:
+            return content.decode('utf8')
+        except UnicodeDecodeError as e:
+            raise DatabaseError from e
+
+    async def read_subnet_file(self, filepath: str) -> Optional[Subnet]:
+        try:
+            s = await self.read_line(filepath)
+        except FileNotFoundError:
+            return None
+
+        try:
+            return Subnet.parse(s)
+        except ValueError as e:
+            raise DatabaseError from e
 
     async def get_node_data(self) -> NodeData:
-        raise NotImplementedError
+        if self._node_data is None:
+            root_cert = await self.read_file('root-ca.crt')
+            node_id = await self.read_line('db/nodeid')
+            node_type_str = await self.read_line('db/nodetype')
+            try:
+                node_type = _parse_node_type(node_type_str)
+            except ValueError as e:
+                raise DatabaseError from e
+
+            subnet = None
+            if node_type == NodeType.CA:
+                subnet = await self.read_subnet_file('creditors-subnet.txt')
+            elif node_type == NodeType.DA:
+                subnet = await self.read_subnet_file('debtors-subnet.txt')
+
+            self._node_data = NodeData(
+                node_type=node_type,
+                node_id=node_id,
+                root_cert=root_cert,
+                subnet=subnet,
+            )
+
+        return self._node_data
 
     async def get_peer_data(self, node_id: str) -> Optional[PeerData]:
         raise NotImplementedError
