@@ -2,6 +2,15 @@ import pytest
 from swpt_stomp.peer_data import Subnet, NodeType, get_database_instance
 
 
+@pytest.fixture
+def datadir(request):
+    import os.path
+
+    filename = request.module.__file__
+    test_dir, _ = os.path.splitext(filename)
+    return test_dir
+
+
 def test_parse_subnet():
     sn = Subnet.parse('0a')
     assert sn.subnet == 0x0a00000000000000
@@ -78,9 +87,16 @@ def test_parse_servers():
         _parse_servers(50 * 'abcdefgh.' + 'com:1234')
 
 
-def test_db_basics():
+@pytest.mark.asyncio
+async def test_db_basics(datadir):
     with pytest.raises(ValueError):
         get_database_instance('http://example.com/db')
 
     db = get_database_instance('file:///home//user/./db/')
     assert db._root_dir == '/home/user/db'
+
+    db = get_database_instance(f'file://{datadir}')
+    data = await db.get_node_data()
+    assert data.node_id == '5921983fe0e6eb987aeedca54ad3c708'
+    assert data.node_type == NodeType.CA
+    assert data.subnet == Subnet.parse('000001')

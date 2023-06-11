@@ -163,7 +163,7 @@ class _LocalDirectory(NodePeersDatabase):
 
     async def get_node_data(self) -> NodeData:
         if self._node_data is None:
-            root_cert = await self.read_file('root-ca.crt')
+            root_cert = await self.read_pem_file('root-ca.crt')
             node_id = await self.read_oneline('db/nodeid')
             node_type_str = await self.read_oneline('db/nodetype')
             try:
