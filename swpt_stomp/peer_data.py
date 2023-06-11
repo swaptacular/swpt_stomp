@@ -3,6 +3,7 @@ import os
 import os.path
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from abc import ABC, abstractmethod
 from enum import Enum
 from dataclasses import dataclass
@@ -118,6 +119,7 @@ class _LocalDirectory(NodePeersDatabase):
         self._root_dir: str = os.path.normpath(url[7:])
         self._loop = asyncio.get_event_loop()
         self._node_data: Optional[NodeData] = None
+
         n = str(os.cpu_count() or 1)
         self._executor = ThreadPoolExecutor(
             max_workers=int(os.environ.get('APP_EXECUTOR_THREADS', n)))
@@ -130,13 +132,13 @@ class _LocalDirectory(NodePeersDatabase):
     async def read_file(self, filepath: str) -> bytes:
         return await self._loop.run_in_executor(
             self._executor,
-            lambda: self._read_file(filepath),
+            partial(self._read_file, filepath),
         )
 
     async def read_pem_file(self, filepath: str) -> bytes:
         return await self.read_file(filepath)
 
-    async def read_line(self, filepath: str) -> str:
+    async def read_oneline(self, filepath: str) -> str:
         content = await self.read_file(filepath)
         if content.endswith(b'\r\n'):
             content = content[:-2]
@@ -150,7 +152,7 @@ class _LocalDirectory(NodePeersDatabase):
 
     async def read_subnet_file(self, filepath: str) -> Optional[Subnet]:
         try:
-            s = await self.read_line(filepath)
+            s = await self.read_oneline(filepath)
         except FileNotFoundError:
             return None
 
@@ -162,8 +164,8 @@ class _LocalDirectory(NodePeersDatabase):
     async def get_node_data(self) -> NodeData:
         if self._node_data is None:
             root_cert = await self.read_file('root-ca.crt')
-            node_id = await self.read_line('db/nodeid')
-            node_type_str = await self.read_line('db/nodetype')
+            node_id = await self.read_oneline('db/nodeid')
+            node_type_str = await self.read_oneline('db/nodetype')
             try:
                 node_type = _parse_node_type(node_type_str)
             except ValueError as e:
