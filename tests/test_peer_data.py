@@ -43,9 +43,11 @@ def test_parse_servers():
     assert _parse_servers(
         'server1.example.com:1234\n'
         'server2.example.com:2345\n'
+        '1.2.3.4:2345\n'
     ) == [
         ('server1.example.com', 1234),
         ('server2.example.com', 2345),
+        ('1.2.3.4', 2345),
     ]
 
     # Invalid port.
@@ -70,9 +72,6 @@ def test_parse_servers():
     # Invalid symbols in host.
     with pytest.raises(ValueError):
         _parse_servers('24[s]3q5:1234')
-
-    with pytest.raises(ValueError):
-        _parse_servers('example.999:1234')
 
     # The host is too long.
     with pytest.raises(ValueError):

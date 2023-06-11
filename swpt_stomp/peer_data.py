@@ -3,7 +3,6 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import NamedTuple, Optional
 
-_ONLY_DIGITS_RE = re.compile(r"[0-9]+$")
 _DN_PART_RE = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
 
 
@@ -121,9 +120,4 @@ def _is_valid_hostname(hostname):
         return False
 
     labels = hostname.split(".")
-
-    # the TLD must be not all-numeric
-    if _ONLY_DIGITS_RE.match(labels[-1]):
-        return False
-
     return all(_DN_PART_RE.match(label) for label in labels)
