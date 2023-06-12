@@ -27,8 +27,8 @@ from typing import NamedTuple, Optional
 _DN_PART_RE = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
 _STOMP_FILE_RE = re.compile(
     r"""
-    ([^\r\n]*)(?:\r?\n)    # host
-    ([^\r\n]*)(?:\r?\n)*$  # destination""",
+    ([^\r\n]*)(?:\r?\n)     # host
+    ([^\r\n]*)(?:\r?\n)*\Z  # destination""",
     re.VERBOSE)
 
 
