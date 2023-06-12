@@ -130,3 +130,14 @@ async def test_get_aa_peer_data(datadir):
     data = await db.get_peer_data('5921983fe0e6eb987aeedca54ad3c708')
     assert data.node_id == '5921983fe0e6eb987aeedca54ad3c708'
     assert data.node_type == NodeType.CA
+
+
+@pytest.mark.asyncio
+async def test_get_da_peer_data(datadir):
+    db = get_database_instance(f'file://{datadir["DA"]}')
+
+    assert await db.get_peer_data('INVALID') is None
+
+    data = await db.get_peer_data('1234abcd')
+    assert data.node_id == '1234abcd'
+    assert data.node_type == NodeType.AA

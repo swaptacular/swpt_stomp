@@ -140,7 +140,7 @@ class NodePeersDatabase(ABC):
         if self.__node_data is None:
             try:
                 self.__node_data = await self._get_node_data()
-            except Exception as e:
+            except Exception as e:  # pragma: nocover
                 raise DatabaseError from e
 
         return self.__node_data
@@ -152,7 +152,7 @@ class NodePeersDatabase(ABC):
         if peer_data is None:
             try:
                 peer_data = await self._get_peer_data(node_id)
-            except Exception as e:
+            except Exception as e:  # pragma: nocover
                 raise DatabaseError from e
             if peer_data:
                 self.__store_peer_data(peer_data)
@@ -246,10 +246,7 @@ class _LocalDirectory(NodePeersDatabase):
         root_cert = await self._read_pem_file('root-ca.crt')
         node_id = await self._read_oneline('db/nodeid')
         node_type_str = await self._read_oneline('db/nodetype')
-        try:
-            node_type = _parse_node_type(node_type_str)
-        except ValueError as e:
-            raise DatabaseError from e
+        node_type = _parse_node_type(node_type_str)
 
         if node_type == NodeType.AA:
             subnet = None
@@ -301,7 +298,7 @@ class _LocalDirectory(NodePeersDatabase):
         if onwer_node_type == NodeType.AA:
             subnet_file = f'{dir}/subnet.txt'
             subnet = await self._read_subnet_file(subnet_file)
-            if subnet is None:
+            if subnet is None:  # pragma: nocover
                 raise Exception(f'missing file: {subnet_file}')
         elif onwer_node_type == NodeType.CA:
             subnet = await self._read_subnet_file(f'{dir}/masq-subnet.txt')
@@ -364,7 +361,7 @@ def _parse_stomp_file(s: str, *, node_id: str) -> tuple[str, str]:
         stomp_destination = m[2].replace('${NODE_ID}', node_id)
         return stomp_host, stomp_destination
 
-    raise Exception('invalid stomp.txt file')
+    raise Exception('invalid stomp.txt file')  # pragma: nocover
 
 
 def _is_valid_hostname(hostname):
