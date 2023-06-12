@@ -120,11 +120,11 @@ class NodePeersDatabase(ABC):
         return None
 
     def __store_peer_data(self, peer_data: PeerData) -> None:
-        peers_dict = self.__peers
-        while len(peers_dict) >= self.__max_cached_peers:
-            peers_dict.popitem()
+        peers = self.__peers
+        while len(peers) >= self.__max_cached_peers:
+            peers.popitem()
 
-        peers_dict[peer_data.node_id] = _PeerCacheRecord(
+        peers[peer_data.node_id] = _PeerCacheRecord(
             peer_data=peer_data,
             time=time.time(),
         )
