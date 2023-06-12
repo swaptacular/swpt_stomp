@@ -266,39 +266,39 @@ class _LocalDirectory(NodePeersDatabase):
         onwer_node_id = onwer_node_data.node_id
         onwer_node_type = onwer_node_data.node_type
 
-        pdir = await self._loop.run_in_executor(
+        dir = await self._loop.run_in_executor(
             self._executor,
             partial(self._get_peer_dir, node_id),
         )
-        if pdir is None:
+        if dir is None:
             return None
 
-        root_cert = await self._read_pem_file(f'{pdir}/root-ca.crt')
-        peer_cert = await self._read_pem_file(f'{pdir}/peercert.crt')
+        root_cert = await self._read_pem_file(f'{dir}/root-ca.crt')
+        peer_cert = await self._read_pem_file(f'{dir}/peercert.crt')
         try:
-            sub_cert = await self._read_pem_file(f'{pdir}/sub-ca.crt')
+            sub_cert = await self._read_pem_file(f'{dir}/sub-ca.crt')
         except FileNotFoundError:
             sub_cert = None
 
-        node_type_str = await self._read_oneline(f'{pdir}/nodetype.txt')
+        node_type_str = await self._read_oneline(f'{dir}/nodetype.txt')
         node_type = _parse_node_type(node_type_str)
 
-        s = await self._read_text_file(f'{pdir}/nodeinfo/servers.txt')
-        servers = _parse_servers_file(s)
+        servers_str = await self._read_text_file(f'{dir}/nodeinfo/servers.txt')
+        servers = _parse_servers_file(servers_str)
 
         try:
-            s = await self._read_text_file(f'{pdir}/nodeinfo/stomp.txt')
+            s = await self._read_text_file(f'{dir}/nodeinfo/stomp.txt')
             stomp_host, stomp_destination = _parse_stomp_file(s, onwer_node_id)
         except FileNotFoundError:
             stomp_host, stomp_destination = None, None
 
         if onwer_node_type == NodeType.AA:
-            subnet_file = f'{pdir}/subnet.txt'
+            subnet_file = f'{dir}/subnet.txt'
             subnet = await self._read_subnet_file(subnet_file)
             if subnet is None:
                 raise Exception(f'missing file: {subnet_file}')
         elif onwer_node_type == NodeType.CA:
-            subnet = await self._read_subnet_file(f'{pdir}/masq-subnet.txt')
+            subnet = await self._read_subnet_file(f'{dir}/masq-subnet.txt')
         else:
             assert onwer_node_type == NodeType.DA
             subnet = onwer_node_data.subnet
