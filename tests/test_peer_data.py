@@ -46,14 +46,14 @@ def test_parse_node_type():
         _parse_node_type('something else')
 
 
-def test_parse_servers():
-    from swpt_stomp.peer_data import _parse_servers
+def test_parse_servers_file():
+    from swpt_stomp.peer_data import _parse_servers_file
 
-    assert _parse_servers('server1.example.com.:1234') == [
+    assert _parse_servers_file('server1.example.com.:1234') == [
         ('server1.example.com.', 1234)
     ]
 
-    assert _parse_servers(
+    assert _parse_servers_file(
         'server1.example.com:1234\n'
         'server2.example.com:2345\n'
         '1.2.3.4:2345\n'
@@ -65,30 +65,30 @@ def test_parse_servers():
 
     # Invalid port.
     with pytest.raises(ValueError):
-        _parse_servers('server1.example.com:123456')
+        _parse_servers_file('server1.example.com:123456')
 
     with pytest.raises(ValueError):
-        _parse_servers('server1.example.com:-1234')
+        _parse_servers_file('server1.example.com:-1234')
 
     with pytest.raises(ValueError):
-        _parse_servers('server1.example.com:0')
+        _parse_servers_file('server1.example.com:0')
 
     with pytest.raises(ValueError):
-        _parse_servers('server1.example.com:INVALID')
+        _parse_servers_file('server1.example.com:INVALID')
 
     with pytest.raises(ValueError):
-        _parse_servers('server1.example.com:')
+        _parse_servers_file('server1.example.com:')
 
     with pytest.raises(ValueError):
-        _parse_servers('server1.example.com')
+        _parse_servers_file('server1.example.com')
 
     # Invalid symbols in host.
     with pytest.raises(ValueError):
-        _parse_servers('24[s]3q5:1234')
+        _parse_servers_file('24[s]3q5:1234')
 
     # The host is too long.
     with pytest.raises(ValueError):
-        _parse_servers(50 * 'abcdefgh.' + 'com:1234')
+        _parse_servers_file(50 * 'abcdefgh.' + 'com:1234')
 
 
 @pytest.mark.asyncio

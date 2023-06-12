@@ -133,21 +133,26 @@ class NodePeersDatabase(ABC):
         """Return data for owner of the node."""
 
         if self.__node_data is None:
-            self.__node_data = await self._get_node_data()
+            try:
+                self.__node_data = await self._get_node_data()
+            except Exception as e:
+                raise DatabaseError from e
 
         return self.__node_data
 
     async def get_peer_data(self, node_id: str) -> Optional[PeerData]:
         """Return data for peer with the given node ID."""
 
-        if peer_data := self.__get_stored_peer_data(node_id):
-            return peer_data
+        peer_data = self.__get_stored_peer_data(node_id)
+        if peer_data is None:
+            try:
+                peer_data = await self._get_peer_data(node_id)
+            except Exception as e:
+                raise DatabaseError from e
+            if peer_data:
+                self.__store_peer_data(peer_data)
 
-        if peer_data := await self._get_peer_data(node_id):
-            self.__store_peer_data(peer_data)
-            return peer_data
-
-        return None
+        return peer_data
 
     @abstractmethod
     async def _get_peer_data(self, node_id: str) -> Optional[PeerData]:
@@ -190,13 +195,17 @@ class _LocalDirectory(NodePeersDatabase):
         self._loop = asyncio.get_event_loop()
 
         default_threads = str(5 * (os.cpu_count() or 1))
-        max_workers = int(os.environ.get('EXECUTOR_THREADS', default_threads))
-        self._executor = ThreadPoolExecutor(max_workers=max_workers)
+        threads = int(os.environ.get('EXECUTOR_THREADS', default_threads))
+        self._executor = ThreadPoolExecutor(max_workers=threads)
 
     def _fetch_file(self, filepath: str) -> bytes:
         abspath = os.path.join(self._root_dir, filepath)
         with open(abspath, 'br') as f:
             return f.read()
+
+    def _get_peer_dir(self, node_id: str) -> Optional[str]:
+        abspath = os.path.join(self._root_dir, f'peers/{node_id}')
+        return abspath if os.path.isdir(abspath) else None
 
     async def _read_file(self, filepath: str) -> bytes:
         return await self._loop.run_in_executor(
@@ -204,20 +213,21 @@ class _LocalDirectory(NodePeersDatabase):
             partial(self._fetch_file, filepath),
         )
 
+    async def _read_text_file(self, filepath: str) -> str:
+        octets = await self._read_file(filepath)
+        return octets.decode('utf8')
+
     async def _read_pem_file(self, filepath: str) -> bytes:
         return await self._read_file(filepath)
 
     async def _read_oneline(self, filepath: str) -> str:
-        content = await self._read_file(filepath)
-        if content.endswith(b'\r\n'):
-            content = content[:-2]
-        elif content.endswith(b'\n'):
-            content = content[:-1]
+        content = await self._read_text_file(filepath)
+        if content.endswith('\r\n'):
+            return content[:-2]
+        elif content.endswith('\n'):
+            return content[:-1]
 
-        try:
-            return content.decode('utf8')
-        except UnicodeDecodeError as e:
-            raise DatabaseError from e
+        return content
 
     async def _read_subnet_file(self, filepath: str) -> Optional[Subnet]:
         try:
@@ -225,10 +235,7 @@ class _LocalDirectory(NodePeersDatabase):
         except FileNotFoundError:
             return None
 
-        try:
-            return Subnet.parse(s)
-        except ValueError as e:
-            raise DatabaseError from e
+        return Subnet.parse(s)
 
     async def _get_node_data(self) -> NodeData:
         root_cert = await self._read_pem_file('root-ca.crt')
@@ -239,10 +246,12 @@ class _LocalDirectory(NodePeersDatabase):
         except ValueError as e:
             raise DatabaseError from e
 
-        subnet = None
-        if node_type == NodeType.CA:
+        if node_type == NodeType.AA:
+            subnet = None
+        elif node_type == NodeType.CA:
             subnet = await self._read_subnet_file('creditors-subnet.txt')
-        elif node_type == NodeType.DA:
+        else:
+            assert node_type == NodeType.DA
             subnet = await self._read_subnet_file('debtors-subnet.txt')
 
         return NodeData(
@@ -253,7 +262,58 @@ class _LocalDirectory(NodePeersDatabase):
         )
 
     async def _get_peer_data(self, node_id: str) -> Optional[PeerData]:
-        raise NotImplementedError
+        onwer_node_data = await self.get_node_data()
+        onwer_node_id = onwer_node_data.node_id
+        onwer_node_type = onwer_node_data.node_type
+
+        pdir = await self._loop.run_in_executor(
+            self._executor,
+            partial(self._get_peer_dir, node_id),
+        )
+        if pdir is None:
+            return None
+
+        root_cert = await self._read_pem_file(f'{pdir}/root-ca.crt')
+        peer_cert = await self._read_pem_file(f'{pdir}/peercert.crt')
+        try:
+            sub_cert = await self._read_pem_file(f'{pdir}/sub-ca.crt')
+        except FileNotFoundError:
+            sub_cert = None
+
+        node_type_str = await self._read_oneline(f'{pdir}/nodetype.txt')
+        node_type = _parse_node_type(node_type_str)
+
+        s = await self._read_text_file(f'{pdir}/nodeinfo/servers.txt')
+        servers = _parse_servers_file(s)
+
+        try:
+            s = await self._read_text_file(f'{pdir}/nodeinfo/stomp.txt')
+            stomp_host, stomp_destination = _parse_stomp_file(s, onwer_node_id)
+        except FileNotFoundError:
+            stomp_host, stomp_destination = None, None
+
+        if onwer_node_type == NodeType.AA:
+            subnet_file = f'{pdir}/subnet.txt'
+            subnet = await self._read_subnet_file(subnet_file)
+            if subnet is None:
+                raise Exception(f'missing file: {subnet_file}')
+        elif onwer_node_type == NodeType.CA:
+            subnet = await self._read_subnet_file(f'{pdir}/masq-subnet.txt')
+        else:
+            assert onwer_node_type == NodeType.DA
+            subnet = onwer_node_data.subnet
+
+        return PeerData(
+            node_type=node_type,
+            node_id=node_id,
+            servers=servers,
+            stomp_host=stomp_host,
+            stomp_destination=stomp_destination,
+            root_cert=root_cert,
+            peer_cert=peer_cert,
+            sub_cert=sub_cert,
+            subnet=subnet,
+        )
 
 
 def _parse_node_type(s: str) -> NodeType:
@@ -267,7 +327,7 @@ def _parse_node_type(s: str) -> NodeType:
         raise ValueError(f'invalid node type: {s}')
 
 
-def _parse_servers(s: str) -> list[tuple[str, int]]:
+def _parse_servers_file(s: str) -> list[tuple[str, int]]:
     servers = []
     for server in s.split(maxsplit=10000):
         try:
@@ -288,6 +348,13 @@ def _parse_servers(s: str) -> list[tuple[str, int]]:
         servers.append((host, port))
 
     return servers
+
+
+def _parse_stomp_file(s: str, node_id: str) -> tuple[str, str]:
+    """Return a (stomp_host, stomp_destination) tuple."""
+
+    # TODO: Implement properly.
+    return ('/', '/exchange/smp')
 
 
 def _is_valid_hostname(hostname):
