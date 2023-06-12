@@ -91,6 +91,32 @@ def test_parse_servers_file():
         _parse_servers_file(50 * 'abcdefgh.' + 'com:1234')
 
 
+def test_parse_stomp_file():
+    from swpt_stomp.peer_data import _parse_stomp_file
+
+    for s in [
+        'host\ndestination',
+        'host\ndestination\n',
+        'host\ndestination\n\n\n',
+        'host\r\ndestination',
+        'host\r\ndestination\r\n',
+        'host\ndestination\r\n\n\n',
+    ]:
+        assert _parse_stomp_file(
+            s, node_id='1234') == ('host', 'destination')
+
+    assert _parse_stomp_file(
+        '/${NODE_ID}\n/exchange/${NODE_ID}/smp',
+        node_id='1234'
+    ) == ('/1234', '/exchange/1234/smp')
+
+    with pytest.raises(Exception):
+        _parse_stomp_file('INVALID', node_id='1234')
+
+    with pytest.raises(Exception):
+        _parse_stomp_file('host\ndestination\nMORE', node_id='1234')
+
+
 @pytest.mark.asyncio
 async def test_get_node_data(datadir):
     with pytest.raises(ValueError):
