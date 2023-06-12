@@ -9,9 +9,9 @@ def datadir(request):
     filename = request.module.__file__
     test_dir, _ = os.path.splitext(filename)
     return {
-        'AA': os.path.join(test_dir, 'AA'),
-        'CA': os.path.join(test_dir, 'CA'),
-        'DA': os.path.join(test_dir, 'DA'),
+        'AA': os.path.join(test_dir, '../test_data/AA'),
+        'CA': os.path.join(test_dir, '../test_data/CA'),
+        'DA': os.path.join(test_dir, '../test_data/DA'),
     }
 
 
