@@ -92,7 +92,7 @@ def test_parse_servers_file():
 
 
 @pytest.mark.asyncio
-async def test_db_basics(datadir):
+async def test_get_node_data(datadir):
     with pytest.raises(ValueError):
         get_database_instance('http://example.com/db')
 
@@ -105,3 +105,28 @@ async def test_db_basics(datadir):
     assert data.node_type == NodeType.CA
     assert data.subnet == Subnet.parse('000001')
     assert b'-----BEGIN CERTIFICATE-----' in data.root_cert
+
+
+@pytest.mark.asyncio
+async def test_get_ca_peer_data(datadir):
+    db = get_database_instance(f'file://{datadir["CA"]}')
+
+    assert await db.get_peer_data('INVALID') is None
+
+    data = await db.get_peer_data('1234abcd')
+    assert data.node_id == '1234abcd'
+    assert data.node_type == NodeType.AA
+
+    data2 = await db.get_peer_data('1234abcd')
+    assert data is data2
+
+
+@pytest.mark.asyncio
+async def test_get_aa_peer_data(datadir):
+    db = get_database_instance(f'file://{datadir["AA"]}')
+
+    assert await db.get_peer_data('INVALID') is None
+
+    data = await db.get_peer_data('5921983fe0e6eb987aeedca54ad3c708')
+    assert data.node_id == '5921983fe0e6eb987aeedca54ad3c708'
+    assert data.node_type == NodeType.CA
