@@ -4,21 +4,25 @@ import os.path
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
-from collections import deque
+from collections import OrderedDict
 from functools import partial
 from abc import ABC, abstractmethod
 from enum import Enum
 from dataclasses import dataclass
 from typing import NamedTuple, Optional
 
-# The `EXECUTOR_THREADS` environment variable specifies the number of
-# threads for the default `ThreadPoolExecutor`.
-
-# The `MAX_CACHED_PEERS` environment variable specifies the maximum number
-# of cached peer data records.
-
-# The `PEERS_CACHE_SECONDS environment variable specifies the number seconds
-# during which cached peer data records will be considered fresh.
+##############################################################################
+# Used environment variables:
+#
+# * `EXECUTOR_THREADS` specifies the number of threads for the default
+#   `ThreadPoolExecutor`.
+#
+# * `MAX_CACHED_PEERS` specifies the maximum number of cached peer data
+#   records.
+#
+# * `PEERS_CACHE_SECONDS` specifies the number seconds during which cached
+#   peer data records will be considered fresh.
+##############################################################################
 
 _DN_PART_RE = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
 
@@ -101,15 +105,14 @@ class NodePeersDatabase(ABC):
 
     def __init__(self) -> None:
         self.__node_data: Optional[NodeData] = None
-        self.__peers_dict: dict[str, _PeerCacheRecord] = dict()
-        self.__peers_deque: deque[_PeerCacheRecord] = deque()
-        self.__max_cached_peers = int(
-            os.environ.get('MAX_CACHED_PEERS', '5000'))
+        self.__peers: OrderedDict[str, _PeerCacheRecord] = OrderedDict()
+        self.__max_cached_peers = max(1, int(
+            os.environ.get('MAX_CACHED_PEERS', '1000')))
         self.__peers_cache_seconds = float(
             os.environ.get('PEERS_CACHE_SECONDS', '600'))
 
     def __get_stored_peer_data(self, node_id: str) -> Optional[PeerData]:
-        if peer_record := self.__peers_dict.get(node_id, None):
+        if peer_record := self.__peers.get(node_id, None):
             cutoff_time = time.time() - self.__peers_cache_seconds
             if peer_record.time >= cutoff_time:
                 return peer_record.peer_data
@@ -117,21 +120,14 @@ class NodePeersDatabase(ABC):
         return None
 
     def __store_peer_data(self, peer_data: PeerData) -> None:
-        node_id = peer_data.node_id
-        peers_dict = self.__peers_dict
-        peers_deque = self.__peers_deque
+        peers_dict = self.__peers
+        while len(peers_dict) >= self.__max_cached_peers:
+            peers_dict.popitem()
 
-        new_record = _PeerCacheRecord(
+        peers_dict[peer_data.node_id] = _PeerCacheRecord(
             peer_data=peer_data,
             time=time.time(),
         )
-        peers_dict[node_id] = new_record
-        peers_deque.append(new_record)
-        while len(peers_deque) > self.__max_cached_peers:
-            oldest_record = peers_deque.popleft()
-            oldest_record_node_id = oldest_record.peer_data.node_id
-            if oldest_record_node_id != node_id:
-                peers_dict.pop(oldest_record_node_id, None)
 
     async def get_node_data(self) -> NodeData:
         """Return data for owner of the node."""
