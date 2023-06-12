@@ -236,8 +236,8 @@ class _LocalDirectory(NodePeersDatabase):
         # PEM files may contain comments. Remove them. If the PEM file
         # contains multiple certificates, return only the first one.
         m = _PEM_CERTIFICATE_RE.search(content)
-        if m is None:
-            raise Exception('invalid certificate file')  # pragma: nocover
+        if m is None:  # pragma: nocover
+            raise RuntimeError('invalid certificate file')
 
         return m[0]
 
@@ -313,10 +313,9 @@ class _LocalDirectory(NodePeersDatabase):
             stomp_destination = None
 
         if onwer_node_type == NodeType.AA:
-            subnet_file = f'{dir}/subnet.txt'
-            subnet = await self._read_subnet_file(subnet_file)
+            subnet = await self._read_subnet_file(f'{dir}/subnet.txt')
             if subnet is None:  # pragma: nocover
-                raise Exception(f'missing file: {subnet_file}')
+                raise RuntimeError('missing subnet.txt file')
         elif onwer_node_type == NodeType.CA:
             subnet = await self._read_subnet_file(f'{dir}/masq-subnet.txt')
         else:
@@ -378,7 +377,7 @@ def _parse_stomp_file(s: str, *, node_id: str) -> tuple[str, str]:
         stomp_destination = m[2].replace('${NODE_ID}', node_id)
         return stomp_host, stomp_destination
 
-    raise Exception('invalid stomp.txt file')
+    raise RuntimeError('invalid stomp.txt file')
 
 
 def _is_valid_hostname(hostname):
