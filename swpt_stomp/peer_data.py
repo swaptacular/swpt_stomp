@@ -30,6 +30,14 @@ _STOMP_FILE_RE = re.compile(
     ([^\r\n]*)(?:\r?\n)     # host
     ([^\r\n]*)(?:\r?\n)*\Z  # destination""",
     re.VERBOSE)
+_PEM_CERTIFICATE_RE = re.compile(
+    rb"""
+    ^-----BEGIN\ CERTIFICATE-----$  # begin marker
+    [^-]+                           # certificate content
+    ^-----END\ CERTIFICATE-----$    # end marker
+    (?:\r?\n)?                      # optional new line
+    """,
+    re.VERBOSE | re.DOTALL | re.MULTILINE)
 
 
 class NodeType(Enum):
@@ -222,8 +230,16 @@ class _LocalDirectory(NodePeersDatabase):
         octets = await self._read_file(filepath)
         return octets.decode('utf8')
 
-    async def _read_pem_file(self, filepath: str) -> bytes:
-        return await self._read_file(filepath)
+    async def _read_cert_file(self, filepath: str) -> bytes:
+        content = await self._read_file(filepath)
+
+        # PEM files may contain comments. Remove them. If the PEM file
+        # contains multiple certificates, return only the first one.
+        m = _PEM_CERTIFICATE_RE.search(content)
+        if m is None:
+            raise Exception('invalid certificate file')  # pragma: nocover
+
+        return m[0]
 
     async def _read_oneline(self, filepath: str) -> str:
         content = await self._read_text_file(filepath)
@@ -243,7 +259,7 @@ class _LocalDirectory(NodePeersDatabase):
         return Subnet.parse(s)
 
     async def _get_node_data(self) -> NodeData:
-        root_cert = await self._read_pem_file('root-ca.crt')
+        root_cert = await self._read_cert_file('root-ca.crt')
         node_id = await self._read_oneline('db/nodeid')
         node_type_str = await self._read_oneline('db/nodetype')
         node_type = _parse_node_type(node_type_str)
@@ -275,10 +291,10 @@ class _LocalDirectory(NodePeersDatabase):
         if dir is None:
             return None
 
-        root_cert = await self._read_pem_file(f'{dir}/root-ca.crt')
-        peer_cert = await self._read_pem_file(f'{dir}/peercert.crt')
+        root_cert = await self._read_cert_file(f'{dir}/root-ca.crt')
+        peer_cert = await self._read_cert_file(f'{dir}/peercert.crt')
         try:
-            sub_cert = await self._read_pem_file(f'{dir}/sub-ca.crt')
+            sub_cert = await self._read_cert_file(f'{dir}/sub-ca.crt')
         except FileNotFoundError:
             sub_cert = None
 
