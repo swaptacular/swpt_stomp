@@ -25,6 +25,11 @@ from typing import NamedTuple, Optional
 ##############################################################################
 
 _DN_PART_RE = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
+_STOMP_FILE_RE = re.compile(
+    r"""
+    ([^\r\n]*)(?:\r?\n)   # host
+    ([^\r\n]*)(?:\r?\n)*  # destination""",
+    re.VERBOSE)
 
 
 class NodeType(Enum):
@@ -288,7 +293,8 @@ class _LocalDirectory(NodePeersDatabase):
 
         try:
             s = await self._read_text_file(f'{dir}/nodeinfo/stomp.txt')
-            stomp_host, stomp_destination = _parse_stomp_file(s, onwer_node_id)
+            stomp_host, stomp_destination = _parse_stomp_file(
+                s, node_id=onwer_node_id)
         except FileNotFoundError:
             stomp_host, stomp_destination = None, None
 
@@ -350,11 +356,15 @@ def _parse_servers_file(s: str) -> list[tuple[str, int]]:
     return servers
 
 
-def _parse_stomp_file(s: str, node_id: str) -> tuple[str, str]:
+def _parse_stomp_file(s: str, *, node_id: str) -> tuple[str, str]:
     """Return a (stomp_host, stomp_destination) tuple."""
 
-    # TODO: Implement properly.
-    return ('/', '/exchange/smp')
+    if m := _STOMP_FILE_RE.match(s):
+        stomp_host = m[1].replace('${NODE_ID}', node_id)
+        stomp_destination = m[2].replace('${NODE_ID}', node_id)
+        return stomp_host, stomp_destination
+
+    raise Exception('invalid stomp.txt file')
 
 
 def _is_valid_hostname(hostname):
