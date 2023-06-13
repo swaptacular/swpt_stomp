@@ -101,8 +101,8 @@ class PeerData:
     node_type: NodeType
     node_id: str
     servers: list[tuple[str, int]]
-    stomp_host: Optional[str]
-    stomp_destination: Optional[str]
+    stomp_host: str
+    stomp_destination: str
     root_cert: bytes
     peer_cert: bytes
     sub_cert: Optional[bytes]
@@ -268,6 +268,8 @@ class _LocalDirectory(NodePeersDatabase):
             subnet = None
         elif node_type == NodeType.CA:
             subnet = await self._read_subnet_file('creditors-subnet.txt')
+            if subnet is None:  # pragma: nocover
+                raise RuntimeError('missing creditors-subnet.txt file')
         else:
             assert node_type == NodeType.DA
             subnet = await self._read_subnet_file('debtors-subnet.txt')
@@ -309,8 +311,8 @@ class _LocalDirectory(NodePeersDatabase):
             stomp_host, stomp_destination = _parse_stomp_file(
                 stomp_str, node_id=onwer_node_id)
         except FileNotFoundError:
-            stomp_host = None
-            stomp_destination = None
+            stomp_host = '/'
+            stomp_destination = '/exchange/smp'
 
         if onwer_node_type == NodeType.AA:
             subnet = await self._read_subnet_file(f'{dir}/subnet.txt')
