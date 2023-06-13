@@ -198,8 +198,9 @@ def get_database_instance(
     environment variables will be used.
 
     The "FILE_READ_THREADS" environment variable specifies the number of
-    threads for the `ThreadPoolExecutor`, which is used for reading local
-    files asynchronously.
+    threads for the `ThreadPoolExecutor`, which will be used for reading
+    local files asynchronously. When not set, a reasonable default number
+    will be used.
     """
     if url.startswith('file:///'):
         return _LocalDirectory(
