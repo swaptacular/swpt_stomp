@@ -11,25 +11,14 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import NamedTuple, Optional
 
-##############################################################################
-# Used environment variables:
-#
-# * `EXECUTOR_THREADS` specifies the number of threads for the default
-#   `ThreadPoolExecutor`.
-#
-# * `MAX_CACHED_PEERS` specifies the maximum number of cached peer data
-#   records.
-#
-# * `PEERS_CACHE_SECONDS` specifies the number seconds during which cached
-#   peer data records will be considered fresh.
-##############################################################################
-
 _DN_PART_RE = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
+
 _STOMP_FILE_RE = re.compile(
     r"""
     ([^\r\n]*)(?:\r?\n)     # host
     ([^\r\n]*)(?:\r?\n)*\Z  # destination""",
     re.VERBOSE)
+
 _PEM_CERTIFICATE_RE = re.compile(
     rb"""
     ^-----BEGIN\ CERTIFICATE-----$  # begin marker
@@ -203,6 +192,14 @@ def get_database_instance(
 
     For example:
     >>> db = get_database_instance('file:///path/to/the/database/')
+
+    When values for `max_cached_peers` or `peers_cache_seconds` are not
+    passed, the values of "MAX_CACHED_PEERS" and "PEERS_CACHE_SECONDS"
+    environment variables will be used.
+
+    The "FILE_READ_THREADS" environment variables specifies the number of
+    threads for the `ThreadPoolExecutor`, which is used for reading local
+    files asynchronously.
     """
     if url.startswith('file:///'):
         return _LocalDirectory(
@@ -238,7 +235,7 @@ class _LocalDirectory(NodePeersDatabase):
         self._loop = asyncio.get_event_loop()
 
         default_threads = str(5 * (os.cpu_count() or 1))
-        threads = int(os.environ.get('EXECUTOR_THREADS', default_threads))
+        threads = int(os.environ.get('FILE_READ_THREADS', default_threads))
         self._executor = ThreadPoolExecutor(max_workers=threads)
 
     def _fetch_file(self, filepath: str) -> bytes:
