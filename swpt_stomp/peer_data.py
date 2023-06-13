@@ -120,7 +120,7 @@ class NodePeersDatabase(ABC):
                 os.environ.get('PEERS_CACHE_SECONDS', '600'))
 
         assert max_cached_peers >= 1
-        assert peers_cache_seconds >= 0.0
+        assert peers_cache_seconds == peers_cache_seconds  # not a NaN
         self.__node_data: Optional[NodeData] = None
         self.__peers: OrderedDict[str, _PeerCacheRecord] = OrderedDict()
         self.__max_cached_peers = max_cached_peers

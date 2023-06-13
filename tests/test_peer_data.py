@@ -216,3 +216,16 @@ async def test_peer_cache(datadir):
 
     data1c = await db.get_peer_data('5921983fe0e6eb987aeedca54ad3c708')
     assert data1c is not data1b
+
+
+@pytest.mark.asyncio
+async def test_peer_cache_timeout(datadir):
+    db = get_database_instance(
+        url=f'file://{datadir["AA"]}',
+        max_cached_peers=1,
+        peers_cache_seconds=-1000.0
+    )
+
+    data1a = await db.get_peer_data('5921983fe0e6eb987aeedca54ad3c708')
+    data1b = await db.get_peer_data('5921983fe0e6eb987aeedca54ad3c708')
+    assert data1a is not data1b
