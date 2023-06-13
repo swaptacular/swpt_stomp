@@ -197,7 +197,7 @@ def get_database_instance(
     passed, the values of "MAX_CACHED_PEERS" and "PEERS_CACHE_SECONDS"
     environment variables will be used.
 
-    The "FILE_READ_THREADS" environment variables specifies the number of
+    The "FILE_READ_THREADS" environment variable specifies the number of
     threads for the `ThreadPoolExecutor`, which is used for reading local
     files asynchronously.
     """
