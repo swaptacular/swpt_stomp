@@ -266,10 +266,7 @@ class _LocalDirectory(NodePeersDatabase):
             subnet = await self._read_subnet_file('creditors-subnet.txt')
         else:
             assert node_type == NodeType.DA
-            try:
-                subnet = await self._read_subnet_file('debtors-subnet.txt')
-            except FileNotFoundError:  # pragma: nocover
-                subnet = None
+            subnet = await self._read_subnet_file('debtors-subnet.txt')
 
         return NodeData(
             node_type=node_type,
@@ -318,8 +315,7 @@ class _LocalDirectory(NodePeersDatabase):
             subnet = await self._read_subnet_file(f'{dir}/masq-subnet.txt')
         else:
             assert onwer_node_type == NodeType.DA
-            if onwer_node_data.subnet is None:  # pragma: nocover
-                raise RuntimeError('missing debtors-subnet.txt file')
+            assert onwer_node_data.subnet is not None
             subnet = onwer_node_data.subnet
 
         return PeerData(
