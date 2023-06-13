@@ -179,8 +179,8 @@ class NodePeersDatabase(ABC):
 
 
 def get_database_instance(
-        url: str,
         *,
+        url: Optional[str] = None,
         max_cached_peers: Optional[int] = None,
         peers_cache_seconds: Optional[float] = None,
         file_read_threads: Optional[int] = None,
@@ -188,12 +188,12 @@ def get_database_instance(
 ) -> NodePeersDatabase:
     """Return an instance of a node-info database.
 
-    The location of the database is determined by the passed `url`
-    parameter. Currently, only the "file://" scheme is supported for the
-    URL, and it must refer to a local directory.
+    The location of the database is determined by the `url` parameter.
+    Currently, only the "file://" scheme is supported for the URL, and it
+    must refer to a local directory.
 
     For example:
-    >>> db = get_database_instance('file:///path/to/the/database/')
+    >>> db = get_database_instance(url='file:///path/to/the/database/')
 
     When values for `max_cached_peers`, `peers_cache_seconds`, and
     `peers_cache_seconds` are not passed, the values of "MAX_CACHED_PEERS",
@@ -204,7 +204,7 @@ def get_database_instance(
     for the `ThreadPoolExecutor`, which will be used for reading local files
     asynchronously.
     """
-    if url.startswith('file:///'):
+    if url and url.startswith('file:///'):
         return _LocalDirectory(
             url,
             max_cached_peers=max_cached_peers,

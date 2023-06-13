@@ -107,26 +107,26 @@ def test_parse_stomp_file():
 @pytest.mark.asyncio
 async def test_get_node_data(datadir):
     with pytest.raises(ValueError):
-        get_database_instance('http://example.com/db')
+        get_database_instance(url='http://example.com/db')
 
-    db = get_database_instance('file:///home//user/./db/')
+    db = get_database_instance(url='file:///home//user/./db/')
     assert db._root_dir == '/home/user/db'
 
-    db = get_database_instance(f'file://{datadir["CA"]}')
+    db = get_database_instance(url=f'file://{datadir["CA"]}')
     data = await db.get_node_data()
     assert data.node_id == '5921983fe0e6eb987aeedca54ad3c708'
     assert data.node_type == NodeType.CA
     assert data.subnet == Subnet.parse('000001')
     assert b'-----BEGIN CERTIFICATE-----\nMIIEqDCCAxCgAw' in data.root_cert
 
-    db = get_database_instance(f'file://{datadir["DA"]}')
+    db = get_database_instance(url=f'file://{datadir["DA"]}')
     data = await db.get_node_data()
     assert data.node_id == '060791aeca7637fa3357dfc0299fb4c5'
     assert data.node_type == NodeType.DA
     assert data.subnet == Subnet.parse('1234abcd00')
     assert b'-----BEGIN CERTIFICATE-----\nMIIEozCCAwugAw' in data.root_cert
 
-    db = get_database_instance(f'file://{datadir["AA"]}')
+    db = get_database_instance(url=f'file://{datadir["AA"]}')
     data = await db.get_node_data()
     assert data.node_id == '1234abcd'
     assert data.node_type == NodeType.AA
@@ -136,7 +136,7 @@ async def test_get_node_data(datadir):
 
 @pytest.mark.asyncio
 async def test_get_ca_peer_data(datadir):
-    db = get_database_instance(f'file://{datadir["CA"]}')
+    db = get_database_instance(url=f'file://{datadir["CA"]}')
 
     assert await db.get_peer_data('INVALID') is None
 
@@ -154,7 +154,7 @@ async def test_get_ca_peer_data(datadir):
 
 @pytest.mark.asyncio
 async def test_get_aa_peer_data(datadir):
-    db = get_database_instance(f'file://{datadir["AA"]}')
+    db = get_database_instance(url=f'file://{datadir["AA"]}')
 
     assert await db.get_peer_data('INVALID') is None
 
@@ -183,7 +183,7 @@ async def test_get_aa_peer_data(datadir):
 
 @pytest.mark.asyncio
 async def test_get_da_peer_data(datadir):
-    db = get_database_instance(f'file://{datadir["DA"]}')
+    db = get_database_instance(url=f'file://{datadir["DA"]}')
 
     assert await db.get_peer_data('INVALID') is None
 
@@ -202,7 +202,7 @@ async def test_get_da_peer_data(datadir):
 @pytest.mark.asyncio
 async def test_peer_cache(datadir):
     db = get_database_instance(
-        f'file://{datadir["AA"]}',
+        url=f'file://{datadir["AA"]}',
         max_cached_peers=1,
     )
 
