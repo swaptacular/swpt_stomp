@@ -409,7 +409,7 @@ def _parse_stomp_file(s: str, *, node_id: str) -> tuple[str, str]:
         stomp_destination = m[2].replace('${NODE_ID}', node_id)
         return stomp_host, stomp_destination
 
-    raise RuntimeError('invalid stomp.txt file')
+    raise ValueError('invalid stomp.txt file')
 
 
 def _is_valid_hostname(hostname):
