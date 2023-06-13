@@ -151,9 +151,6 @@ async def test_get_ca_peer_data(datadir):
     assert data.stomp_destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('000001')
 
-    data2 = await db.get_peer_data('1234abcd')
-    assert data is data2
-
 
 @pytest.mark.asyncio
 async def test_get_aa_peer_data(datadir):
@@ -200,3 +197,22 @@ async def test_get_da_peer_data(datadir):
     assert data.stomp_host == '/'
     assert data.stomp_destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('1234abcd00')
+
+
+@pytest.mark.asyncio
+async def test_peer_cache(datadir):
+    db = get_database_instance(
+        f'file://{datadir["AA"]}',
+        max_cached_peers=1,
+    )
+
+    data1a = await db.get_peer_data('5921983fe0e6eb987aeedca54ad3c708')
+    data1b = await db.get_peer_data('5921983fe0e6eb987aeedca54ad3c708')
+    assert data1a is data1b
+
+    data2a = await db.get_peer_data('060791aeca7637fa3357dfc0299fb4c5')
+    data2b = await db.get_peer_data('060791aeca7637fa3357dfc0299fb4c5')
+    assert data2a is data2b
+
+    data1c = await db.get_peer_data('5921983fe0e6eb987aeedca54ad3c708')
+    assert data1c is not data1b

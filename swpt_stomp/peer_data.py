@@ -116,13 +116,26 @@ class DatabaseError(Exception):
 class NodePeersDatabase(ABC):
     """A database containing information for the node and its peers."""
 
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            *,
+            max_cached_peers: Optional[int] = None,
+            peers_cache_seconds: Optional[float] = None,
+    ):
+        if max_cached_peers is None:
+            max_cached_peers = int(
+                os.environ.get('MAX_CACHED_PEERS', '5000'))
+
+        if peers_cache_seconds is None:
+            peers_cache_seconds = float(
+                os.environ.get('PEERS_CACHE_SECONDS', '600'))
+
+        assert max_cached_peers >= 1
+        assert peers_cache_seconds >= 0.0
         self.__node_data: Optional[NodeData] = None
         self.__peers: OrderedDict[str, _PeerCacheRecord] = OrderedDict()
-        self.__max_cached_peers = max(1, int(
-            os.environ.get('MAX_CACHED_PEERS', '1000')))
-        self.__peers_cache_seconds = float(
-            os.environ.get('PEERS_CACHE_SECONDS', '600'))
+        self.__max_cached_peers = max_cached_peers
+        self.__peers_cache_seconds = peers_cache_seconds
 
     def __get_stored_peer_data(self, node_id: str) -> Optional[PeerData]:
         if peer_record := self.__peers.get(node_id, None):
@@ -176,7 +189,12 @@ class NodePeersDatabase(ABC):
         raise NotImplementedError  # pragma: nocover
 
 
-def get_database_instance(url: str) -> NodePeersDatabase:
+def get_database_instance(
+        url: str,
+        *,
+        max_cached_peers: Optional[int] = None,
+        peers_cache_seconds: Optional[float] = None,
+) -> NodePeersDatabase:
     """Return an instance of a node-info database.
 
     The location of the database is determined by the passed `url`
@@ -187,7 +205,11 @@ def get_database_instance(url: str) -> NodePeersDatabase:
     >>> db = get_database_instance('file:///path/to/the/database/')
     """
     if url.startswith('file:///'):
-        return _LocalDirectory(url)
+        return _LocalDirectory(
+            url,
+            max_cached_peers=max_cached_peers,
+            peers_cache_seconds=peers_cache_seconds,
+        )
 
     raise ValueError(f'invalid database URL: {url}')
 
@@ -200,9 +222,17 @@ class _PeerCacheRecord:
 
 
 class _LocalDirectory(NodePeersDatabase):
-    def __init__(self, url: str):
-        super().__init__()
-
+    def __init__(
+            self,
+            url: str,
+            *,
+            max_cached_peers: Optional[int] = None,
+            peers_cache_seconds: Optional[float] = None,
+    ):
+        super().__init__(
+            max_cached_peers=max_cached_peers,
+            peers_cache_seconds=peers_cache_seconds,
+        )
         assert url.startswith('file:///')
         self._root_dir: str = os.path.normpath(url[7:])
         self._loop = asyncio.get_event_loop()
