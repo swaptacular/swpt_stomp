@@ -183,6 +183,8 @@ def get_database_instance(
         *,
         max_cached_peers: Optional[int] = None,
         peers_cache_seconds: Optional[float] = None,
+        file_read_threads: Optional[int] = None,
+        **kwargs,
 ) -> NodePeersDatabase:
     """Return an instance of a node-info database.
 
@@ -193,20 +195,21 @@ def get_database_instance(
     For example:
     >>> db = get_database_instance('file:///path/to/the/database/')
 
-    When values for `max_cached_peers` or `peers_cache_seconds` are not
-    passed, the values of "MAX_CACHED_PEERS" and "PEERS_CACHE_SECONDS"
-    environment variables will be used.
+    When values for `max_cached_peers`, `peers_cache_seconds`, and
+    `peers_cache_seconds` are not passed, the values of "MAX_CACHED_PEERS",
+    "PEERS_CACHE_SECONDS", and "FILE_READ_THREADS" environment variables
+    will be used. When not set, reasonable default values will be used.
 
-    The "FILE_READ_THREADS" environment variable specifies the number of
-    threads for the `ThreadPoolExecutor`, which will be used for reading
-    local files asynchronously. When not set, a reasonable default number
-    will be used.
+    NOTE: The `file_read_threads` parameter specifies the number of threads
+    for the `ThreadPoolExecutor`, which will be used for reading local files
+    asynchronously.
     """
     if url.startswith('file:///'):
         return _LocalDirectory(
             url,
             max_cached_peers=max_cached_peers,
             peers_cache_seconds=peers_cache_seconds,
+            file_read_threads=file_read_threads,
         )
 
     raise ValueError(f'invalid database URL: {url}')
@@ -226,6 +229,7 @@ class _LocalDirectory(NodePeersDatabase):
             *,
             max_cached_peers: Optional[int] = None,
             peers_cache_seconds: Optional[float] = None,
+            file_read_threads: Optional[int] = None,
     ):
         super().__init__(
             max_cached_peers=max_cached_peers,
@@ -235,9 +239,13 @@ class _LocalDirectory(NodePeersDatabase):
         self._root_dir: str = os.path.normpath(url[7:])
         self._loop = asyncio.get_event_loop()
 
-        default_threads = str(5 * (os.cpu_count() or 1))
-        threads = int(os.environ.get('FILE_READ_THREADS', default_threads))
-        self._executor = ThreadPoolExecutor(max_workers=threads)
+        if file_read_threads is None:
+            file_read_threads = int(os.environ.get(
+                'FILE_READ_THREADS',
+                str(5 * (os.cpu_count() or 1)),
+            ))
+        assert file_read_threads >= 1
+        self._executor = ThreadPoolExecutor(max_workers=file_read_threads)
 
     def _fetch_file(self, filepath: str) -> bytes:
         abspath = os.path.join(self._root_dir, filepath)
