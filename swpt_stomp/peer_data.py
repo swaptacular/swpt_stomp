@@ -316,9 +316,9 @@ class _LocalDirectory(NodePeersDatabase):
             subnet = await self._read_subnet_file(f'{dir}/subnet.txt')
         elif onwer_node_type == NodeType.CA:
             subnet = await self._read_subnet_file(f'{dir}/masq-subnet.txt')
-        else:  # pragma: nocover
+        else:
             assert onwer_node_type == NodeType.DA
-            if onwer_node_data.subnet is None:
+            if onwer_node_data.subnet is None:  # pragma: nocover
                 raise RuntimeError('missing debtors-subnet.txt file')
             subnet = onwer_node_data.subnet
 
