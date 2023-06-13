@@ -132,6 +132,13 @@ async def test_get_node_data(datadir):
     assert data.subnet == Subnet.parse('000001')
     assert b'-----BEGIN CERTIFICATE-----' in data.root_cert
 
+    db = get_database_instance(f'file://{datadir["DA"]}')
+    data = await db.get_node_data()
+    assert data.node_id == '060791aeca7637fa3357dfc0299fb4c5'
+    assert data.node_type == NodeType.DA
+    assert data.subnet == Subnet.parse('1234abcd00')
+    assert b'-----BEGIN CERTIFICATE-----' in data.root_cert
+
 
 @pytest.mark.asyncio
 async def test_get_ca_peer_data(datadir):

@@ -105,8 +105,8 @@ class PeerData:
     stomp_destination: str
     root_cert: bytes
     peer_cert: bytes
-    sub_cert: Optional[bytes]
-    subnet: Optional[Subnet]
+    sub_cert: bytes
+    subnet: Subnet
 
 
 class DatabaseError(Exception):
@@ -250,12 +250,8 @@ class _LocalDirectory(NodePeersDatabase):
 
         return content
 
-    async def _read_subnet_file(self, filepath: str) -> Optional[Subnet]:
-        try:
-            s = await self._read_oneline(filepath)
-        except FileNotFoundError:
-            return None
-
+    async def _read_subnet_file(self, filepath: str) -> Subnet:
+        s = await self._read_oneline(filepath)
         return Subnet.parse(s)
 
     async def _get_node_data(self) -> NodeData:
@@ -268,11 +264,12 @@ class _LocalDirectory(NodePeersDatabase):
             subnet = None
         elif node_type == NodeType.CA:
             subnet = await self._read_subnet_file('creditors-subnet.txt')
-            if subnet is None:  # pragma: nocover
-                raise RuntimeError('missing creditors-subnet.txt file')
         else:
             assert node_type == NodeType.DA
-            subnet = await self._read_subnet_file('debtors-subnet.txt')
+            try:
+                subnet = await self._read_subnet_file('debtors-subnet.txt')
+            except FileNotFoundError:  # pragma: nocover
+                subnet = None
 
         return NodeData(
             node_type=node_type,
@@ -282,10 +279,6 @@ class _LocalDirectory(NodePeersDatabase):
         )
 
     async def _get_peer_data(self, node_id: str) -> Optional[PeerData]:
-        onwer_node_data = await self.get_node_data()
-        onwer_node_id = onwer_node_data.node_id
-        onwer_node_type = onwer_node_data.node_type
-
         dir = await self._loop.run_in_executor(
             self._executor,
             partial(self._get_peer_dir, node_id),
@@ -293,18 +286,23 @@ class _LocalDirectory(NodePeersDatabase):
         if dir is None:
             return None
 
-        root_cert = await self._read_cert_file(f'{dir}/root-ca.crt')
-        peer_cert = await self._read_cert_file(f'{dir}/peercert.crt')
         try:
             sub_cert = await self._read_cert_file(f'{dir}/sub-ca.crt')
-        except FileNotFoundError:
-            sub_cert = None
+        except FileNotFoundError:  # pragma: nocover
+            return None
+
+        root_cert = await self._read_cert_file(f'{dir}/root-ca.crt')
+        peer_cert = await self._read_cert_file(f'{dir}/peercert.crt')
 
         node_type_str = await self._read_oneline(f'{dir}/nodetype.txt')
         node_type = _parse_node_type(node_type_str)
 
         servers_str = await self._read_text_file(f'{dir}/nodeinfo/servers.txt')
         servers = _parse_servers_file(servers_str)
+
+        onwer_node_data = await self.get_node_data()
+        onwer_node_id = onwer_node_data.node_id
+        onwer_node_type = onwer_node_data.node_type
 
         try:
             stomp_str = await self._read_text_file(f'{dir}/nodeinfo/stomp.txt')
@@ -316,12 +314,12 @@ class _LocalDirectory(NodePeersDatabase):
 
         if onwer_node_type == NodeType.AA:
             subnet = await self._read_subnet_file(f'{dir}/subnet.txt')
-            if subnet is None:  # pragma: nocover
-                raise RuntimeError('missing subnet.txt file')
         elif onwer_node_type == NodeType.CA:
             subnet = await self._read_subnet_file(f'{dir}/masq-subnet.txt')
-        else:
+        else:  # pragma: nocover
             assert onwer_node_type == NodeType.DA
+            if onwer_node_data.subnet is None:
+                raise RuntimeError('missing debtors-subnet.txt file')
             subnet = onwer_node_data.subnet
 
         return PeerData(
