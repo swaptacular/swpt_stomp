@@ -23,16 +23,12 @@ CLIENT_RECV_QUEUE_SIZE = int(os.environ.get('SERVER_RECV_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
-async def connect(node_id: str):
-    node_db = get_database_instance(url=NODEDATA_DIR)
-    owner_node_data = await node_db.get_node_data()
-    peer_data = await node_db.get_peer_data(node_id)
+async def connect(peer_node_id: str):
+    db = get_database_instance(url=NODEDATA_DIR)
+    owner_node_data = await db.get_node_data()
+    peer_data = await db.get_peer_data(peer_node_id)
     if peer_data is None:
-        raise RuntimeError(f'Peer {node_id} is not in the database.')
-
-    loop = asyncio.get_running_loop()
-    peer_root_cert = peer_data.root_cert.decode('ascii')
-    server_host, server_port = random.choice(peer_data.servers)
+        raise RuntimeError(f'Peer {peer_node_id} is not in the database.')
 
     # To be correctly authenticated by the server, we must present both the
     # server certificate, and the sub-CA certificate issued by the peer's
@@ -52,11 +48,14 @@ async def connect(node_id: str):
         ssl_context.verify_mode = ssl.CERT_REQUIRED
         ssl_context.check_hostname = False
         ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
-        ssl_context.load_verify_locations(cadata=peer_root_cert)
+        ssl_context.load_verify_locations(
+            cadata=peer_data.root_cert.decode('ascii'))
         ssl_context.load_cert_chain(certfile=certfile.name, keyfile=SERVER_KEY)
 
+        loop = asyncio.get_running_loop()
+        server_host, server_port = random.choice(peer_data.servers)
         transport, protocol = await loop.create_connection(
-            partial(_create_client_protocol, owner_node_data, peer_data),
+            partial(_create_client_protocol, loop, owner_node_data, peer_data),
             host=server_host,
             port=server_port,
             ssl=ssl_context,
@@ -66,13 +65,14 @@ async def connect(node_id: str):
 
 
 def _create_client_protocol(
+        loop: asyncio.AbstractEventLoop,
         owner_node_data: NodeData,
         peer_data: PeerData,
 ) -> StompClient:
-    send_queue: asyncio.Queue[Union[Message, None, ServerError]] = asyncio.Queue(
-        CLIENT_SEND_QUEUE_SIZE)
-    recv_queue: WatermarkQueue[Union[str, None]] = WatermarkQueue(
-        CLIENT_RECV_QUEUE_SIZE)
+    send_queue: asyncio.Queue[Union[Message, None, ServerError]] = (
+        asyncio.Queue(CLIENT_SEND_QUEUE_SIZE))
+    recv_queue: WatermarkQueue[Union[str, None]] = (
+        WatermarkQueue(CLIENT_RECV_QUEUE_SIZE))
 
     async def consume(transport: asyncio.Transport) -> None:
         try:
@@ -95,7 +95,6 @@ def _create_client_protocol(
                     _transform_message_body, owner_node_data, peer_data),
             )
 
-    loop = asyncio.get_running_loop()
     return StompClient(
         send_queue,
         recv_queue,

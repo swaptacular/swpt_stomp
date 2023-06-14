@@ -25,8 +25,8 @@ _logger = logging.getLogger(__name__)
 
 async def serve():
     loop = asyncio.get_running_loop()
-    node_db = get_database_instance(url=NODEDATA_DIR)
-    owner_node_data = await node_db.get_node_data()
+    db = get_database_instance(url=NODEDATA_DIR)
+    owner_node_data = await db.get_node_data()
     owner_root_cert = owner_node_data.root_cert.decode('ascii')
 
     # Configure SSL context:
@@ -37,7 +37,7 @@ async def serve():
     ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
 
     server = await loop.create_server(
-        partial(_create_server_protocol, node_db),
+        partial(_create_server_protocol, db),
         port=SERVER_PORT,
         backlog=SERVER_BACKLOG,
         ssl=ssl_context,
@@ -48,7 +48,7 @@ async def serve():
         await server.serve_forever()
 
 
-def _create_server_protocol(node_db: NodePeersDatabase) -> StompServer:
+def _create_server_protocol(db: NodePeersDatabase) -> StompServer:
     send_queue: asyncio.Queue[Union[str, None, ServerError]] = asyncio.Queue(
         SERVER_SEND_QUEUE_SIZE)
     recv_queue: WatermarkQueue[Union[Message, None]] = WatermarkQueue(
@@ -56,9 +56,9 @@ def _create_server_protocol(node_db: NodePeersDatabase) -> StompServer:
 
     async def publish(transport: asyncio.Transport) -> None:
         try:
-            owner_node_data = await node_db.get_node_data()
+            owner_node_data = await db.get_node_data()
             peer_serial_number = get_peer_serial_number(transport)
-            peer_data = await node_db.get_peer_data(peer_serial_number)
+            peer_data = await db.get_peer_data(peer_serial_number)
             if peer_data is None:
                 raise ServerError('Unknown peer serial number.')
         except ServerError as e:
