@@ -8,6 +8,7 @@ from swpt_stomp.logging import configure_logging
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
     SERVER_KEY, SERVER_CERT, NODEDATA_DIR, PROTOCOL_BROKER_URL,
+    get_peer_serial_number,
 )
 from swpt_stomp.rmq import publish_to_exchange, RmqMessage
 from swpt_stomp.peer_data import (
@@ -56,8 +57,7 @@ def _create_server_protocol(node_db: NodePeersDatabase) -> StompServer:
     async def publish(transport: asyncio.Transport) -> None:
         try:
             owner_node_data = await node_db.get_node_data()
-            peercert = transport.get_extra_info('peercert')
-            peer_serial_number = _get_peer_serial_number(peercert)
+            peer_serial_number = get_peer_serial_number(transport)
             peer_data = node_db.get_peer_data(peer_serial_number)
             if peer_data is None:
                 raise ServerError('Unknown peer serial number.')
@@ -82,16 +82,6 @@ def _create_server_protocol(node_db: NodePeersDatabase) -> StompServer:
         recv_queue,
         start_message_processor=lambda t: loop.create_task(publish(t)),
     )
-
-
-def _get_peer_serial_number(peercert) -> str:
-    subject = peercert['subject']
-    for rdns in subject:  # traverse all relative distinguished names
-        key, value = rdns[0]
-        if key == 'serialNumber':
-            return value
-
-    raise ValueError('invalid certificate DN')
 
 
 async def _preprocess_message(

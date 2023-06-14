@@ -117,3 +117,16 @@ class WatermarkQueue(asyncio.Queue[_T]):
         Raises `ValueError` if the callback has not been registered.
         """
         self.__lw_callbacks.remove(cb)
+
+
+def get_peer_serial_number(transport: asyncio.Transport) -> str:
+    """Try to obtain peer's serial number from a certificate.
+    """
+    peercert = transport.get_extra_info('peercert')
+    subject = peercert['subject']
+    for rdns in subject:  # traverse all relative distinguished names
+        key, value = rdns[0]
+        if key == 'serialNumber':
+            return value
+
+    raise ValueError('invalid certificate DN')
