@@ -4,6 +4,7 @@ import asyncio
 import ssl
 from typing import Union
 from functools import partial
+from swpt_stomp.logging import configure_logging
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
     SERVER_KEY, SERVER_CERT, NODEDATA_DIR, PROTOCOL_BROKER_URL,
@@ -33,7 +34,6 @@ async def serve():
     ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
     ssl_context.load_verify_locations(cadata=owner_root_cert)
     ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
-    print(ssl_context.get_ca_certs())
 
     server = await loop.create_server(
         partial(_create_server_protocol, node_db),
@@ -43,6 +43,7 @@ async def serve():
         ssl_handshake_timeout=SSL_HANDSHAKE_TIMEOUT,
     )
     async with server:
+        _logger.info('Started STOMP server at port %i.', SERVER_PORT)
         await server.serve_forever()
 
 
@@ -102,4 +103,5 @@ async def _preprocess_message(
 
 
 if __name__ == '__main__':
+    configure_logging()
     asyncio.run(serve())
