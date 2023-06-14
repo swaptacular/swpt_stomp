@@ -16,6 +16,8 @@ SERVER_CERT = os.environ['SERVER_CERT']
 SERVER_KEY = os.environ['SERVER_KEY']
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '1234'))
 SERVER_BACKLOG = int(os.environ.get('SERVER_BACKLOG', '100'))
+SERVER_SEND_QUEUE_SIZE = int(os.environ.get('SERVER_SEND_QUEUE_SIZE', '100'))
+SERVER_RECV_QUEUE_SIZE = int(os.environ.get('SERVER_RECV_QUEUE_SIZE', '100'))
 SSL_HANDSHAKE_TIMEOUT = float(os.environ.get('SSL_HANDSHAKE_TIMEOUT', '5'))
 _logger = logging.getLogger(__name__)
 
@@ -46,11 +48,10 @@ async def serve():
 
 
 def _create_server_protocol(node_db: NodePeersDatabase) -> StompServer:
-    loop = asyncio.get_running_loop()
-
-    # TODO: set proper queue sizes.
-    send_queue: asyncio.Queue[Union[str, None, ServerError]] = asyncio.Queue()
-    recv_queue: WatermarkQueue[Union[Message, None]] = WatermarkQueue(2)
+    send_queue: asyncio.Queue[Union[str, None, ServerError]] = asyncio.Queue(
+        SERVER_SEND_QUEUE_SIZE)
+    recv_queue: WatermarkQueue[Union[Message, None]] = WatermarkQueue(
+        SERVER_RECV_QUEUE_SIZE)
 
     async def publish(transport: asyncio.Transport) -> None:
         try:
@@ -75,6 +76,7 @@ def _create_server_protocol(node_db: NodePeersDatabase) -> StompServer:
                     _preprocess_message, owner_node_data, peer_data),
             )
 
+    loop = asyncio.get_running_loop()
     return StompServer(
         send_queue,
         recv_queue,
