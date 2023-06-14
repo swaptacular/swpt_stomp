@@ -37,8 +37,9 @@ async def connect(node_id: str):
     # To be correctly authenticated by the server, we must present both the
     # server certificate, and the sub-CA certificate issued by the peer's
     # root CA. Here we create a temporary file containing both certificates.
+    # Note that this is a blocking operation, but it this is OK, because we
+    # will open no more than one client connection per process.
     with tempfile.NamedTemporaryFile() as certfile:
-        # TODO: is blocking here OK?
         with open(SERVER_CERT, 'br') as f:
             certfile.write(f.read())
 
