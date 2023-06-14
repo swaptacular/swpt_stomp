@@ -92,6 +92,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self._writer_task: Optional[asyncio.Task] = None
         self._watchdog_task: Optional[asyncio.Task] = None
         self._message_processor_task: Optional[asyncio.Task] = None
+        self._peername = None
         self._start_sending = asyncio.Event()
         self._start_sending.set()
 
@@ -110,8 +111,8 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self.recv_queue.add_low_watermark_callback(transport.resume_reading)
         loop.call_later(self._max_network_delay / 1000,
                         self._detect_connected_timeout)
-        _logger.info('Opened STOMP connection to %s',
-                     transport.get_extra_info('peername'))
+        self._peername = transport.get_extra_info('peername')
+        _logger.info('Opened STOMP connection to %s', self._peername)
 
     def data_received(self, data: bytes) -> None:
         self._data_receved_at = self._loop.time()
@@ -133,9 +134,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self.recv_queue.remove_high_watermark_callback(t.pause_reading)
         self.recv_queue.remove_low_watermark_callback(t.resume_reading)
         self.recv_queue.put_nowait(None)  # Marks the end.
-
-        _logger.info('Closed STOMP connection to %s',
-                     t.get_extra_info('peername'))
+        _logger.info('Closed STOMP connection to %s', self._peername)
 
     def pause_writing(self) -> None:
         self._start_sending.clear()

@@ -66,7 +66,7 @@ def configure_logging(
     root_logger = _configure_root_logger(format)
 
     # Set the log level for this app's logger.
-    app_logger = logging.getLogger(__name__)
+    app_logger = logging.getLogger('swpt_stomp')
     app_logger.setLevel(level.upper())
     app_logger_level = app_logger.getEffectiveLevel()
 
