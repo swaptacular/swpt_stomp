@@ -6,7 +6,7 @@ from typing import Union
 from functools import partial
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
-    SERVER_KEY, SERVER_CERT, NODE_DATA_DIR, PROTOCOL_BROKER_URL,
+    SERVER_KEY, SERVER_CERT, NODEDATA_DIR, PROTOCOL_BROKER_URL,
 )
 from swpt_stomp.rmq import publish_to_exchange, RmqMessage
 from swpt_stomp.peer_data import (
@@ -23,7 +23,7 @@ _logger = logging.getLogger(__name__)
 
 async def serve():
     loop = asyncio.get_running_loop()
-    node_db = get_database_instance(url=NODE_DATA_DIR)
+    node_db = get_database_instance(url=NODEDATA_DIR)
     owner_node_data = await node_db.get_node_data()
     owner_root_cert = owner_node_data.root_cert.decode('ascii')
 
