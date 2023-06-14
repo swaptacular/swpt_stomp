@@ -52,7 +52,6 @@ async def connect(node_id: str):
         ssl_context.check_hostname = False
         ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
         ssl_context.load_verify_locations(cadata=peer_root_cert)
-        # TODO: include the sub-cert in the certfile
         ssl_context.load_cert_chain(certfile=certfile.name, keyfile=SERVER_KEY)
 
         transport, protocol = await loop.create_connection(
