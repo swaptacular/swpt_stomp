@@ -1,4 +1,5 @@
 import logging
+import tempfile
 import os
 import asyncio
 import ssl
@@ -33,30 +34,35 @@ async def connect(node_id: str):
     peer_root_cert = peer_data.root_cert.decode('ascii')
     server_host, server_port = random.choice(peer_data.servers)
 
-    # Configure SSL context:
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ssl_context.verify_mode = ssl.CERT_REQUIRED
-    ssl_context.check_hostname = False
-    ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
-    ssl_context.load_verify_locations(cadata=peer_root_cert)
-    # TODO: include the sub-cert in the certfile
-    ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+    # To be correctly authenticated by the server, we must present both the
+    # server certificate, and the sub-CA certificate issued by the peer's
+    # root CA. Here we create a temporary file containing both certificates.
+    with tempfile.NamedTemporaryFile() as certfile:
+        # TODO: is blocking here OK?
+        with open(SERVER_CERT, 'br') as f:
+            certfile.write(f.read())
 
-    transport, protocol = await loop.create_connection(
-        partial(_create_client_protocol, owner_node_data, peer_data),
-        host=server_host,
-        port=server_port,
-        ssl=ssl_context,
-        ssl_handshake_timeout=SSL_HANDSHAKE_TIMEOUT,
-    )
-    _logger.info(
-        'Established client STOMP connection to %s',
-        transport.get_extra_info('peername'),
-    )
-    try:
-        await on_con_lost
-    finally:
-        transport.close()
+        certfile.write(b'\n')
+        certfile.write(peer_data.sub_cert)
+        certfile.flush()
+
+        # Configure SSL context:
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_context.verify_mode = ssl.CERT_REQUIRED
+        ssl_context.check_hostname = False
+        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
+        ssl_context.load_verify_locations(cadata=peer_root_cert)
+        # TODO: include the sub-cert in the certfile
+        ssl_context.load_cert_chain(certfile=certfile.name, keyfile=SERVER_KEY)
+
+        transport, protocol = await loop.create_connection(
+            partial(_create_client_protocol, owner_node_data, peer_data),
+            host=server_host,
+            port=server_port,
+            ssl=ssl_context,
+            ssl_handshake_timeout=SSL_HANDSHAKE_TIMEOUT,
+        )
+        await protocol.connection_lost_event.wait()
 
 
 def _create_client_protocol(
