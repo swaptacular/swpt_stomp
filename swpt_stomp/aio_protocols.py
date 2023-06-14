@@ -61,6 +61,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
     """
     send_queue: asyncio.Queue[Union[_U, None, ServerError]]
     recv_queue: WatermarkQueue[Union[_V, None]]
+    connection_lost_event: asyncio.Event
 
     def __init__(
             self,
@@ -76,6 +77,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
 
         self.send_queue = send_queue
         self.recv_queue = recv_queue
+        self.connection_lost_event = asyncio.Event()
         self._start_message_processor = start_message_processor
         self._hb_send_min = hb_send_min
         self._hb_recv_desired = hb_recv_desired
@@ -118,6 +120,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self._data_receved_at = self._loop.time()
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
+        self.connection_lost_event.set()
         self._done = True
 
         if self._writer_task:

@@ -58,7 +58,7 @@ def _create_server_protocol(node_db: NodePeersDatabase) -> StompServer:
         try:
             owner_node_data = await node_db.get_node_data()
             peer_serial_number = get_peer_serial_number(transport)
-            peer_data = node_db.get_peer_data(peer_serial_number)
+            peer_data = await node_db.get_peer_data(peer_serial_number)
             if peer_data is None:
                 raise ServerError('Unknown peer serial number.')
         except ServerError as e:
@@ -94,4 +94,4 @@ async def _preprocess_message(
 
 if __name__ == '__main__':
     configure_logging()
-    asyncio.run(serve())
+    asyncio.run(serve(), debug=True)

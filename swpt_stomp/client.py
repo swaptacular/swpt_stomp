@@ -115,4 +115,4 @@ def _transform_message_body(
 
 if __name__ == '__main__':
     configure_logging()
-    asyncio.run(connect(PEER_NODE_ID))
+    asyncio.run(connect(PEER_NODE_ID), debug=True)
