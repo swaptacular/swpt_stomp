@@ -246,7 +246,7 @@ async def _consume_from_queue(
 
         consume_queue_task.cancel()
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     consume_queue_task = loop.create_task(consume_queue())
     send_acks_task = loop.create_task(send_acks())
     tasks = [consume_queue_task, send_acks_task]
@@ -354,7 +354,7 @@ async def _publish_to_exchange(
         assert failed_confirmation is not None
         await failed_confirmation
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     publish_messages_task = loop.create_task(publish_messages())
     send_receipts_task = loop.create_task(send_receipts())
     report_task = loop.create_task(report_failed_confirmations())
