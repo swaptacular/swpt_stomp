@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from typing import Callable, List, Any, Optional, TypeVar
 import asyncio
@@ -5,6 +6,15 @@ import asyncio
 _T = TypeVar("_T")
 Callback = Callable[[], Any]
 DEFAULT_MAX_NETWORK_DELAY = 10_000  # 10 seconds
+
+PROTOCOL_BROKER_URL = os.environ.get(
+    'PROTOCOL_BROKER_URL',
+    'amqp://guest:guest@localhost:5672',
+)
+NODE_DATA_DIR = os.environ.get('NODE_DATA_DIR', '/var/lib/nodedata')
+SERVER_CERT = os.environ.get('SERVER_CERT', '/etc/swpt-stomp/server.crt')
+SERVER_KEY = os.environ.get('SERVER_KEY', '/secrets/swpt-stomp-server.key')
+SSL_HANDSHAKE_TIMEOUT = float(os.environ.get('SSL_HANDSHAKE_TIMEOUT', '5'))
 
 
 @dataclass

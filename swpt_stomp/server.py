@@ -4,21 +4,20 @@ import asyncio
 import ssl
 from typing import Union
 from functools import partial
-from swpt_stomp.common import WatermarkQueue, ServerError, Message
+from swpt_stomp.common import (
+    WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
+    SERVER_KEY, SERVER_CERT, NODE_DATA_DIR, PROTOCOL_BROKER_URL,
+)
 from swpt_stomp.rmq import publish_to_exchange, RmqMessage
 from swpt_stomp.peer_data import (
-    get_database_instance, NodeData, PeerData, NodePeersDatabase)
+    get_database_instance, NodeData, PeerData, NodePeersDatabase,
+)
 from swpt_stomp.aio_protocols import StompServer
 
-PROTOCOL_BROKER_URL = os.environ['PROTOCOL_BROKER_URL']
-NODE_DATA_DIR = os.environ['NODE_DATA_DIR']
-SERVER_CERT = os.environ['SERVER_CERT']
-SERVER_KEY = os.environ['SERVER_KEY']
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '1234'))
 SERVER_BACKLOG = int(os.environ.get('SERVER_BACKLOG', '100'))
 SERVER_SEND_QUEUE_SIZE = int(os.environ.get('SERVER_SEND_QUEUE_SIZE', '100'))
 SERVER_RECV_QUEUE_SIZE = int(os.environ.get('SERVER_RECV_QUEUE_SIZE', '100'))
-SSL_HANDSHAKE_TIMEOUT = float(os.environ.get('SSL_HANDSHAKE_TIMEOUT', '5'))
 _logger = logging.getLogger(__name__)
 
 
