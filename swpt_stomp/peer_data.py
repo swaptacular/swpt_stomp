@@ -333,26 +333,26 @@ class _LocalDirectory(NodePeersDatabase):
         servers_str = await self._read_text_file(f'{dir}/nodeinfo/servers.txt')
         servers = _parse_servers_file(servers_str)
 
-        onwer_node_data = await self.get_node_data()
-        onwer_node_id = onwer_node_data.node_id
-        onwer_node_type = onwer_node_data.node_type
+        owner_node_data = await self.get_node_data()
+        owner_node_id = owner_node_data.node_id
+        owner_node_type = owner_node_data.node_type
 
         try:
             stomp_str = await self._read_text_file(f'{dir}/nodeinfo/stomp.txt')
             stomp_host, stomp_destination = _parse_stomp_file(
-                stomp_str, node_id=onwer_node_id)
+                stomp_str, node_id=owner_node_id)
         except FileNotFoundError:
             stomp_host = '/'
             stomp_destination = '/exchange/smp'
 
-        if onwer_node_type == NodeType.AA:
+        if owner_node_type == NodeType.AA:
             subnet = await self._read_subnet_file(f'{dir}/subnet.txt')
-        elif onwer_node_type == NodeType.CA:
+        elif owner_node_type == NodeType.CA:
             subnet = await self._read_subnet_file(f'{dir}/masq-subnet.txt')
         else:
-            assert onwer_node_type == NodeType.DA
-            assert onwer_node_data.subnet is not None
-            subnet = onwer_node_data.subnet
+            assert owner_node_type == NodeType.DA
+            assert owner_node_data.subnet is not None
+            subnet = owner_node_data.subnet
 
         return PeerData(
             node_type=node_type,
