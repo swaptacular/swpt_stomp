@@ -18,8 +18,7 @@ from swpt_stomp.aio_protocols import StompClient
 
 PROTOCOL_BROKER_QUEUE = os.environ.get('PROTOCOL_BROKER_QUEUE', 'default')
 PEER_NODE_ID = os.environ.get('PEER_NODE_ID', 'UNKNOWN')
-CLIENT_SEND_QUEUE_SIZE = int(os.environ.get('SERVER_SEND_QUEUE_SIZE', '100'))
-CLIENT_RECV_QUEUE_SIZE = int(os.environ.get('SERVER_RECV_QUEUE_SIZE', '100'))
+CLIENT_QUEUE_SIZE = int(os.environ.get('CLIENT_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
@@ -70,9 +69,9 @@ def _create_client_protocol(
         peer_data: PeerData,
 ) -> StompClient:
     send_queue: asyncio.Queue[Union[Message, None, ServerError]] = (
-        asyncio.Queue(CLIENT_SEND_QUEUE_SIZE))
+        asyncio.Queue(CLIENT_QUEUE_SIZE))
     recv_queue: WatermarkQueue[Union[str, None]] = (
-        WatermarkQueue(CLIENT_RECV_QUEUE_SIZE))
+        WatermarkQueue(CLIENT_QUEUE_SIZE))
 
     async def consume(transport: asyncio.Transport) -> None:
         try:

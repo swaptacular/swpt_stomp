@@ -20,8 +20,7 @@ from swpt_stomp.aio_protocols import StompServer
 
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '1234'))
 SERVER_BACKLOG = int(os.environ.get('SERVER_BACKLOG', '100'))
-SERVER_SEND_QUEUE_SIZE = int(os.environ.get('SERVER_SEND_QUEUE_SIZE', '100'))
-SERVER_RECV_QUEUE_SIZE = int(os.environ.get('SERVER_RECV_QUEUE_SIZE', '100'))
+SERVER_QUEUE_SIZE = int(os.environ.get('SERVER_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
@@ -58,9 +57,9 @@ def _create_server_protocol(
         channel: AbstractChannel,
 ) -> StompServer:
     send_queue: asyncio.Queue[Union[str, None, ServerError]] = asyncio.Queue(
-        SERVER_SEND_QUEUE_SIZE)
+        SERVER_QUEUE_SIZE)
     recv_queue: WatermarkQueue[Union[Message, None]] = WatermarkQueue(
-        SERVER_RECV_QUEUE_SIZE)
+        SERVER_QUEUE_SIZE)
 
     async def publish(transport: asyncio.Transport) -> None:
         try:
