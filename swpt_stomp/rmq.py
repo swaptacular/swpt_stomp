@@ -16,12 +16,12 @@ _logger = logging.getLogger(__name__)
 _PERSISTENT = aio_pika.DeliveryMode.PERSISTENT
 _RMQ_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
 
-RMQ_CONNECTION_TIMEOUT = float(os.environ.get(
-    'RMQ_CONNECTION_TIMEOUT',
+RMQ_CONNECTION_TIMEOUT_SECONDS = float(os.environ.get(
+    'RMQ_CONNECTION_TIMEOUT_SECONDS',
     str(DEFAULT_MAX_NETWORK_DELAY / 1000),
 ))
-RMQ_CONFIRMATION_TIMEOUT = float(os.environ.get(
-    'RMQ_CONFIRMATION_TIMEOUT',
+RMQ_CONFIRMATION_TIMEOUT_SECONDS = float(os.environ.get(
+    'RMQ_CONFIRMATION_TIMEOUT_SECONDS',
     '20',
 ))
 AbstractConnection = aio_pika.abc.AbstractConnection
@@ -52,7 +52,7 @@ async def consume_from_queue(
         url: str,
         queue_name: str,
         transform_message_body: Callable[[bytes], bytearray] = bytearray,
-        connection_timeout: float = RMQ_CONNECTION_TIMEOUT,
+        connection_timeout: float = RMQ_CONNECTION_TIMEOUT_SECONDS,
         prefetch_size: int = 0,
 ) -> None:
     """Consumes messages from a RabbitMQ queue.
@@ -102,8 +102,8 @@ async def publish_to_exchange(
         url: str,
         exchange_name: str,
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
-        confirmation_timeout: float = RMQ_CONFIRMATION_TIMEOUT,
-        connection_timeout: float = RMQ_CONNECTION_TIMEOUT,
+        confirmation_timeout: float = RMQ_CONFIRMATION_TIMEOUT_SECONDS,
+        connection_timeout: float = RMQ_CONNECTION_TIMEOUT_SECONDS,
         channel: Optional[AbstractChannel] = None,
 ) -> None:
     """Publishes messages to a RabbitMQ exchange.
@@ -159,7 +159,7 @@ async def publish_to_exchange(
 
 async def open_robust_channel(
         url: str,
-        timeout: float = RMQ_CONNECTION_TIMEOUT,
+        timeout: float = RMQ_CONNECTION_TIMEOUT_SECONDS,
 ) -> tuple[AbstractConnection, AbstractChannel]:
     """Returns a robust RabbitMQ connection, and a robust RabbitMQ channel
     suitable for publishing messages.
