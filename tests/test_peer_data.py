@@ -145,7 +145,7 @@ async def test_get_ca_peer_data(datadir):
     assert data.node_type == NodeType.AA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEgzCCAuugA' in data.root_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFeTCCA+GgA' in data.sub_cert
-    assert data.servers == [('aa.example.com', 1234)]
+    assert data.servers == [('127.0.0.1', 1234), ('127.0.0.1', 1234)]
     assert data.stomp_host == '/'
     assert data.stomp_destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('000001')
@@ -162,7 +162,7 @@ async def test_get_aa_peer_data(datadir):
     assert data.node_type == NodeType.CA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEqDCCAxCgAw' in data.root_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFWjCCA8KgAw' in data.sub_cert
-    assert data.servers == [('ca.example.com', 1234)]
+    assert data.servers == [('127.0.0.1', 1235)]
     assert data.stomp_host == '/1234abcd'
     assert data.stomp_destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('000001')
@@ -172,7 +172,7 @@ async def test_get_aa_peer_data(datadir):
     assert data.node_type == NodeType.DA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEozCCAwugAw' in data.root_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFVzCCA7+gAw' in data.sub_cert
-    assert data.servers == [('da.example.com', 1234)]
+    assert data.servers == [('127.0.0.1', 1236)]
     assert data.stomp_host == '/'
     assert data.stomp_destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('1234abcd00')
@@ -189,7 +189,7 @@ async def test_get_da_peer_data(datadir):
     assert data.node_type == NodeType.AA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEgzCCAuugAw' in data.root_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFeTCCA+GgAw' in data.sub_cert
-    assert data.servers == [('aa.example.com', 1234)]
+    assert data.servers == [('127.0.0.1', 1234), ('127.0.0.1', 1234)]
     assert data.stomp_host == '/'
     assert data.stomp_destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('1234abcd00')
