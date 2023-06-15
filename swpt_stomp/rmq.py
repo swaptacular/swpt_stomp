@@ -14,7 +14,10 @@ from swpt_stomp.common import (
 _logger = logging.getLogger(__name__)
 _PERSISTENT = aio_pika.DeliveryMode.PERSISTENT
 _RMQ_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
+
 DEFAULT_CONFIRMATION_TIMEOUT = 20_000  # 20 seconds
+AbstractConnection = aio_pika.abc.AbstractConnection
+AbstractChannel = aio_pika.abc.AbstractChannel
 
 
 class _Delivery:
@@ -93,7 +96,7 @@ async def publish_to_exchange(
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
         confirmation_timeout: float = DEFAULT_CONFIRMATION_TIMEOUT / 1000,
         connection_timeout: float = DEFAULT_MAX_NETWORK_DELAY / 1000,
-        channel: Optional[aio_pika.abc.AbstractChannel] = None,
+        channel: Optional[AbstractChannel] = None,
 ) -> None:
     """Publishes messages to a RabbitMQ exchange.
 
@@ -119,7 +122,7 @@ async def publish_to_exchange(
     publishing the message to the RabbitMQ exchange.
     """
 
-    async def publish_messages(ch: aio_pika.abc.AbstractChannel) -> None:
+    async def publish_messages(ch: AbstractChannel) -> None:
         await _publish_to_exchange(
             send_queue,
             recv_queue,
@@ -149,7 +152,7 @@ async def publish_to_exchange(
 async def open_robust_channel(
         url: str,
         timeout: float,
-) -> tuple[aio_pika.abc.AbstractConnection, aio_pika.abc.AbstractChannel]:
+) -> tuple[AbstractConnection, AbstractChannel]:
     """Returns a robust RabbitMQ connection, and a robust RabbitMQ channel
     suitable for publishing messages.
 
@@ -178,7 +181,7 @@ async def _open_channel(
         *,
         prefetch_count: int = 0,
         prefetch_size: int = 0,
-) -> AsyncGenerator[aio_pika.abc.AbstractChannel, None]:
+) -> AsyncGenerator[AbstractChannel, None]:
 
     _logger.info('Connecting to %s.', url)
     async with await aio_pika.connect(url, timeout=timeout) as connection:
@@ -203,7 +206,7 @@ async def _consume_from_queue(
         send_queue: asyncio.Queue[Union[Message, None, ServerError]],
         recv_queue: WatermarkQueue[Union[str, None]],
         *,
-        channel: aio_pika.abc.AbstractChannel,
+        channel: AbstractChannel,
         queue_name: str,
         transform_message_body: Callable[[bytes], bytearray],
 ) -> None:
@@ -264,7 +267,7 @@ async def _publish_to_exchange(
         send_queue: asyncio.Queue[Union[str, None, ServerError]],
         recv_queue: WatermarkQueue[Union[Message, None]],
         *,
-        channel: aio_pika.abc.AbstractChannel,
+        channel: AbstractChannel,
         exchange_name: str,
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
         confirmation_timeout: float,

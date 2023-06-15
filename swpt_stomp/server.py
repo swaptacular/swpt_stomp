@@ -10,7 +10,9 @@ from swpt_stomp.common import (
     SERVER_KEY, SERVER_CERT, NODEDATA_DIR, PROTOCOL_BROKER_URL,
     get_peer_serial_number,
 )
-from swpt_stomp.rmq import publish_to_exchange, RmqMessage
+from swpt_stomp.rmq import (
+    publish_to_exchange, open_robust_channel, RmqMessage, AbstractChannel,
+)
 from swpt_stomp.peer_data import (
     get_database_instance, NodeData, PeerData, NodePeersDatabase,
 )
@@ -36,19 +38,25 @@ async def serve():
     ssl_context.load_verify_locations(cadata=owner_root_cert)
     ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
 
-    server = await loop.create_server(
-        partial(_create_server_protocol, db),
-        port=SERVER_PORT,
-        backlog=SERVER_BACKLOG,
-        ssl=ssl_context,
-        ssl_handshake_timeout=SSL_HANDSHAKE_TIMEOUT,
-    )
-    async with server:
-        _logger.info('Started STOMP server at port %i.', SERVER_PORT)
-        await server.serve_forever()
+    connection, channel = await open_robust_channel(
+        'amqp://guest:guest@127.0.0.1/', 10.0)
+    async with channel, connection:
+        server = await loop.create_server(
+            partial(_create_server_protocol, db, channel),
+            port=SERVER_PORT,
+            backlog=SERVER_BACKLOG,
+            ssl=ssl_context,
+            ssl_handshake_timeout=SSL_HANDSHAKE_TIMEOUT,
+        )
+        async with server:
+            _logger.info('Started STOMP server at port %i.', SERVER_PORT)
+            await server.serve_forever()
 
 
-def _create_server_protocol(db: NodePeersDatabase) -> StompServer:
+def _create_server_protocol(
+        db: NodePeersDatabase,
+        channel: AbstractChannel,
+) -> StompServer:
     send_queue: asyncio.Queue[Union[str, None, ServerError]] = asyncio.Queue(
         SERVER_SEND_QUEUE_SIZE)
     recv_queue: WatermarkQueue[Union[Message, None]] = WatermarkQueue(
@@ -74,6 +82,7 @@ def _create_server_protocol(db: NodePeersDatabase) -> StompServer:
                 exchange_name='smp',
                 preprocess_message=partial(
                     _preprocess_message, owner_node_data, peer_data),
+                channel=channel,
             )
 
     loop = asyncio.get_running_loop()
