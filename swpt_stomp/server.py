@@ -25,23 +25,23 @@ _logger = logging.getLogger(__name__)
 
 
 async def serve():
-    loop = asyncio.get_running_loop()
     db = get_database_instance(url=NODEDATA_DIR)
     owner_node_data = await db.get_node_data()
-    owner_root_cert = owner_node_data.root_cert.decode('ascii')
 
     # Configure SSL context:
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.verify_mode = ssl.CERT_REQUIRED
     ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
-    ssl_context.load_verify_locations(cadata=owner_root_cert)
+    ssl_context.load_verify_locations(
+        cadata=owner_node_data.root_cert.decode('ascii'))
     ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
 
     connection, channel = await open_robust_channel(
-        'amqp://guest:guest@127.0.0.1/', 10.0)
-    async with channel, connection:
+        'amqp://guest:guest@127.0.0.1/')
+    async with connection, channel:
+        loop = asyncio.get_running_loop()
         server = await loop.create_server(
-            partial(_create_server_protocol, db, channel),
+            partial(_create_server_protocol, loop, db, channel),
             port=SERVER_PORT,
             backlog=SERVER_BACKLOG,
             ssl=ssl_context,
@@ -53,13 +53,14 @@ async def serve():
 
 
 def _create_server_protocol(
+        loop: asyncio.AbstractEventLoop,
         db: NodePeersDatabase,
         channel: AbstractChannel,
 ) -> StompServer:
-    send_queue: asyncio.Queue[Union[str, None, ServerError]] = asyncio.Queue(
-        SERVER_QUEUE_SIZE)
-    recv_queue: WatermarkQueue[Union[Message, None]] = WatermarkQueue(
-        SERVER_QUEUE_SIZE)
+    send_queue: asyncio.Queue[Union[str, None, ServerError]] = (
+        asyncio.Queue(SERVER_QUEUE_SIZE))
+    recv_queue: WatermarkQueue[Union[Message, None]] = (
+        WatermarkQueue(SERVER_QUEUE_SIZE))
 
     async def publish(transport: asyncio.Transport) -> None:
         try:
@@ -86,7 +87,6 @@ def _create_server_protocol(
                 channel=channel,
             )
 
-    loop = asyncio.get_running_loop()
     return StompServer(
         send_queue,
         recv_queue,
