@@ -83,7 +83,6 @@ class PeerData:
         'stomp_host',
         'stomp_destination',
         'root_cert',
-        'peer_cert',
         'sub_cert',
         'subnet',
     )
@@ -93,7 +92,6 @@ class PeerData:
     stomp_host: str
     stomp_destination: str
     root_cert: bytes
-    peer_cert: bytes
     sub_cert: bytes
     subnet: Subnet
 
@@ -325,7 +323,6 @@ class _LocalDirectory(NodePeersDatabase):
             return None
 
         root_cert = await self._read_cert_file(f'{dir}/root-ca.crt')
-        peer_cert = await self._read_cert_file(f'{dir}/peercert.crt')
 
         node_type_str = await self._read_oneline(f'{dir}/nodetype.txt')
         node_type = _parse_node_type(node_type_str)
@@ -361,7 +358,6 @@ class _LocalDirectory(NodePeersDatabase):
             stomp_host=stomp_host,
             stomp_destination=stomp_destination,
             root_cert=root_cert,
-            peer_cert=peer_cert,
             sub_cert=sub_cert,
             subnet=subnet,
         )

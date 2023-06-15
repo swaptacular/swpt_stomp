@@ -144,7 +144,6 @@ async def test_get_ca_peer_data(datadir):
     assert data.node_id == '1234abcd'
     assert data.node_type == NodeType.AA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEgzCCAuugA' in data.root_cert
-    assert b'-----BEGIN CERTIFICATE-----\nMIIFWjCCA8KgA' in data.peer_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFeTCCA+GgA' in data.sub_cert
     assert data.servers == [('aa.example.com', 1234)]
     assert data.stomp_host == '/'
@@ -162,7 +161,6 @@ async def test_get_aa_peer_data(datadir):
     assert data.node_id == '5921983fe0e6eb987aeedca54ad3c708'
     assert data.node_type == NodeType.CA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEqDCCAxCgAw' in data.root_cert
-    assert b'-----BEGIN CERTIFICATE-----\nMIIFeTCCA+GgAw' in data.peer_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFWjCCA8KgAw' in data.sub_cert
     assert data.servers == [('ca.example.com', 1234)]
     assert data.stomp_host == '/1234abcd'
@@ -173,7 +171,6 @@ async def test_get_aa_peer_data(datadir):
     assert data.node_id == '060791aeca7637fa3357dfc0299fb4c5'
     assert data.node_type == NodeType.DA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEozCCAwugAw' in data.root_cert
-    assert b'-----BEGIN CERTIFICATE-----\nMIIFeTCCA+GgAw' in data.peer_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFVzCCA7+gAw' in data.sub_cert
     assert data.servers == [('da.example.com', 1234)]
     assert data.stomp_host == '/'
@@ -191,7 +188,6 @@ async def test_get_da_peer_data(datadir):
     assert data.node_id == '1234abcd'
     assert data.node_type == NodeType.AA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEgzCCAuugAw' in data.root_cert
-    assert b'-----BEGIN CERTIFICATE-----\nMIIFVzCCA7+gAw' in data.peer_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFeTCCA+GgAw' in data.sub_cert
     assert data.servers == [('aa.example.com', 1234)]
     assert data.stomp_host == '/'
