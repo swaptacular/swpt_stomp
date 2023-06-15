@@ -33,6 +33,7 @@ async def serve(
         nodedata_dir: str = NODEDATA_DIR,
         protocol_broker_url: str = PROTOCOL_BROKER_URL,
         ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
+        server_queue_size: int = SERVER_QUEUE_SIZE,
 ):
     db = get_database_instance(url=nodedata_dir)
     owner_node_data = await db.get_node_data()
@@ -51,7 +52,7 @@ async def serve(
         loop = asyncio.get_running_loop()
         server = await loop.create_server(
             partial(_create_server_protocol,
-                    loop, db, protocol_broker_url, channel),
+                    loop, db, protocol_broker_url, channel, server_queue_size),
             port=server_port,
             backlog=server_backlog,
             ssl=ssl_context,
@@ -67,11 +68,12 @@ def _create_server_protocol(
         db: NodePeersDatabase,
         protocol_broker_url: str,
         channel: AbstractChannel,
+        server_queue_size: int,
 ) -> StompServer:
     send_queue: asyncio.Queue[Union[str, None, ServerError]] = (
-        asyncio.Queue(SERVER_QUEUE_SIZE))
+        asyncio.Queue(server_queue_size))
     recv_queue: WatermarkQueue[Union[Message, None]] = (
-        WatermarkQueue(SERVER_QUEUE_SIZE))
+        WatermarkQueue(server_queue_size))
 
     async def publish(transport: asyncio.Transport) -> None:
         try:

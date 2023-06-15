@@ -17,7 +17,7 @@ from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
 from swpt_stomp.aio_protocols import StompClient
 
 PROTOCOL_BROKER_QUEUE = os.environ.get('PROTOCOL_BROKER_QUEUE', 'default')
-PEER_NODE_ID = os.environ.get('PEER_NODE_ID', 'UNKNOWN')
+PEER_NODE_ID = os.environ.get('PEER_NODE_ID', '00000000')
 CLIENT_QUEUE_SIZE = int(os.environ.get('CLIENT_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ async def connect(
         protocol_broker_url: str = PROTOCOL_BROKER_URL,
         protocol_broker_queue: str = PROTOCOL_BROKER_QUEUE,
         ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
+        client_queue_size: int = CLIENT_QUEUE_SIZE,
 ):
     db = get_database_instance(url=nodedata_dir)
     owner_node_data = await db.get_node_data()
@@ -64,8 +65,8 @@ async def connect(
         server_host, server_port = random.choice(peer_data.servers)
         transport, protocol = await loop.create_connection(
             partial(_create_client_protocol,
-                    loop, owner_node_data, peer_data,
-                    protocol_broker_url, protocol_broker_queue),
+                    loop, owner_node_data, peer_data, protocol_broker_url,
+                    protocol_broker_queue, client_queue_size),
             host=server_host,
             port=server_port,
             ssl=ssl_context,
@@ -80,11 +81,12 @@ def _create_client_protocol(
         peer_data: PeerData,
         protocol_broker_url: str,
         protocol_broker_queue: str,
+        client_queue_size: int
 ) -> StompClient:
     send_queue: asyncio.Queue[Union[Message, None, ServerError]] = (
-        asyncio.Queue(CLIENT_QUEUE_SIZE))
+        asyncio.Queue(client_queue_size))
     recv_queue: WatermarkQueue[Union[str, None]] = (
-        WatermarkQueue(CLIENT_QUEUE_SIZE))
+        WatermarkQueue(client_queue_size))
 
     async def consume(transport: asyncio.Transport) -> None:
         try:
