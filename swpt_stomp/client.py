@@ -75,10 +75,9 @@ def _create_client_protocol(
 
     async def consume(transport: asyncio.Transport) -> None:
         try:
-            # TODO: Properly check the certificate's subject.
             peer_serial_number = get_peer_serial_number(transport)
             if peer_serial_number != peer_data.node_id:
-                raise ServerError('Wrong peer serial number.')
+                raise ServerError('Invalid certificate subject.')
         except ServerError as e:
             await send_queue.put(e)
         except (asyncio.CancelledError, Exception):

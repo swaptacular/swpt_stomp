@@ -1,5 +1,6 @@
 import pytest
-from swpt_stomp.common import WatermarkQueue
+from swpt_stomp.common import WatermarkQueue, get_peer_serial_number
+from unittest.mock import NonCallableMock, Mock
 
 
 def test_create_watermark_queue():
@@ -122,3 +123,65 @@ def test_watermark_queue_put():
     assert cb_called == 0
     loop.run_until_complete(q.put('item'))
     assert cb_called == 1
+
+
+def test_get_peer_serial_number():
+    data = {
+        'issuer': (
+            (('countryName', 'IL'),),
+            (('organizationName', 'StartCom Ltd.'),),
+            (('organizationalUnitName',
+              'Secure Digital Certificate Signing'),),
+            (('commonName',
+              'StartCom Class 2 Primary Intermediate Server CA'),)
+        ),
+        'notAfter': 'Nov 22 08:15:19 2013 GMT',
+        'notBefore': 'Nov 21 03:09:52 2011 GMT',
+        'serialNumber': '95F0',
+        'subject': (
+            (('description', '571208-SLe257oHY9fVQ07Z'),),
+            (('countryName', 'US'),),
+            (('stateOrProvinceName', 'California'),),
+            (('localityName', 'San Francisco'),),
+            (('organizationName', 'Swaptacular Nodes Registry'),),
+            (('commonName', '*.eff.org'),),
+            (('serialNumber', '1234abcd'),),
+            (('emailAddress', 'hostmaster@eff.org'),)
+        ),
+        'subjectAltName': (('DNS', '*.eff.org'), ('DNS', 'eff.org')),
+        'version': 3,
+    }
+    transport = NonCallableMock(get_extra_info=Mock(
+        return_value=data),
+    )
+    assert get_peer_serial_number(transport) == '1234abcd'
+
+    data['subject'] = (
+        (('description', '571208-SLe257oHY9fVQ07Z'),),
+        (('countryName', 'US'),),
+        (('stateOrProvinceName', 'California'),),
+        (('localityName', 'San Francisco'),),
+        (('organizationName', 'SOMETHING ELSE'),),
+        (('commonName', '*.eff.org'),),
+        (('serialNumber', '1234abcd'),),
+        (('emailAddress', 'hostmaster@eff.org'),)
+    )
+    transport = NonCallableMock(get_extra_info=Mock(
+        return_value=data),
+    )
+    assert get_peer_serial_number(transport) is None
+
+    data['subject'] = (
+        (('description', '571208-SLe257oHY9fVQ07Z'),),
+        (('countryName', 'US'),),
+        (('stateOrProvinceName', 'California'),),
+        (('localityName', 'San Francisco'),),
+        (('organizationName', 'Swaptacular Nodes Registry'),),
+        (('commonName', '*.eff.org'),),
+        (('serialNumber', '1234abcd'), ('serialNumber', '00000000')),
+        (('emailAddress', 'hostmaster@eff.org'),)
+    )
+    transport = NonCallableMock(get_extra_info=Mock(
+        return_value=data),
+    )
+    assert get_peer_serial_number(transport) is None

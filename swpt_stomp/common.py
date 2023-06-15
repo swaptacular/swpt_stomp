@@ -119,14 +119,23 @@ class WatermarkQueue(asyncio.Queue[_T]):
         self.__lw_callbacks.remove(cb)
 
 
-def get_peer_serial_number(transport: asyncio.Transport) -> str:
+def get_peer_serial_number(transport: asyncio.Transport) -> Optional[str]:
     """Try to obtain peer's serial number from a certificate.
     """
+    data = {}
+    important_keys = set(['organizationName', 'serialNumber'])
     peercert = transport.get_extra_info('peercert')
-    subject = peercert['subject']
-    for rdns in subject:  # traverse all relative distinguished names
-        key, value = rdns[0]
-        if key == 'serialNumber':
-            return value
+    try:
+        subject = peercert['subject']
+        for rdns in subject:  # traverse all relative distinguished names
+            key, value = rdns[0]
+            if key in important_keys:
+                if len(rdns) > 1 or key in data:
+                    raise ValueError(f'multi-valued {key}')
+                data[key] = value
+    except (TypeError, IndexError, KeyError, ValueError):
+        pass
 
-    raise ValueError('invalid certificate DN')
+    if data.get('organizationName') != 'Swaptacular Nodes Registry':
+        return None
+    return data.get('serialNumber')

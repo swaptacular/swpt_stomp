@@ -65,6 +65,8 @@ def _create_server_protocol(
         try:
             owner_node_data = await db.get_node_data()
             peer_serial_number = get_peer_serial_number(transport)
+            if peer_serial_number is None:
+                raise ServerError('Invalid certificate subject.')
             peer_data = await db.get_peer_data(peer_serial_number)
             if peer_data is None:
                 raise ServerError('Unknown peer serial number.')
