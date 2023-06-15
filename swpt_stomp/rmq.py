@@ -20,7 +20,10 @@ RMQ_CONNECTION_TIMEOUT = float(os.environ.get(
     'RMQ_CONNECTION_TIMEOUT',
     str(DEFAULT_MAX_NETWORK_DELAY / 1000),
 ))
-RMQ_CONFIRMATION_TIMEOUT = float(os.environ.get('CONFIRMATION_TIMEOUT', '20'))
+RMQ_CONFIRMATION_TIMEOUT = float(os.environ.get(
+    'RMQ_CONFIRMATION_TIMEOUT',
+    '20',
+))
 AbstractConnection = aio_pika.abc.AbstractConnection
 AbstractChannel = aio_pika.abc.AbstractChannel
 
