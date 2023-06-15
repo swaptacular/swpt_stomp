@@ -4,7 +4,7 @@ import os
 import asyncio
 import ssl
 import random
-from typing import Union
+from typing import Union, Callable
 from functools import partial
 from swpt_stomp.logging import configure_logging
 from swpt_stomp.common import (
@@ -22,8 +22,17 @@ CLIENT_QUEUE_SIZE = int(os.environ.get('CLIENT_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
+def NO_TMP(n: NodeData, p: PeerData, body: bytes) -> bytearray:
+    """This is mainly useful for testing purposes.
+    """
+    return bytearray(body)
+
+
 async def connect(
         *,
+        # TODO: change the default to the real message body transformer.
+        transform_message_body: Callable[
+            [NodeData, PeerData, bytes], bytearray] = NO_TMP,
         peer_node_id: str = PEER_NODE_ID,
         server_cert: str = SERVER_CERT,
         server_key: str = SERVER_KEY,
@@ -64,9 +73,16 @@ async def connect(
         loop = asyncio.get_running_loop()
         server_host, server_port = random.choice(peer_data.servers)
         transport, protocol = await loop.create_connection(
-            partial(_create_client_protocol,
-                    loop, owner_node_data, peer_data, protocol_broker_url,
-                    protocol_broker_queue, client_queue_size),
+            partial(
+                _create_client_protocol,
+                loop=loop,
+                transform_message_body=partial(
+                    transform_message_body, owner_node_data, peer_data),
+                peer_data=peer_data,
+                protocol_broker_url=protocol_broker_url,
+                protocol_broker_queue=protocol_broker_queue,
+                client_queue_size=client_queue_size,
+            ),
             host=server_host,
             port=server_port,
             ssl=ssl_context,
@@ -76,8 +92,9 @@ async def connect(
 
 
 def _create_client_protocol(
+        *,
         loop: asyncio.AbstractEventLoop,
-        owner_node_data: NodeData,
+        transform_message_body: Callable[[bytes], bytearray],
         peer_data: PeerData,
         protocol_broker_url: str,
         protocol_broker_queue: str,
@@ -104,8 +121,7 @@ def _create_client_protocol(
                 recv_queue,
                 url=protocol_broker_url,
                 queue_name=protocol_broker_queue,
-                transform_message_body=partial(
-                    _transform_message_body, owner_node_data, peer_data),
+                transform_message_body=transform_message_body,
             )
 
     return StompClient(
@@ -115,14 +131,6 @@ def _create_client_protocol(
         host=peer_data.stomp_host,
         send_destination=peer_data.stomp_destination,
     )
-
-
-def _transform_message_body(
-        owner_node_data: NodeData,
-        peer_data: PeerData,
-        message_body: bytes,
-) -> bytearray:
-    raise Exception
 
 
 if __name__ == '__main__':

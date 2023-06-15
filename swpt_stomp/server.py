@@ -2,7 +2,7 @@ import logging
 import os
 import asyncio
 import ssl
-from typing import Union
+from typing import Union, Callable, Awaitable
 from functools import partial
 from swpt_stomp.logging import configure_logging
 from swpt_stomp.common import (
@@ -24,8 +24,23 @@ SERVER_QUEUE_SIZE = int(os.environ.get('SERVER_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
+async def NO_PPM(n: NodeData, p: PeerData, m: Message) -> RmqMessage:
+    """This is mainly useful for testing purposes.
+    """
+    return RmqMessage(
+        body=m.body,
+        headers={},
+        type=m.type,
+        content_type=m.content_type,
+        routing_key='',
+    )
+
+
 async def serve(
         *,
+        # TODO: change the default to the real message preprocessor.
+        preprocess_message: Callable[
+            [NodeData, PeerData, Message], Awaitable[RmqMessage]] = NO_PPM,
         server_cert: str = SERVER_CERT,
         server_key: str = SERVER_KEY,
         server_port: int = SERVER_PORT,
@@ -51,8 +66,15 @@ async def serve(
     async with connection, channel:
         loop = asyncio.get_running_loop()
         server = await loop.create_server(
-            partial(_create_server_protocol,
-                    loop, db, protocol_broker_url, channel, server_queue_size),
+            partial(
+                _create_server_protocol,
+                loop=loop,
+                preprocess_message=preprocess_message,
+                db=db,
+                protocol_broker_url=protocol_broker_url,
+                channel=channel,
+                server_queue_size=server_queue_size,
+            ),
             port=server_port,
             backlog=server_backlog,
             ssl=ssl_context,
@@ -64,7 +86,10 @@ async def serve(
 
 
 def _create_server_protocol(
+        *,
         loop: asyncio.AbstractEventLoop,
+        preprocess_message: Callable[
+            [NodeData, PeerData, Message], Awaitable[RmqMessage]],
         db: NodePeersDatabase,
         protocol_broker_url: str,
         channel: AbstractChannel,
@@ -96,7 +121,7 @@ def _create_server_protocol(
                 url=protocol_broker_url,
                 exchange_name='smp',
                 preprocess_message=partial(
-                    _preprocess_message, owner_node_data, peer_data),
+                    preprocess_message, owner_node_data, peer_data),
                 channel=channel,
             )
 
@@ -105,14 +130,6 @@ def _create_server_protocol(
         recv_queue,
         start_message_processor=lambda t: loop.create_task(publish(t)),
     )
-
-
-async def _preprocess_message(
-        owner_node_data: NodeData,
-        peer_data: PeerData,
-        message: Message,
-) -> RmqMessage:
-    raise Exception
 
 
 if __name__ == '__main__':
