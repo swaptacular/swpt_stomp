@@ -24,8 +24,17 @@ SERVER_QUEUE_SIZE = int(os.environ.get('SERVER_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
-async def serve():
-    db = get_database_instance(url=NODEDATA_DIR)
+async def serve(
+        *,
+        server_cert: str = SERVER_CERT,
+        server_key: str = SERVER_KEY,
+        server_port: int = SERVER_PORT,
+        server_backlog: int = SERVER_BACKLOG,
+        nodedata_dir: str = NODEDATA_DIR,
+        protocol_broker_url: str = PROTOCOL_BROKER_URL,
+        ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
+):
+    db = get_database_instance(url=nodedata_dir)
     owner_node_data = await db.get_node_data()
 
     # Configure SSL context:
@@ -34,27 +43,29 @@ async def serve():
     ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
     ssl_context.load_verify_locations(
         cadata=owner_node_data.root_cert.decode('ascii'))
-    ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+    ssl_context.load_cert_chain(certfile=server_cert, keyfile=server_key)
 
     connection, channel = await open_robust_channel(
         'amqp://guest:guest@127.0.0.1/')
     async with connection, channel:
         loop = asyncio.get_running_loop()
         server = await loop.create_server(
-            partial(_create_server_protocol, loop, db, channel),
-            port=SERVER_PORT,
-            backlog=SERVER_BACKLOG,
+            partial(_create_server_protocol,
+                    loop, db, protocol_broker_url, channel),
+            port=server_port,
+            backlog=server_backlog,
             ssl=ssl_context,
-            ssl_handshake_timeout=SSL_HANDSHAKE_TIMEOUT,
+            ssl_handshake_timeout=ssl_handshake_timeout,
         )
         async with server:
-            _logger.info('Started STOMP server at port %i.', SERVER_PORT)
+            _logger.info('Started STOMP server at port %i.', server_port)
             await server.serve_forever()
 
 
 def _create_server_protocol(
         loop: asyncio.AbstractEventLoop,
         db: NodePeersDatabase,
+        protocol_broker_url: str,
         channel: AbstractChannel,
 ) -> StompServer:
     send_queue: asyncio.Queue[Union[str, None, ServerError]] = (
@@ -80,7 +91,7 @@ def _create_server_protocol(
             await publish_to_exchange(
                 send_queue,
                 recv_queue,
-                url=PROTOCOL_BROKER_URL,
+                url=protocol_broker_url,
                 exchange_name='smp',
                 preprocess_message=partial(
                     _preprocess_message, owner_node_data, peer_data),

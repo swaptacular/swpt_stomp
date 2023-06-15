@@ -22,8 +22,17 @@ CLIENT_QUEUE_SIZE = int(os.environ.get('CLIENT_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
-async def connect(peer_node_id: str):
-    db = get_database_instance(url=NODEDATA_DIR)
+async def connect(
+        *,
+        peer_node_id: str = PEER_NODE_ID,
+        server_cert: str = SERVER_CERT,
+        server_key: str = SERVER_KEY,
+        nodedata_dir: str = NODEDATA_DIR,
+        protocol_broker_url: str = PROTOCOL_BROKER_URL,
+        protocol_broker_queue: str = PROTOCOL_BROKER_QUEUE,
+        ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
+):
+    db = get_database_instance(url=nodedata_dir)
     owner_node_data = await db.get_node_data()
     peer_data = await db.get_peer_data(peer_node_id)
     if peer_data is None:
@@ -35,7 +44,7 @@ async def connect(peer_node_id: str):
     # Note that this is a blocking operation, but this is OK, because we
     # will open no more than one client connection per process.
     with tempfile.NamedTemporaryFile() as certfile:
-        with open(SERVER_CERT, 'br') as f:
+        with open(server_cert, 'br') as f:
             certfile.write(f.read())
 
         certfile.write(b'\n')
@@ -49,16 +58,18 @@ async def connect(peer_node_id: str):
         ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
         ssl_context.load_verify_locations(
             cadata=peer_data.root_cert.decode('ascii'))
-        ssl_context.load_cert_chain(certfile=certfile.name, keyfile=SERVER_KEY)
+        ssl_context.load_cert_chain(certfile=certfile.name, keyfile=server_key)
 
         loop = asyncio.get_running_loop()
         server_host, server_port = random.choice(peer_data.servers)
         transport, protocol = await loop.create_connection(
-            partial(_create_client_protocol, loop, owner_node_data, peer_data),
+            partial(_create_client_protocol,
+                    loop, owner_node_data, peer_data,
+                    protocol_broker_url, protocol_broker_queue),
             host=server_host,
             port=server_port,
             ssl=ssl_context,
-            ssl_handshake_timeout=SSL_HANDSHAKE_TIMEOUT,
+            ssl_handshake_timeout=ssl_handshake_timeout,
         )
         await protocol.connection_lost_event.wait()
 
@@ -67,6 +78,8 @@ def _create_client_protocol(
         loop: asyncio.AbstractEventLoop,
         owner_node_data: NodeData,
         peer_data: PeerData,
+        protocol_broker_url: str,
+        protocol_broker_queue: str,
 ) -> StompClient:
     send_queue: asyncio.Queue[Union[Message, None, ServerError]] = (
         asyncio.Queue(CLIENT_QUEUE_SIZE))
@@ -87,8 +100,8 @@ def _create_client_protocol(
             await consume_from_queue(
                 send_queue,
                 recv_queue,
-                url=PROTOCOL_BROKER_URL,
-                queue_name=PROTOCOL_BROKER_QUEUE,
+                url=protocol_broker_url,
+                queue_name=protocol_broker_queue,
                 transform_message_body=partial(
                     _transform_message_body, owner_node_data, peer_data),
             )
@@ -112,4 +125,4 @@ def _transform_message_body(
 
 if __name__ == '__main__':
     configure_logging()
-    asyncio.run(connect(PEER_NODE_ID), debug=True)
+    asyncio.run(connect(), debug=True)
