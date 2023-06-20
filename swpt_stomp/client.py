@@ -9,7 +9,7 @@ from functools import partial
 from swpt_stomp.logging import configure_logging
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
-    SERVER_KEY, SERVER_CERT, NODEDATA_DIR, PROTOCOL_BROKER_URL,
+    SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
     get_peer_serial_number,
 )
 from swpt_stomp.rmq import consume_from_queue
@@ -36,14 +36,14 @@ async def connect(
         peer_node_id: str = PEER_NODE_ID,
         server_cert: str = SERVER_CERT,
         server_key: str = SERVER_KEY,
-        nodedata_dir: str = NODEDATA_DIR,
+        nodedata_url: str = NODEDATA_URL,
         protocol_broker_url: str = PROTOCOL_BROKER_URL,
         protocol_broker_queue: str = PROTOCOL_BROKER_QUEUE,
         ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
         client_queue_size: int = CLIENT_QUEUE_SIZE,
 ):
     loop = asyncio.get_running_loop()
-    db = get_database_instance(url=f'file://{nodedata_dir}')
+    db = get_database_instance(url=nodedata_url)
     owner_node_data = await db.get_node_data()
     peer_data = await db.get_peer_data(peer_node_id)
     if peer_data is None:  # pragma: nocover
