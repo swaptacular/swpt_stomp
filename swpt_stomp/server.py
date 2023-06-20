@@ -8,7 +8,7 @@ from functools import partial
 from swpt_stomp.logging import configure_logging
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
-    SERVER_KEY, SERVER_CERT, NODEDATA_DIR, PROTOCOL_BROKER_URL,
+    SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
     get_peer_serial_number,
 )
 from swpt_stomp.rmq import publish_to_exchange, open_robust_channel, RmqMessage
@@ -45,7 +45,7 @@ async def serve(
         server_key: str = SERVER_KEY,
         server_port: int = SERVER_PORT,
         server_backlog: int = SERVER_BACKLOG,
-        nodedata_dir: str = NODEDATA_DIR,
+        nodedata_url: str = NODEDATA_URL,
         protocol_broker_url: str = PROTOCOL_BROKER_URL,
         ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
         max_connections_per_peer: int = MAX_CONNECTIONS_PER_PEER,
@@ -53,7 +53,7 @@ async def serve(
         server_started_event: Optional[asyncio.Event] = None,
 ):
     loop = asyncio.get_running_loop()
-    db = get_database_instance(url=f'file://{nodedata_dir}')
+    db = get_database_instance(url=nodedata_url)
     owner_node_data = await db.get_node_data()
     connection, channel = await open_robust_channel(protocol_broker_url)
 

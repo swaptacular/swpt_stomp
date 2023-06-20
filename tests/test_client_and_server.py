@@ -54,7 +54,7 @@ async def test_connect_to_server(datadir, rmq_url):
         preprocess_message=server.NO_PPM,
         server_cert=os.path.abspath(f'{datadir["AA"]}/server.crt'),
         server_key=os.path.abspath(f'{datadir["AA"]}/server.key'),
-        nodedata_dir=f'{datadir["AA"]}',
+        nodedata_url=f'file://{datadir["AA"]}',
         server_started_event=server_started,
     ))
     await server_started.wait()
@@ -66,7 +66,7 @@ async def test_connect_to_server(datadir, rmq_url):
         peer_node_id='1234abcd',
         server_cert=os.path.abspath(f'{datadir["CA"]}/server.crt'),
         server_key=os.path.abspath(f'{datadir["CA"]}/server.key'),
-        nodedata_dir=f'{datadir["CA"]}',
+        nodedata_url=f'file://{datadir["CA"]}',
         protocol_broker_queue='test_client',
     ))
 
