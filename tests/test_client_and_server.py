@@ -93,4 +93,4 @@ async def test_connect_to_server(datadir, rmq_url):
     assert messages_ok
     await channel.close()
     await connection.close()
-    await asyncio.sleep(0.1)
+    await asyncio.wait([server_task, client_task, read_task])
