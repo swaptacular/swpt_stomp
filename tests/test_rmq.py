@@ -5,7 +5,7 @@ from swpt_stomp.rmq import (
     open_robust_channel, consume_from_queue, publish_to_exchange, RmqMessage)
 
 
-@pytest.mark.skip('Requires external STOMP server.')
+@pytest.mark.skip('Requires external RabbitMQ server.')
 @pytest.mark.asyncio
 async def test_consume_from_queue():
     loop = asyncio.get_running_loop()
@@ -37,7 +37,7 @@ async def test_consume_from_queue():
     assert n == message_count
 
 
-@pytest.mark.skip('Requires external STOMP server.')
+@pytest.mark.skip('Requires external RabbitMQ server.')
 @pytest.mark.asyncio
 async def test_publish_to_exchange():
     loop = asyncio.get_running_loop()
@@ -96,7 +96,7 @@ async def test_publish_to_exchange():
     assert last_receipt == message_count
 
 
-# @pytest.mark.skip('Requires external STOMP server.')
+@pytest.mark.skip('Requires external RabbitMQ server.')
 @pytest.mark.asyncio
 async def test_publish_returned_message(caplog):
     import logging
@@ -158,7 +158,7 @@ async def test_publish_returned_message(caplog):
     assert m.error_message == 'Internal server error.'
 
 
-@pytest.mark.skip('Requires external STOMP server.')
+@pytest.mark.skip('Requires external RabbitMQ server.')
 @pytest.mark.asyncio
 async def test_publish_server_error():
     loop = asyncio.get_running_loop()
