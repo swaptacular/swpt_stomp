@@ -3,7 +3,7 @@ import os
 import asyncio
 import ssl
 from contextlib import contextmanager
-from typing import Union, Callable, Awaitable
+from typing import Union, Callable, Awaitable, Optional
 from functools import partial
 from swpt_stomp.logging import configure_logging
 from swpt_stomp.common import (
@@ -54,8 +54,9 @@ async def serve(
         ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
         max_connections_per_peer: int = MAX_CONNECTIONS_PER_PEER,
         server_queue_size: int = SERVER_QUEUE_SIZE,
+        server_started_event: Optional[asyncio.Event] = None,
 ):
-    db = get_database_instance(url=nodedata_dir)
+    db = get_database_instance(url=f'file://{nodedata_dir}')
     owner_node_data = await db.get_node_data()
 
     # Configure SSL context:
@@ -68,6 +69,7 @@ async def serve(
 
     connection, channel = await open_robust_channel(
         'amqp://guest:guest@127.0.0.1/')
+
     async with connection, channel:
         loop = asyncio.get_running_loop()
         server = await loop.create_server(
@@ -86,6 +88,9 @@ async def serve(
             ssl=ssl_context,
             ssl_handshake_timeout=ssl_handshake_timeout,
         )
+        if server_started_event:
+            server_started_event.set()
+
         async with server:
             _logger.info('Started STOMP server at port %i.', server_port)
             await server.serve_forever()
@@ -111,13 +116,13 @@ def _create_server_protocol(
         try:
             owner_node_data = await db.get_node_data()
             peer_serial_number = get_peer_serial_number(transport)
-            if peer_serial_number is None:
+            if peer_serial_number is None:  # pragma: nocover
                 raise ServerError('Invalid certificate subject.')
             peer_data = await db.get_peer_data(peer_serial_number)
-            if peer_data is None:
+            if peer_data is None:  # pragma: nocover
                 raise ServerError('Unknown peer serial number.')
             n = _connection_counters.get(peer_data.node_id, 0)
-            if n >= max_connections_per_peer:
+            if n >= max_connections_per_peer:  # pragma: nocover
                 raise ServerError('Too many connections from one peer.')
         except ServerError as e:
             await send_queue.put(e)
@@ -156,6 +161,6 @@ def _allowed_peer_connection(node_id: str):
             _connection_counters[node_id] = n
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: nocover
     configure_logging()
     asyncio.run(serve(), debug=True)

@@ -42,10 +42,10 @@ async def connect(
         ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
         client_queue_size: int = CLIENT_QUEUE_SIZE,
 ):
-    db = get_database_instance(url=nodedata_dir)
+    db = get_database_instance(url=f'file://{nodedata_dir}')
     owner_node_data = await db.get_node_data()
     peer_data = await db.get_peer_data(peer_node_id)
-    if peer_data is None:
+    if peer_data is None:  # pragma: nocover
         raise RuntimeError(f'Peer {peer_node_id} is not in the database.')
 
     # To be correctly authenticated by the server, we must present both the
@@ -108,7 +108,7 @@ def _create_client_protocol(
     async def consume(transport: asyncio.Transport) -> None:
         try:
             peer_serial_number = get_peer_serial_number(transport)
-            if peer_serial_number != peer_data.node_id:
+            if peer_serial_number != peer_data.node_id:  # pragma: nocover
                 raise ServerError('Invalid certificate subject.')
         except ServerError as e:
             await send_queue.put(e)
@@ -133,6 +133,6 @@ def _create_client_protocol(
     )
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: nocover
     configure_logging()
     asyncio.run(connect(), debug=True)

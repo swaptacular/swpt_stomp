@@ -11,7 +11,7 @@ PROTOCOL_BROKER_URL = os.environ.get(
     'PROTOCOL_BROKER_URL',
     'amqp://guest:guest@localhost:5672',
 )
-NODEDATA_DIR = os.environ.get('NODEDATA_DIR', 'file:///var/lib/nodedata')
+NODEDATA_DIR = os.environ.get('NODEDATA_DIR', '/var/lib/nodedata')
 SERVER_CERT = os.environ.get('SERVER_CERT', '/etc/swpt-stomp/server.crt')
 SERVER_KEY = os.environ.get('SERVER_KEY', '/secrets/swpt-stomp-server.key')
 SSL_HANDSHAKE_TIMEOUT = float(os.environ.get('SSL_HANDSHAKE_TIMEOUT', '5'))
