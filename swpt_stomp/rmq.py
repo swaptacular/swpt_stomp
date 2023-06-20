@@ -375,7 +375,7 @@ async def _publish_to_exchange(
     except asyncio.CancelledError:
         pass
     finally:
-        if pending_confirmations:
+        if pending_confirmations:  # pragma: nocover
             for c in pending_confirmations:
                 c.cancel()
             await asyncio.wait(pending_confirmations)

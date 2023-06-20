@@ -19,7 +19,6 @@ def test_server_allowed_peer_connection():
     assert len(server._connection_counters) == 0
 
 
-@pytest.mark.skip('Requires external RabbitMQ server.')
 @pytest.mark.asyncio
 async def test_connect_to_server(datadir, rmq_url):
     loop = asyncio.get_running_loop()

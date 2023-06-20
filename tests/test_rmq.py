@@ -1,13 +1,35 @@
+import logging
 import pytest
 import asyncio
+import aio_pika
 from swpt_stomp.common import WatermarkQueue, Message, ServerError
 from swpt_stomp.rmq import (
     open_robust_channel, consume_from_queue, publish_to_exchange, RmqMessage)
 
 
-@pytest.mark.skip('Requires external RabbitMQ server.')
+async def ready_queue(rmq_url: str) -> None:
+    connection = await aio_pika.connect(rmq_url)
+    channel = await connection.channel()
+    async with connection, channel:
+        queue = await channel.declare_queue('test_stomp')
+
+        # Remove all existing messages from the queue.
+        while await queue.get(no_ack=True, fail=False):
+            pass
+
+        # Add 100 messages to the queue.
+        for i in range(1, 101):
+            message = aio_pika.Message(
+                str(i).encode('ascii'),
+                type='TestMessage',
+                content_type='text/plain',
+            )
+            await channel.default_exchange.publish(message, 'test_stomp')
+
+
 @pytest.mark.asyncio
-async def test_consume_from_queue():
+async def test_consume_from_queue(rmq_url):
+    await ready_queue(rmq_url)
     loop = asyncio.get_running_loop()
     send_queue = asyncio.Queue(5)
     recv_queue = WatermarkQueue(5)
@@ -27,7 +49,7 @@ async def test_consume_from_queue():
         consume_from_queue(
             send_queue,
             recv_queue,
-            url='amqp://guest:guest@127.0.0.1/',
+            url=rmq_url,
             queue_name='test_stomp',
         ))
     confirm_task = loop.create_task(confirm_sent_messages())
@@ -37,9 +59,9 @@ async def test_consume_from_queue():
     assert n == message_count
 
 
-@pytest.mark.skip('Requires external RabbitMQ server.')
 @pytest.mark.asyncio
-async def test_publish_to_exchange():
+async def test_publish_to_exchange(rmq_url):
+    await ready_queue(rmq_url)
     loop = asyncio.get_running_loop()
     send_queue = asyncio.Queue(5)
     recv_queue = WatermarkQueue(5)
@@ -83,7 +105,7 @@ async def test_publish_to_exchange():
         publish_to_exchange(
             send_queue,
             recv_queue,
-            url='amqp://guest:guest@127.0.0.1/',
+            url=rmq_url,
             exchange_name='',
             preprocess_message=preprocess_message,
         ))
@@ -96,11 +118,9 @@ async def test_publish_to_exchange():
     assert last_receipt == message_count
 
 
-@pytest.mark.skip('Requires external RabbitMQ server.')
 @pytest.mark.asyncio
-async def test_publish_returned_message(caplog):
-    import logging
-
+async def test_publish_returned_message(caplog, rmq_url):
+    await ready_queue(rmq_url)
     caplog.set_level(logging.ERROR)
     loop = asyncio.get_running_loop()
     send_queue = asyncio.Queue(5)
@@ -131,8 +151,7 @@ async def test_publish_returned_message(caplog):
             routing_key='nonexisting_queue',
         )
 
-    connection, channel = await open_robust_channel(
-        'amqp://guest:guest@127.0.0.1/', 10.0)
+    connection, channel = await open_robust_channel(rmq_url, 10.0)
     generate_task = loop.create_task(generate_messages())
     publish_task = loop.create_task(
         publish_to_exchange(
@@ -158,9 +177,9 @@ async def test_publish_returned_message(caplog):
     assert m.error_message == 'Internal server error.'
 
 
-@pytest.mark.skip('Requires external RabbitMQ server.')
 @pytest.mark.asyncio
-async def test_publish_server_error():
+async def test_publish_server_error(rmq_url):
+    await ready_queue(rmq_url)
     loop = asyncio.get_running_loop()
     send_queue = asyncio.Queue(5)
     recv_queue = WatermarkQueue(5)
@@ -181,7 +200,7 @@ async def test_publish_server_error():
         publish_to_exchange(
             send_queue,
             recv_queue,
-            url='amqp://guest:guest@127.0.0.1/',
+            url=rmq_url,
             exchange_name='',
             preprocess_message=preprocess_message,
         ))

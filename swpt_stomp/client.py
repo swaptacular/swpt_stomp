@@ -6,7 +6,6 @@ import ssl
 import random
 from typing import Union, Callable
 from functools import partial
-from swpt_stomp.logging import configure_logging
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
     SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
@@ -119,5 +118,7 @@ async def connect(
 
 
 if __name__ == '__main__':  # pragma: nocover
+    from swpt_stomp.logging import configure_logging
+
     configure_logging()
     asyncio.run(connect(), debug=True)
