@@ -11,12 +11,8 @@ from swpt_stomp.common import (
     SERVER_KEY, SERVER_CERT, NODEDATA_DIR, PROTOCOL_BROKER_URL,
     get_peer_serial_number,
 )
-from swpt_stomp.rmq import (
-    publish_to_exchange, open_robust_channel, RmqMessage, AbstractChannel,
-)
-from swpt_stomp.peer_data import (
-    get_database_instance, NodeData, PeerData, NodePeersDatabase,
-)
+from swpt_stomp.rmq import publish_to_exchange, open_robust_channel, RmqMessage
+from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
 from swpt_stomp.aio_protocols import StompServer
 
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '1234'))
@@ -56,10 +52,52 @@ async def serve(
         server_queue_size: int = SERVER_QUEUE_SIZE,
         server_started_event: Optional[asyncio.Event] = None,
 ):
+    loop = asyncio.get_running_loop()
     db = get_database_instance(url=f'file://{nodedata_dir}')
     owner_node_data = await db.get_node_data()
+    connection, channel = await open_robust_channel(protocol_broker_url)
 
-    # Configure SSL context:
+    def create_protocol() -> StompServer:
+        send_queue: asyncio.Queue[Union[str, None, ServerError]] = (
+            asyncio.Queue(server_queue_size))
+        recv_queue: WatermarkQueue[Union[Message, None]] = (
+            WatermarkQueue(server_queue_size))
+
+        async def publish(transport: asyncio.Transport) -> None:
+            try:
+                owner_node_data = await db.get_node_data()
+                peer_serial_number = get_peer_serial_number(transport)
+                if peer_serial_number is None:  # pragma: nocover
+                    raise ServerError('Invalid certificate subject.')
+                peer_data = await db.get_peer_data(peer_serial_number)
+                if peer_data is None:  # pragma: nocover
+                    raise ServerError('Unknown peer serial number.')
+                n = _connection_counters.get(peer_data.node_id, 0)
+                if n >= max_connections_per_peer:  # pragma: nocover
+                    raise ServerError('Too many connections from one peer.')
+            except ServerError as e:  # pragma: nocover
+                await send_queue.put(e)
+            except (asyncio.CancelledError, Exception):  # pragma: nocover
+                await send_queue.put(ServerError('Internal server error.'))
+                raise
+            else:
+                with _allowed_peer_connection(peer_data.node_id):
+                    await publish_to_exchange(
+                        send_queue,
+                        recv_queue,
+                        url=protocol_broker_url,
+                        exchange_name='smp',
+                        preprocess_message=partial(
+                            preprocess_message, owner_node_data, peer_data),
+                        channel=channel,
+                    )
+
+        return StompServer(
+            send_queue,
+            recv_queue,
+            start_message_processor=lambda t: loop.create_task(publish(t)),
+        )
+
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.verify_mode = ssl.CERT_REQUIRED
     ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
@@ -67,22 +105,9 @@ async def serve(
         cadata=owner_node_data.root_cert.decode('ascii'))
     ssl_context.load_cert_chain(certfile=server_cert, keyfile=server_key)
 
-    connection, channel = await open_robust_channel(
-        'amqp://guest:guest@127.0.0.1/')
-
     async with connection, channel:
-        loop = asyncio.get_running_loop()
         server = await loop.create_server(
-            partial(
-                _create_server_protocol,
-                loop=loop,
-                preprocess_message=preprocess_message,
-                db=db,
-                protocol_broker_url=protocol_broker_url,
-                channel=channel,
-                max_connections_per_peer=max_connections_per_peer,
-                server_queue_size=server_queue_size,
-            ),
+            create_protocol,
             port=server_port,
             backlog=server_backlog,
             ssl=ssl_context,
@@ -90,62 +115,9 @@ async def serve(
         )
         if server_started_event:
             server_started_event.set()
-
         async with server:
             _logger.info('Started STOMP server at port %i.', server_port)
             await server.serve_forever()
-
-
-def _create_server_protocol(
-        *,
-        loop: asyncio.AbstractEventLoop,
-        preprocess_message: Callable[
-            [NodeData, PeerData, Message], Awaitable[RmqMessage]],
-        db: NodePeersDatabase,
-        protocol_broker_url: str,
-        channel: AbstractChannel,
-        max_connections_per_peer: int,
-        server_queue_size: int,
-) -> StompServer:
-    send_queue: asyncio.Queue[Union[str, None, ServerError]] = (
-        asyncio.Queue(server_queue_size))
-    recv_queue: WatermarkQueue[Union[Message, None]] = (
-        WatermarkQueue(server_queue_size))
-
-    async def publish(transport: asyncio.Transport) -> None:
-        try:
-            owner_node_data = await db.get_node_data()
-            peer_serial_number = get_peer_serial_number(transport)
-            if peer_serial_number is None:  # pragma: nocover
-                raise ServerError('Invalid certificate subject.')
-            peer_data = await db.get_peer_data(peer_serial_number)
-            if peer_data is None:  # pragma: nocover
-                raise ServerError('Unknown peer serial number.')
-            n = _connection_counters.get(peer_data.node_id, 0)
-            if n >= max_connections_per_peer:  # pragma: nocover
-                raise ServerError('Too many connections from one peer.')
-        except ServerError as e:  # pragma: nocover
-            await send_queue.put(e)
-        except (asyncio.CancelledError, Exception):  # pragma: nocover
-            await send_queue.put(ServerError('Internal server error.'))
-            raise
-        else:
-            with _allowed_peer_connection(peer_data.node_id):
-                await publish_to_exchange(
-                    send_queue,
-                    recv_queue,
-                    url=protocol_broker_url,
-                    exchange_name='smp',
-                    preprocess_message=partial(
-                        preprocess_message, owner_node_data, peer_data),
-                    channel=channel,
-                )
-
-    return StompServer(
-        send_queue,
-        recv_queue,
-        start_message_processor=lambda t: loop.create_task(publish(t)),
-    )
 
 
 @contextmanager

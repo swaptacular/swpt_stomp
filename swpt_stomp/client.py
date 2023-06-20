@@ -42,11 +42,49 @@ async def connect(
         ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
         client_queue_size: int = CLIENT_QUEUE_SIZE,
 ):
+    loop = asyncio.get_running_loop()
     db = get_database_instance(url=f'file://{nodedata_dir}')
     owner_node_data = await db.get_node_data()
     peer_data = await db.get_peer_data(peer_node_id)
     if peer_data is None:  # pragma: nocover
         raise RuntimeError(f'Peer {peer_node_id} is not in the database.')
+
+    def create_protocol() -> StompClient:
+        assert peer_data
+        send_queue: asyncio.Queue[Union[Message, None, ServerError]] = (
+            asyncio.Queue(client_queue_size))
+        recv_queue: WatermarkQueue[Union[str, None]] = (
+            WatermarkQueue(client_queue_size))
+
+        async def consume(transport: asyncio.Transport) -> None:
+            assert peer_data
+            try:
+                peer_serial_number = get_peer_serial_number(transport)
+                if peer_serial_number != peer_data.node_id:  # pragma: nocover
+                    raise ServerError('Invalid certificate subject.')
+            except ServerError as e:  # pragma: nocover
+                await send_queue.put(e)
+            except (asyncio.CancelledError, Exception):  # pragma: nocover
+                await send_queue.put(ServerError(
+                    'Abruptly closed connection.'))
+                raise
+            else:
+                await consume_from_queue(
+                    send_queue,
+                    recv_queue,
+                    url=protocol_broker_url,
+                    queue_name=protocol_broker_queue,
+                    transform_message_body=partial(
+                        transform_message_body, owner_node_data, peer_data),
+                )
+
+        return StompClient(
+            send_queue,
+            recv_queue,
+            start_message_processor=lambda t: loop.create_task(consume(t)),
+            host=peer_data.stomp_host,
+            send_destination=peer_data.stomp_destination,
+        )
 
     # To be correctly authenticated by the server, we must present both the
     # server certificate, and the sub-CA certificate issued by the peer's
@@ -61,7 +99,6 @@ async def connect(
         certfile.write(peer_data.sub_cert)
         certfile.flush()
 
-        # Configure SSL context:
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ssl_context.verify_mode = ssl.CERT_REQUIRED
         ssl_context.check_hostname = False
@@ -70,67 +107,15 @@ async def connect(
             cadata=peer_data.root_cert.decode('ascii'))
         ssl_context.load_cert_chain(certfile=certfile.name, keyfile=server_key)
 
-        loop = asyncio.get_running_loop()
         server_host, server_port = random.choice(peer_data.servers)
         transport, protocol = await loop.create_connection(
-            partial(
-                _create_client_protocol,
-                loop=loop,
-                transform_message_body=partial(
-                    transform_message_body, owner_node_data, peer_data),
-                peer_data=peer_data,
-                protocol_broker_url=protocol_broker_url,
-                protocol_broker_queue=protocol_broker_queue,
-                client_queue_size=client_queue_size,
-            ),
+            create_protocol,
             host=server_host,
             port=server_port,
             ssl=ssl_context,
             ssl_handshake_timeout=ssl_handshake_timeout,
         )
         await protocol.connection_lost_event.wait()
-
-
-def _create_client_protocol(
-        *,
-        loop: asyncio.AbstractEventLoop,
-        transform_message_body: Callable[[bytes], bytearray],
-        peer_data: PeerData,
-        protocol_broker_url: str,
-        protocol_broker_queue: str,
-        client_queue_size: int
-) -> StompClient:
-    send_queue: asyncio.Queue[Union[Message, None, ServerError]] = (
-        asyncio.Queue(client_queue_size))
-    recv_queue: WatermarkQueue[Union[str, None]] = (
-        WatermarkQueue(client_queue_size))
-
-    async def consume(transport: asyncio.Transport) -> None:
-        try:
-            peer_serial_number = get_peer_serial_number(transport)
-            if peer_serial_number != peer_data.node_id:  # pragma: nocover
-                raise ServerError('Invalid certificate subject.')
-        except ServerError as e:  # pragma: nocover
-            await send_queue.put(e)
-        except (asyncio.CancelledError, Exception):  # pragma: nocover
-            await send_queue.put(ServerError('Abruptly closed connection.'))
-            raise
-        else:
-            await consume_from_queue(
-                send_queue,
-                recv_queue,
-                url=protocol_broker_url,
-                queue_name=protocol_broker_queue,
-                transform_message_body=transform_message_body,
-            )
-
-    return StompClient(
-        send_queue,
-        recv_queue,
-        start_message_processor=lambda t: loop.create_task(consume(t)),
-        host=peer_data.stomp_host,
-        send_destination=peer_data.stomp_destination,
-    )
 
 
 if __name__ == '__main__':  # pragma: nocover
