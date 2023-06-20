@@ -124,9 +124,9 @@ def _create_server_protocol(
             n = _connection_counters.get(peer_data.node_id, 0)
             if n >= max_connections_per_peer:  # pragma: nocover
                 raise ServerError('Too many connections from one peer.')
-        except ServerError as e:
+        except ServerError as e:  # pragma: nocover
             await send_queue.put(e)
-        except (asyncio.CancelledError, Exception):
+        except (asyncio.CancelledError, Exception):  # pragma: nocover
             await send_queue.put(ServerError('Internal server error.'))
             raise
         else:

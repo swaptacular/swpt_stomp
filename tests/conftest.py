@@ -12,3 +12,8 @@ def datadir(request):
         'CA': os.path.join(test_dir, '../test_data/CA'),
         'DA': os.path.join(test_dir, '../test_data/DA'),
     }
+
+
+@pytest.fixture
+def rmq_url(request):
+    return 'amqp://guest:guest@localhost:5672'

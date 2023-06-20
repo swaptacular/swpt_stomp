@@ -110,9 +110,9 @@ def _create_client_protocol(
             peer_serial_number = get_peer_serial_number(transport)
             if peer_serial_number != peer_data.node_id:  # pragma: nocover
                 raise ServerError('Invalid certificate subject.')
-        except ServerError as e:
+        except ServerError as e:  # pragma: nocover
             await send_queue.put(e)
-        except (asyncio.CancelledError, Exception):
+        except (asyncio.CancelledError, Exception):  # pragma: nocover
             await send_queue.put(ServerError('Abruptly closed connection.'))
             raise
         else:
