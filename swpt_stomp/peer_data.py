@@ -3,6 +3,7 @@ import os
 import os.path
 import asyncio
 import time
+import tomli
 from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 from functools import partial
@@ -12,12 +13,6 @@ from dataclasses import dataclass
 from typing import NamedTuple, Optional
 
 _DN_PART_RE = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
-
-_STOMP_FILE_RE = re.compile(
-    r"""
-    ([^\r\n]*)(?:\r?\n)     # host
-    ([^\r\n]*)(?:\r?\n)*\Z  # destination""",
-    re.VERBOSE)
 
 _PEM_CERTIFICATE_RE = re.compile(
     rb"""
@@ -337,7 +332,7 @@ class _LocalDirectory(NodePeersDatabase):
         owner_node_type = owner_node_data.node_type
 
         try:
-            stomp_str = await self._read_text_file(f'{dir}/nodeinfo/stomp.txt')
+            stomp_str = await self._read_text_file(f'{dir}/nodeinfo/stomp.toml')
             stomp_host, stomp_destination = _parse_stomp_file(
                 stomp_str, node_id=owner_node_id)
         except FileNotFoundError:
@@ -402,12 +397,18 @@ def _parse_servers_file(s: str) -> list[tuple[str, int]]:
 def _parse_stomp_file(s: str, *, node_id: str) -> tuple[str, str]:
     """Return a (stomp_host, stomp_destination) tuple."""
 
-    if m := _STOMP_FILE_RE.match(s):
-        stomp_host = m[1].replace('${NODE_ID}', node_id)
-        stomp_destination = m[2].replace('${NODE_ID}', node_id)
-        return stomp_host, stomp_destination
+    data = tomli.loads(s)
+    host: object = data.get('host', '/')
+    if not isinstance(host, str):
+        raise ValueError('invalid host value')
 
-    raise ValueError('invalid stomp.txt file')
+    destination: object = data.get('destination', '/exchange/smp')
+    if not isinstance(destination, str):
+        raise ValueError('invalid destination value')
+
+    stomp_host = host.replace('${NODE_ID}', node_id)
+    stomp_destination = destination.replace('${NODE_ID}', node_id)
+    return stomp_host, stomp_destination
 
 
 def _is_valid_hostname(hostname):

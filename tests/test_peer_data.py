@@ -82,18 +82,31 @@ def test_parse_stomp_file():
     from swpt_stomp.peer_data import _parse_stomp_file
 
     for s in [
-        'host\ndestination',
-        'host\ndestination\n',
-        'host\ndestination\n\n\n',
-        'host\r\ndestination',
-        'host\r\ndestination\r\n',
-        'host\ndestination\r\n\n\n',
+        'host = "HOST"\ndestination = "DESTINATION"',
+        '"host"="HOST"\n"destination"="DESTINATION"',
+        'host = "HOST"\n\ndestination = "DESTINATION"\n',
+        'host = "HOST"\r\ndestination = "DESTINATION"\r\n',
     ]:
         assert _parse_stomp_file(
-            s, node_id='1234') == ('host', 'destination')
+            s, node_id='1234') == ('HOST', 'DESTINATION')
 
     assert _parse_stomp_file(
-        '/${NODE_ID}\n/exchange/${NODE_ID}/smp',
+        'host = "HOST"',
+        node_id='1234'
+    ) == ('HOST', '/exchange/smp')
+
+    assert _parse_stomp_file(
+        'destination = "DESTINATION"',
+        node_id='1234'
+    ) == ('/', 'DESTINATION')
+
+    assert _parse_stomp_file(
+        '',
+        node_id='1234'
+    ) == ('/', '/exchange/smp')
+
+    assert _parse_stomp_file(
+        'host = "/${NODE_ID}"\ndestination = "/exchange/${NODE_ID}/smp"',
         node_id='1234'
     ) == ('/1234', '/exchange/1234/smp')
 
@@ -101,7 +114,10 @@ def test_parse_stomp_file():
         _parse_stomp_file('INVALID', node_id='1234')
 
     with pytest.raises(Exception):
-        _parse_stomp_file('host\ndestination\nMORE', node_id='1234')
+        _parse_stomp_file('host=1', node_id='1234')
+
+    with pytest.raises(Exception):
+        _parse_stomp_file('destination=1', node_id='1234')
 
 
 @pytest.mark.asyncio

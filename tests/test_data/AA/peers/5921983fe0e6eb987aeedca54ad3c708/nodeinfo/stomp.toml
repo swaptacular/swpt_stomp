@@ -1,0 +1,2 @@
+host = "/${NODE_ID}"
+destination = "/exchange/smp"
