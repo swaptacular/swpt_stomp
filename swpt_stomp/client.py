@@ -31,8 +31,8 @@
 #
 # The "Node Peers Database" contains information about the peers of the
 # given node. The "StompClient" uses this information during the SSL
-# authentication, and the "consumer" uses it to transform and add necessary
-# data to the AMQP messages.
+# authentication, and the "consumer" uses it to transform the message before
+# sending it to the server.
 ##############################################################################
 
 import logging
