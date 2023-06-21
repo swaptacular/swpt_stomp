@@ -1,3 +1,40 @@
+##############################################################################
+# Implements a STOMP server that reads messages from a STOMP client, and
+# publishes them to a RabbitMQ exchange.
+#
+# Here is how the different parts fit together:
+#
+#                             recv_queue
+#   messages  /------------\  (messages)  /----------\  messages   /-------\
+#  ---------->|            |------------->|          |------------>|       |
+#    STOMP    |StompServer |              |publisher |             |Rabbit |
+#    over     |asyncio     |              |asyncio   |  AMQP 0.9.1 |MQ     |
+#    SSL      |protocol    |              |task      |             |Server |
+#  <----------|            |<-------------|          |<------------|       |
+#  msg. acks  \------------/  send_queue  \----------/  AMQP       \-------/
+#                   |         (msg. acks)       |       publisher
+#                   |                           |       confirms
+#                   |                           |
+#                   V                           V
+#                /---------------------------------\
+#                |       Node Peers Database       |
+#                \---------------------------------/
+#
+# There are two important message processing parts: the "StompServer asyncio
+# protocol" instance, and the "publisher asyncio task". They talk to each
+# other via two asyncio queues: "recv_queue" and "send_queue". Putting a
+# `None` or a `ServerError in the "send_queue" signals the end of the
+# connection gracefully. In the other direction, putting `None` in the
+# "recv_queue" also ends the connection gracefully. Also, the StompServer
+# protocol instance holds a reference to the publisher task, and can cancel
+# it when something went wrong (lost TCP connection for example).
+#
+# The "Node Peers Database" contains information about the peers of the
+# given node. The "StompServer" uses this information during the SSL
+# authentication, and the "publisher" uses it to transform and add necessary
+# data to the AMQP messages.
+##############################################################################
+
 import logging
 import os
 import asyncio

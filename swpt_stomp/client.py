@@ -1,3 +1,40 @@
+##############################################################################
+# Implements a STOMP client that consumes messages from a RabbitMQ queue,
+# and sends them to a STOMP server.
+#
+# Here is how the different parts fit together:
+#
+#                             send_queue
+#   messages  /------------\  (messages)  /----------\  messages   /-------\
+#  <----------|            |<-------------|          |<------------|       |
+#    STOMP    |StompClient |              |consumer  |             |Rabbit |
+#    over     |asyncio     |              |asyncio   |  AMQP 0.9.1 |MQ     |
+#    SSL      |protocol    |              |task      |             |Server |
+#  ---------->|            |------------->|          |------------>|       |
+#  msg. acks  \------------/  recv_queue  \----------/  AMQP       \-------/
+#                   |         (msg. acks)       |       acks
+#                   |                           |
+#                   |                           |
+#                   V                           V
+#                /---------------------------------\
+#                |       Node Peers Database       |
+#                \---------------------------------/
+#
+# There are two important message processing parts: the "StompClient asyncio
+# protocol" instance, and the "consumer asyncio task". They talk to each
+# other via two asyncio queues: "send_queue" and "recv_queue". Putting a
+# `None` or a `ServerError in the "send_queue" signals the end of the
+# connection gracefully. In the other direction, putting `None` in the
+# "recv_queue" also ends the connection gracefully. Also, the StompClient
+# protocol instance holds a reference to the consumer task, and can cancel
+# it when something went wrong (lost TCP connection for example).
+#
+# The "Node Peers Database" contains information about the peers of the
+# given node. The "StompClient" uses this information during the SSL
+# authentication, and the "consumer" uses it to transform and add necessary
+# data to the AMQP messages.
+##############################################################################
+
 import logging
 import tempfile
 import os
