@@ -24,10 +24,10 @@
 # protocol" instance, and the "consumer asyncio task". They talk to each
 # other via two asyncio queues: "send_queue" and "recv_queue". Putting a
 # `None` or a `ServerError in the "send_queue" signals the end of the
-# connection gracefully. In the other direction, putting `None` in the
-# "recv_queue" also ends the connection gracefully. Also, the StompClient
-# protocol instance holds a reference to the consumer task, and can cancel
-# it when something went wrong (lost TCP connection for example).
+# connection. In the other direction, putting `None` in the "recv_queue"
+# ends the connection immediately. Also, the StompClient protocol instance
+# holds a reference to the consumer task, and can cancel it when something
+# went wrong (lost TCP connection for example).
 #
 # The "Node Peers Database" contains information about the peers of the
 # given node. The "StompClient" uses this information during the SSL
@@ -46,7 +46,7 @@ from functools import partial
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
     SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
-    get_peer_serial_number,
+    get_peer_serial_number, ensure_put,
 )
 from swpt_stomp.rmq import consume_from_queue
 from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
@@ -99,9 +99,9 @@ async def connect(
                 if peer_serial_number != peer_data.node_id:  # pragma: nocover
                     raise ServerError('Invalid certificate subject.')
             except ServerError as e:  # pragma: nocover
-                await send_queue.put(e)
+                ensure_put(send_queue, e)
             except (asyncio.CancelledError, Exception):  # pragma: nocover
-                await send_queue.put(ServerError(
+                ensure_put(send_queue, ServerError(
                     'Abruptly closed connection.'))
                 raise
             else:

@@ -24,10 +24,10 @@
 # protocol" instance, and the "publisher asyncio task". They talk to each
 # other via two asyncio queues: "recv_queue" and "send_queue". Putting a
 # `None` or a `ServerError in the "send_queue" signals the end of the
-# connection gracefully. In the other direction, putting `None` in the
-# "recv_queue" also ends the connection gracefully. Also, the StompServer
-# protocol instance holds a reference to the publisher task, and can cancel
-# it when something went wrong (lost TCP connection for example).
+# connection. In the other direction, putting `None` in the "recv_queue"
+# ends the connection immediately. Also, the StompServer protocol instance
+# holds a reference to the publisher task, and can cancel it when something
+# went wrong (lost TCP connection for example).
 #
 # The "Node Peers Database" contains information about the peers of the
 # given node. The "StompServer" uses this information during the SSL
@@ -45,7 +45,7 @@ from functools import partial
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
     SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
-    get_peer_serial_number,
+    get_peer_serial_number, ensure_put,
 )
 from swpt_stomp.rmq import publish_to_exchange, open_robust_channel, RmqMessage
 from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
@@ -112,9 +112,9 @@ async def serve(
                 if n >= max_connections_per_peer:  # pragma: nocover
                     raise ServerError('Too many connections from one peer.')
             except ServerError as e:  # pragma: nocover
-                await send_queue.put(e)
+                ensure_put(send_queue, e)
             except (asyncio.CancelledError, Exception):  # pragma: nocover
-                await send_queue.put(ServerError('Internal server error.'))
+                ensure_put(send_queue, ServerError('Internal server error.'))
                 raise
             else:
                 with _allowed_peer_connection(peer_data.node_id):

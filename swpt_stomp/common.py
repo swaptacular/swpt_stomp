@@ -1,3 +1,4 @@
+import logging
 import os
 from dataclasses import dataclass
 from typing import Callable, List, Any, Optional, TypeVar
@@ -15,6 +16,8 @@ NODEDATA_URL = os.environ.get('NODEDATA_URL', 'file:///var/lib/nodedata')
 SERVER_CERT = os.environ.get('SERVER_CERT', '/etc/swpt-stomp/server.crt')
 SERVER_KEY = os.environ.get('SERVER_KEY', '/secrets/swpt-stomp-server.key')
 SSL_HANDSHAKE_TIMEOUT = float(os.environ.get('SSL_HANDSHAKE_TIMEOUT', '5'))
+_logger = logging.getLogger(__name__)
+_put_tasks: set[asyncio.Task] = set()
 
 
 @dataclass
@@ -139,3 +142,30 @@ def get_peer_serial_number(transport: asyncio.Transport) -> Optional[str]:
     if data.get('organizationName') != 'Swaptacular Nodes Registry':
         return None
     return data.get('serialNumber')
+
+
+def ensure_put(
+        queue: asyncio.Queue[_T],
+        item: _T,
+        timeout: float = 60.0,
+) -> None:
+    """Try to put an item into a queue. If the queue is full, create a task.
+    """
+    try:
+        queue.put_nowait(item)
+    except asyncio.QueueFull:
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(asyncio.wait_for(queue.put(item), timeout))
+        task.add_done_callback(_on_done_put_task)
+        _put_tasks.add(task)
+
+
+def _on_done_put_task(task: asyncio.Task) -> None:
+    _put_tasks.remove(task)
+    try:
+        task.result()
+    except asyncio.CancelledError:  # pragma: nocover
+        _logger.warning('A task started by ensure_put has timed out.')
+    except Exception:  # pragma: nocover
+        _logger.exception(
+            'An error occurred during the execution of %s.', task)

@@ -1,5 +1,7 @@
 import pytest
-from swpt_stomp.common import WatermarkQueue, get_peer_serial_number
+from swpt_stomp.common import (
+    WatermarkQueue, get_peer_serial_number, ensure_put, _put_tasks
+)
 from unittest.mock import NonCallableMock, Mock
 
 
@@ -185,3 +187,21 @@ def test_get_peer_serial_number():
         return_value=data),
     )
     assert get_peer_serial_number(transport) is None
+
+
+@pytest.mark.asyncio
+async def test_ensure_put():
+    import asyncio
+
+    loop = asyncio.get_running_loop()
+    queue = asyncio.Queue(1)
+    ensure_put(queue, 'first')
+    assert queue.qsize() == 1
+    ensure_put(queue, 'second')
+    assert queue.qsize() == 1
+    assert len(_put_tasks) == 1
+    loop.call_soon(queue.get_nowait)
+    await asyncio.sleep(0.2)
+    assert queue.qsize() == 1
+    assert queue.get_nowait() == 'second'
+    assert len(_put_tasks) == 0

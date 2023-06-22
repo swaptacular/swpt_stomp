@@ -10,7 +10,9 @@ from typing import Optional, Union, Callable, Awaitable, AsyncGenerator
 from collections import deque
 from aio_pika.abc import HeadersType
 from swpt_stomp.common import (
-    Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY)
+    Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY,
+    ensure_put,
+)
 
 _logger = logging.getLogger(__name__)
 _PERSISTENT = aio_pika.DeliveryMode.PERSISTENT
@@ -87,12 +89,12 @@ async def consume_from_queue(
                 transform_message_body=transform_message_body,
             )
     except (asyncio.CancelledError, Exception) as e:  # pragma: nocover
-        await send_queue.put(ServerError('Abruptly closed connection.'))
+        ensure_put(send_queue, ServerError('Abruptly closed connection.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
             raise
         _logger.exception('RabbitMQ connection error')
     else:
-        await send_queue.put(None)
+        ensure_put(send_queue, None)
 
 
 async def publish_to_exchange(
@@ -147,14 +149,14 @@ async def publish_to_exchange(
         else:
             await publish_messages(channel)
     except ServerError as e:
-        await send_queue.put(e)
+        ensure_put(send_queue, e)
     except (asyncio.CancelledError, Exception) as e:
-        await send_queue.put(ServerError('Internal server error.'))
+        ensure_put(send_queue, ServerError('Internal server error.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):  # pragma: nocover
             raise
         _logger.exception('RabbitMQ connection error')
     else:
-        await send_queue.put(None)
+        ensure_put(send_queue, None)
 
 
 async def open_robust_channel(
@@ -289,7 +291,6 @@ async def _publish_to_exchange(
     has_confirmed_deliveries = asyncio.Event()
     has_failed_confirmations = asyncio.Event()
     failed_confirmation: Optional[asyncio.Future] = None
-    is_publishing: bool = True
 
     def on_confirmation(
             delivery: _Delivery,
@@ -337,14 +338,11 @@ async def _publish_to_exchange(
             pending_confirmations.add(confirmation)
             recv_queue.task_done()
 
-        # The stream of messages has ended.
-        nonlocal is_publishing
-        is_publishing = False
-        await send_receipts_task
+        send_receipts_task.cancel()
         report_task.cancel()
 
     async def send_receipts() -> None:
-        while is_publishing or deliveries:
+        while True:
             receipt_id = None
             await has_confirmed_deliveries.wait()
             while deliveries:

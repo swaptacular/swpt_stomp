@@ -67,6 +67,7 @@ async def test_publish_to_exchange(rmq_url):
     recv_queue = WatermarkQueue(5)
     message_count = 100
     last_receipt = 0
+    all_received = asyncio.Event()
 
     async def generate_messages():
         for n in range(1, message_count + 1):
@@ -77,6 +78,7 @@ async def test_publish_to_exchange(rmq_url):
                 content_type='text/plain',
             )
             await recv_queue.put(message)
+        await all_received.wait()
         await recv_queue.put(None)
 
     async def read_receipts():
@@ -86,6 +88,8 @@ async def test_publish_to_exchange(rmq_url):
             assert last_receipt < n
             last_receipt = n
             send_queue.task_done()
+            if last_receipt == message_count:
+                all_received.set()
 
     async def preprocess_message(m):
         return RmqMessage(
@@ -191,7 +195,6 @@ async def test_publish_server_error(rmq_url):
         content_type='text/plain',
     )
     await recv_queue.put(message)
-    await recv_queue.put(None)
 
     async def preprocess_message(m):
         raise ServerError('Test error')
@@ -209,3 +212,4 @@ async def test_publish_server_error(rmq_url):
     m = await send_queue.get()
     assert isinstance(m, ServerError)
     assert m.error_message == 'Test error'
+    assert send_queue.empty()
