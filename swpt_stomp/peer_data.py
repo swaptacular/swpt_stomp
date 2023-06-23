@@ -59,6 +59,24 @@ class Subnet(NamedTuple):
 
 
 @dataclass
+class StompConfig:
+    """Data parsed from the stomp.toml file.
+    """
+    __slots__ = (
+        'servers',
+        'host',
+        'destination',
+        'login',
+        'passcode',
+    )
+    servers: list[tuple[str, int]]
+    host: str
+    destination: str
+    login: Optional[str]
+    passcode: Optional[str]
+
+
+@dataclass
 class NodeData:
     """Basic data about the owner of the node.
     """
@@ -81,18 +99,14 @@ class PeerData:
     __slots__ = (
         'node_type',
         'node_id',
-        'servers',
-        'stomp_host',
-        'stomp_destination',
+        'stomp_config',
         'root_cert',
         'sub_cert',
         'subnet',
     )
     node_type: NodeType
     node_id: str
-    servers: list[tuple[str, int]]
-    stomp_host: str
-    stomp_destination: str
+    stomp_config: StompConfig
     root_cert: bytes
     sub_cert: bytes
     subnet: Subnet
@@ -324,20 +338,14 @@ class _LocalDirectory(NodePeersDatabase):
         node_type_str = await self._read_oneline(f'{dir}/nodetype.txt')
         node_type = _parse_node_type(node_type_str)
 
-        servers_str = await self._read_text_file(f'{dir}/nodeinfo/servers.txt')
-        servers = _parse_servers_file(servers_str)
-
         owner_node_data = await self.get_node_data()
         owner_node_id = owner_node_data.node_id
         owner_node_type = owner_node_data.node_type
 
-        try:
-            stomp_str = await self._read_text_file(f'{dir}/nodeinfo/stomp.toml')
-            stomp_host, stomp_destination = _parse_stomp_file(
-                stomp_str, node_id=owner_node_id)
-        except FileNotFoundError:
-            stomp_host = '/'
-            stomp_destination = '/exchange/smp'
+        stomp_config = _parse_stomp_toml(
+            await self._read_text_file(f'{dir}/nodeinfo/stomp.toml'),
+            node_id=owner_node_id,
+        )
 
         if owner_node_type == NodeType.AA:
             subnet = await self._read_subnet_file(f'{dir}/subnet.txt')
@@ -351,9 +359,7 @@ class _LocalDirectory(NodePeersDatabase):
         return PeerData(
             node_type=node_type,
             node_id=node_id,
-            servers=servers,
-            stomp_host=stomp_host,
-            stomp_destination=stomp_destination,
+            stomp_config=stomp_config,
             root_cert=root_cert,
             sub_cert=sub_cert,
             subnet=subnet,
@@ -371,13 +377,15 @@ def _parse_node_type(s: str) -> NodeType:
         raise ValueError(f'invalid node type: {s}')
 
 
-def _parse_servers_file(s: str) -> list[tuple[str, int]]:
-    servers = []
-    for server in s.split(maxsplit=10000):
+def _parse_servers_list(servers: list[object]) -> list[tuple[str, int]]:
+    parsed_servers = []
+    for server in servers:
         try:
+            if not isinstance(server, str):
+                raise TypeError
             host, port_str = server.split(':', maxsplit=1)
-        except ValueError:
-            raise ValueError(f'invalid server: {s}')
+        except (TypeError, ValueError):
+            raise ValueError(f'invalid server: {server}')
 
         if not _is_valid_hostname(host):
             raise ValueError(f'invalid host: {host}')
@@ -389,26 +397,46 @@ def _parse_servers_file(s: str) -> list[tuple[str, int]]:
         except ValueError:
             raise ValueError(f'invalid port: {port_str}')
 
-        servers.append((host, port))
+        parsed_servers.append((host, port))
 
-    return servers
+    return parsed_servers
 
 
-def _parse_stomp_file(s: str, *, node_id: str) -> tuple[str, str]:
-    """Return a (stomp_host, stomp_destination) tuple."""
-
+def _parse_stomp_toml(s: str, *, node_id: str) -> StompConfig:
     data = tomli.loads(s)
-    host: object = data.get('host', '/')
+
+    servers: object = data.get('servers')
+    if not isinstance(servers, list):
+        raise ValueError('invalid servers value')
+    parsed_servers = _parse_servers_list(servers)
+
+    host: object = data.get('host')
     if not isinstance(host, str):
         raise ValueError('invalid host value')
+    host = host.replace('${NODE_ID}', node_id)
 
-    destination: object = data.get('destination', '/exchange/smp')
+    destination: object = data.get('destination')
     if not isinstance(destination, str):
         raise ValueError('invalid destination value')
+    destination = destination.replace('${NODE_ID}', node_id)
 
-    stomp_host = host.replace('${NODE_ID}', node_id)
-    stomp_destination = destination.replace('${NODE_ID}', node_id)
-    return stomp_host, stomp_destination
+    login: object = data.get('login')
+    if login is not None:
+        if not isinstance(login, str):
+            raise ValueError('invalid login value')
+        login = login.replace('${NODE_ID}', node_id)
+
+    passcode: object = data.get('passcode')
+    if not (passcode is None or isinstance(passcode, str)):
+        raise ValueError('invalid passcode value')
+
+    return StompConfig(
+        servers=parsed_servers,
+        host=host,
+        destination=destination,
+        login=login,
+        passcode=passcode,
+    )
 
 
 def _is_valid_hostname(hostname):

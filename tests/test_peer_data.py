@@ -33,18 +33,18 @@ def test_parse_node_type():
         _parse_node_type('something else')
 
 
-def test_parse_servers_file():
-    from swpt_stomp.peer_data import _parse_servers_file
+def test_parse_servers_list():
+    from swpt_stomp.peer_data import _parse_servers_list
 
-    assert _parse_servers_file('server1.example.com.:1234') == [
+    assert _parse_servers_list(['server1.example.com.:1234']) == [
         ('server1.example.com.', 1234)
     ]
 
-    assert _parse_servers_file(
-        'server1.example.com:1234\n'
-        'server2.example.com:2345\n'
-        '1.2.3.4:2345\n'
-    ) == [
+    assert _parse_servers_list([
+        'server1.example.com:1234',
+        'server2.example.com:2345',
+        '1.2.3.4:2345',
+    ]) == [
         ('server1.example.com', 1234),
         ('server2.example.com', 2345),
         ('1.2.3.4', 2345),
@@ -52,72 +52,113 @@ def test_parse_servers_file():
 
     # Invalid port.
     with pytest.raises(ValueError):
-        _parse_servers_file('server1.example.com:123456')
+        _parse_servers_list(['server1.example.com:123456'])
 
     with pytest.raises(ValueError):
-        _parse_servers_file('server1.example.com:-1234')
+        _parse_servers_list(['server1.example.com:-1234'])
 
     with pytest.raises(ValueError):
-        _parse_servers_file('server1.example.com:0')
+        _parse_servers_list(['server1.example.com:0'])
 
     with pytest.raises(ValueError):
-        _parse_servers_file('server1.example.com:INVALID')
+        _parse_servers_list(['server1.example.com:INVALID'])
 
     with pytest.raises(ValueError):
-        _parse_servers_file('server1.example.com:')
+        _parse_servers_list(['server1.example.com:'])
 
     with pytest.raises(ValueError):
-        _parse_servers_file('server1.example.com')
+        _parse_servers_list(['server1.example.com'])
+
+    with pytest.raises(ValueError):
+        _parse_servers_list([666])
 
     # Invalid symbols in host.
     with pytest.raises(ValueError):
-        _parse_servers_file('24[s]3q5:1234')
+        _parse_servers_list(['24[s]3q5:1234'])
 
     # The host is too long.
     with pytest.raises(ValueError):
-        _parse_servers_file(50 * 'abcdefgh.' + 'com:1234')
+        _parse_servers_list([50 * 'abcdefgh.' + 'com:1234'])
 
 
-def test_parse_stomp_file():
-    from swpt_stomp.peer_data import _parse_stomp_file
+def test_parse_stomp_toml():
+    from swpt_stomp.peer_data import _parse_stomp_toml
 
+    servers = 'servers = ["example.com:1234", "example.com:1235"]\n'
+    host = 'host = "HOST"\n'
+    destination = 'destination = "DESTINATION"\n'
     for s in [
-        'host = "HOST"\ndestination = "DESTINATION"',
-        '"host"="HOST"\n"destination"="DESTINATION"',
-        'host = "HOST"\n\ndestination = "DESTINATION"\n',
-        'host = "HOST"\r\ndestination = "DESTINATION"\r\n',
+            f'{servers}{host}{destination}',
+            f'{servers}host = "HOST"\ndestination = "DESTINATION"',
+            f'{servers}"host"="HOST"\n"destination"="DESTINATION"',
+            f'{servers}host = "HOST"\n\ndestination = "DESTINATION"\n',
+            f'{servers}host = "HOST"\r\ndestination = "DESTINATION"\r\n',
     ]:
-        assert _parse_stomp_file(
-            s, node_id='1234') == ('HOST', 'DESTINATION')
+        config = _parse_stomp_toml(s, node_id='1234')
+        assert config.host == 'HOST'
+        assert config.destination == 'DESTINATION'
+        assert config.servers == [("example.com", 1234), ("example.com", 1235)]
+        assert config.login is None
+        assert config.passcode is None
 
-    assert _parse_stomp_file(
-        'host = "HOST"',
+    # test ${NODE_ID} substitution
+    m = _parse_stomp_toml(
+        f'{servers}'
+        "host = '/${NODE_ID}'\n"
+        "destination = '/exchange/${NODE_ID}/smp'\n"
+        "login = '/user/${NODE_ID}'\n",
         node_id='1234'
-    ) == ('HOST', '/exchange/smp')
-
-    assert _parse_stomp_file(
-        'destination = "DESTINATION"',
-        node_id='1234'
-    ) == ('/', 'DESTINATION')
-
-    assert _parse_stomp_file(
-        '',
-        node_id='1234'
-    ) == ('/', '/exchange/smp')
-
-    assert _parse_stomp_file(
-        'host = "/${NODE_ID}"\ndestination = "/exchange/${NODE_ID}/smp"',
-        node_id='1234'
-    ) == ('/1234', '/exchange/1234/smp')
+    )
+    assert m.host == '/1234'
+    assert m.destination == '/exchange/1234/smp'
+    assert m.login == '/user/1234'
 
     with pytest.raises(Exception):
-        _parse_stomp_file('INVALID', node_id='1234')
+        _parse_stomp_toml('INVALID', node_id='1234')
 
+    # no servers
     with pytest.raises(Exception):
-        _parse_stomp_file('host=1', node_id='1234')
+        _parse_stomp_toml(f'{host}{destination}', node_id='1234')
 
+    # servers is not a list
     with pytest.raises(Exception):
-        _parse_stomp_file('destination=1', node_id='1234')
+        _parse_stomp_toml(f'{host}{destination}servers=1', node_id='1234')
+
+    # servers is a list, but not all items are strings
+    with pytest.raises(Exception):
+        _parse_stomp_toml(
+            f'{host}{destination}servers=["example.com:1234", 1]',
+            node_id='1234',
+        )
+
+    # servers is a list of strings, but they are not valid
+    with pytest.raises(Exception):
+        _parse_stomp_toml(
+            f'{host}{destination}servers=["INVALID"]',
+            node_id='1234',
+        )
+
+    # host is not a string
+    with pytest.raises(Exception):
+        _parse_stomp_toml(f'{servers}{destination}host=1', node_id='1234')
+
+    # destination is not a string
+    with pytest.raises(Exception):
+        _parse_stomp_toml(f'{servers}{host}destination=1', node_id='1234')
+
+    # login is not a string
+    with pytest.raises(Exception):
+        _parse_stomp_toml(
+            f'{servers}{host}{destination}login=1',
+            node_id='1234',
+        )
+
+    # passcode is not a string
+    with pytest.raises(Exception):
+        _parse_stomp_toml(
+            f'{servers}{host}{destination}passcode=1',
+            node_id='1234',
+        )
 
 
 @pytest.mark.asyncio
@@ -161,9 +202,10 @@ async def test_get_ca_peer_data(datadir):
     assert data.node_type == NodeType.AA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEgzCCAuugA' in data.root_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFeTCCA+GgA' in data.sub_cert
-    assert data.servers == [('127.0.0.1', 1234), ('127.0.0.1', 1234)]
-    assert data.stomp_host == '/'
-    assert data.stomp_destination == '/exchange/smp'
+    assert data.stomp_config.servers == [('127.0.0.1', 1234),
+                                         ('127.0.0.1', 1234)]
+    assert data.stomp_config.host == '/'
+    assert data.stomp_config.destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('000001')
 
 
@@ -178,9 +220,9 @@ async def test_get_aa_peer_data(datadir):
     assert data.node_type == NodeType.CA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEqDCCAxCgAw' in data.root_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFWjCCA8KgAw' in data.sub_cert
-    assert data.servers == [('127.0.0.1', 1235)]
-    assert data.stomp_host == '/1234abcd'
-    assert data.stomp_destination == '/exchange/smp'
+    assert data.stomp_config.servers == [('127.0.0.1', 1235)]
+    assert data.stomp_config.host == '/1234abcd'
+    assert data.stomp_config.destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('000001')
 
     data = await db.get_peer_data('060791aeca7637fa3357dfc0299fb4c5')
@@ -188,9 +230,9 @@ async def test_get_aa_peer_data(datadir):
     assert data.node_type == NodeType.DA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEozCCAwugAw' in data.root_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFVzCCA7+gAw' in data.sub_cert
-    assert data.servers == [('127.0.0.1', 1236)]
-    assert data.stomp_host == '/'
-    assert data.stomp_destination == '/exchange/smp'
+    assert data.stomp_config.servers == [('127.0.0.1', 1236)]
+    assert data.stomp_config.host == '/'
+    assert data.stomp_config.destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('1234abcd00')
 
 
@@ -205,9 +247,10 @@ async def test_get_da_peer_data(datadir):
     assert data.node_type == NodeType.AA
     assert b'-----BEGIN CERTIFICATE-----\nMIIEgzCCAuugAw' in data.root_cert
     assert b'-----BEGIN CERTIFICATE-----\nMIIFeTCCA+GgAw' in data.sub_cert
-    assert data.servers == [('127.0.0.1', 1234), ('127.0.0.1', 1234)]
-    assert data.stomp_host == '/'
-    assert data.stomp_destination == '/exchange/smp'
+    assert data.stomp_config.servers == [('127.0.0.1', 1234),
+                                         ('127.0.0.1', 1234)]
+    assert data.stomp_config.host == '/'
+    assert data.stomp_config.destination == '/exchange/smp'
     assert data.subnet == Subnet.parse('1234abcd00')
 
 

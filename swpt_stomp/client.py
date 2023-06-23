@@ -112,12 +112,15 @@ async def connect(
                         transform_message_body, owner_node_data, peer_data),
                 )
 
+        c = peer_data.stomp_config
         return StompClient(
             send_queue,
             recv_queue,
             start_message_processor=lambda t: loop.create_task(consume(t)),
-            host=peer_data.stomp_host,
-            send_destination=peer_data.stomp_destination,
+            host=c.host,
+            login=c.login,
+            passcode=c.passcode,
+            send_destination=c.destination,
         )
 
     # To be correctly authenticated by the server, we must present both the
@@ -141,7 +144,8 @@ async def connect(
             cadata=peer_data.root_cert.decode('ascii'))
         ssl_context.load_cert_chain(certfile=certfile.name, keyfile=server_key)
 
-        server_host, server_port = random.choice(peer_data.servers)
+        server_host, server_port = random.choice(
+            peer_data.stomp_config.servers)
         transport, protocol = await loop.create_connection(
             create_protocol,
             host=server_host,
