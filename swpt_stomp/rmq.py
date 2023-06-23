@@ -61,10 +61,9 @@ async def consume_from_queue(
 
     The consumed messages will be added to the `send_queue`, awaiting
     receipt confirmations for them to arrive on the `recv_queue`. The
-    consumption of messages will stop only when the connection to the
-    RabbitMQ server is lost, or a `None` is received on the `recv_queue`. At
-    the end, a `None` (no error), or a `ServerError` will be added to the
-    `send_queue`.
+    consumption of messages will stop only when a `None` is received on the
+    `recv_queue` (lost connection). At the end, a `None` (no error), or a
+    `ServerError` will be added to the `send_queue`.
 
     A new connection will be initiated to the RabbbitMQ server specified by
     `url`. If the connection to the RabbitMQ server has been lost for some
@@ -113,10 +112,9 @@ async def publish_to_exchange(
     The messages from the `recv_queue`, will be published to the RabbitMQ
     exchange, and when publish confirmations are received for them, the
     corresponding confirmations will be added to the `send_queue`. The
-    publishing of messages will stop only when the connection to the
-    RabbitMQ server is lost, or a `None` is received on the `recv_queue`. At
-    the end, a `None` (no error), or a `ServerError` will be added to the
-    `send_queue`.
+    publishing of messages will stop only when a `None` is received on the
+    `recv_queue` (lost connection). At the end, a `None` (no error), or a
+    `ServerError` will be added to the `send_queue`.
 
     If an open `channel` is passed, it will be used to communicate with the
     RabbbitMQ server. If it is `None`, a new connection will be initiated to
@@ -380,24 +378,3 @@ async def _publish_to_exchange(
         for t in tasks:
             t.cancel()
         await asyncio.wait(tasks)
-
-
-# def _transform_message(m: Message) -> SmpMessage:
-#     data = self.__marshmallow_schema__.dump(self)
-#     message_type = data['type']
-#     headers = {
-#         'message-type': message_type,
-#         'debtor-id': data['debtor_id'],
-#         'creditor-id': data['creditor_id'],
-#     }
-#     if 'coordinator_id' in data:
-#         headers['coordinator-id'] = data['coordinator_id']
-#         headers['coordinator-type'] = data['coordinator_type']
-
-#     body = json.dumps(
-#         data,
-#         ensure_ascii=False,
-#         check_circular=False,
-#         allow_nan=False,
-#         separators=(',', ':'),
-#     ).encode('utf8')
