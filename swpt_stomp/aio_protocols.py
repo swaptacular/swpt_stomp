@@ -11,6 +11,8 @@ MessageProcessorStarter = Callable[[asyncio.Transport], Optional[asyncio.Task]]
 
 DEFAULT_HB_SEND_MIN = 5_000  # 5 seconds
 DEFAULT_HB_RECV_DESIRED = 30_000  # 30 seconds
+DEFAULT_STOMP_HOST = '/'
+DEFAULT_STOMP_DESTINATION = '/exchange/smp'
 _logger = logging.getLogger(__name__)
 
 
@@ -254,10 +256,10 @@ class StompClient(_BaseStompProtocol[Message, str]):
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
-            host: str = '/',
+            host: str = DEFAULT_STOMP_HOST,
             login: Optional[str] = None,
             passcode: Optional[str] = None,
-            send_destination: str = '/exchange/smp',
+            send_destination: str = DEFAULT_STOMP_DESTINATION,
     ):
         super().__init__(
             send_queue,
@@ -433,7 +435,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
             max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
-            recv_destination: str = '/exchange/smp'
+            recv_destination: str = DEFAULT_STOMP_DESTINATION
     ):
         super().__init__(
             send_queue,
