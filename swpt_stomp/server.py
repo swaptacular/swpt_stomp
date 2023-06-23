@@ -25,7 +25,7 @@
 # other via two asyncio queues: "recv_queue" and "send_queue". Putting a
 # `None` or a `ServerError in the "send_queue" signals the end of the
 # connection. In the other direction, putting `None` in the "recv_queue"
-# ends the connection immediately.
+# cancels the publisher task immediately.
 #
 # The "Node Peers Database" contains information about the peers of the
 # given node. The "StompServer" uses this information during the SSL
