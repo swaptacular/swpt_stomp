@@ -11,7 +11,7 @@ from collections import deque
 from aio_pika.abc import HeadersType
 from swpt_stomp.common import (
     Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY,
-    ensure_put,
+    terminate_queue,
 )
 
 _logger = logging.getLogger(__name__)
@@ -89,12 +89,12 @@ async def consume_from_queue(
                 transform_message_body=transform_message_body,
             )
     except (asyncio.CancelledError, Exception) as e:  # pragma: nocover
-        ensure_put(send_queue, ServerError('Abruptly closed connection.'))
+        terminate_queue(send_queue, ServerError('Abruptly closed connection.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
             raise
         _logger.exception('RabbitMQ connection error')
     else:
-        ensure_put(send_queue, None)
+        terminate_queue(send_queue, None)
 
 
 async def publish_to_exchange(
@@ -149,14 +149,14 @@ async def publish_to_exchange(
         else:
             await publish_messages(channel)
     except ServerError as e:
-        ensure_put(send_queue, e)
+        terminate_queue(send_queue, e)
     except (asyncio.CancelledError, Exception) as e:
-        ensure_put(send_queue, ServerError('Internal server error.'))
+        terminate_queue(send_queue, ServerError('Internal server error.'))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):  # pragma: nocover
             raise
         _logger.exception('RabbitMQ connection error')
     else:
-        ensure_put(send_queue, None)
+        terminate_queue(send_queue, None)
 
 
 async def open_robust_channel(

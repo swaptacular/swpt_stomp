@@ -46,7 +46,7 @@ from functools import partial
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
     SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
-    get_peer_serial_number, ensure_put,
+    get_peer_serial_number, terminate_queue,
 )
 from swpt_stomp.rmq import consume_from_queue
 from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
@@ -99,9 +99,9 @@ async def connect(
                 if peer_serial_number != peer_data.node_id:  # pragma: nocover
                     raise ServerError('Invalid certificate subject.')
             except ServerError as e:  # pragma: nocover
-                ensure_put(send_queue, e)
+                terminate_queue(send_queue, e)
             except (asyncio.CancelledError, Exception):  # pragma: nocover
-                ensure_put(send_queue, ServerError(
+                terminate_queue(send_queue, ServerError(
                     'Abruptly closed connection.'))
                 raise
             else:

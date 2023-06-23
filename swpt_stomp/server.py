@@ -45,7 +45,7 @@ from functools import partial
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
     SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
-    get_peer_serial_number, ensure_put,
+    get_peer_serial_number, terminate_queue,
 )
 from swpt_stomp.rmq import publish_to_exchange, open_robust_channel, RmqMessage
 from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
@@ -112,9 +112,10 @@ async def serve(
                 if n >= max_connections_per_peer:  # pragma: nocover
                     raise ServerError('Too many connections from one peer.')
             except ServerError as e:  # pragma: nocover
-                ensure_put(send_queue, e)
+                terminate_queue(send_queue, e)
             except (asyncio.CancelledError, Exception):  # pragma: nocover
-                ensure_put(send_queue, ServerError('Internal server error.'))
+                terminate_queue(send_queue, ServerError(
+                    'Internal server error.'))
                 raise
             else:
                 with _allowed_peer_connection(peer_data.node_id):
