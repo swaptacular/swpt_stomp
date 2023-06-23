@@ -25,9 +25,7 @@
 # other via two asyncio queues: "send_queue" and "recv_queue". Putting a
 # `None` or a `ServerError in the "send_queue" signals the end of the
 # connection. In the other direction, putting `None` in the "recv_queue"
-# ends the connection immediately. Also, the StompClient protocol instance
-# holds a reference to the consumer task, and can cancel it when something
-# went wrong (lost TCP connection for example).
+# ends the connection immediately.
 #
 # The "Node Peers Database" contains information about the peers of the
 # given node. The "StompClient" uses this information during the SSL

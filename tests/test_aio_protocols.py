@@ -75,12 +75,14 @@ def test_client_connection(transport):
     loop = asyncio.get_event_loop()
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-
-    async def do_nothing():
-        await asyncio.sleep(100000000)
+    start_message_processor_called = asyncio.Event()
+    message_processor_task = None
 
     def start_message_processor(transport):
-        return loop.create_task(do_nothing())
+        start_message_processor_called.set()
+        nonlocal message_processor_task
+        message_processor_task = loop.create_task(asyncio.sleep(0))
+        return message_processor_task
 
     # create instance
     c = StompClient(
@@ -175,16 +177,16 @@ def test_client_connection(transport):
     transport.write.assert_not_called()
     transport.close.assert_not_called()
 
-    async def wait_for_cancelation():
+    async def wait_for_finalization():
+        await start_message_processor_called.wait()
         while not (
                 c._writer_task.cancelled()
                 and c._watchdog_task.cancelled()
-                and c._message_processor_task.cancelled()
+                and message_processor_task.done()
         ):
             await asyncio.sleep(0)
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(wait_for_cancelation())
+    loop.run_until_complete(wait_for_finalization())
 
 
 @pytest.mark.parametrize("data", [

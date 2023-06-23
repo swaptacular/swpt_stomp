@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 
 
 def _NO_MP(x: asyncio.Transport) -> None:
-    pass
+    return None
 
 
 def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
@@ -93,7 +93,6 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self._transport: Optional[asyncio.Transport] = None
         self._writer_task: Optional[asyncio.Task] = None
         self._watchdog_task: Optional[asyncio.Task] = None
-        self._message_processor_task: Optional[asyncio.Task] = None
         self._peername = None
         self._start_sending = asyncio.Event()
         self._start_sending.set()
@@ -105,9 +104,9 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         loop = self._loop
         self._connection_started_at = loop.time()
         self._transport = transport
-        self._message_processor_task = self._start_message_processor(transport)
-        if self._message_processor_task is not None:
-            _tasks.register(self._message_processor_task)
+
+        if message_processor_task := self._start_message_processor(transport):
+            _tasks.register(message_processor_task)
 
         self.recv_queue.add_high_watermark_callback(transport.pause_reading)
         self.recv_queue.add_low_watermark_callback(transport.resume_reading)
@@ -128,9 +127,6 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
 
         if self._watchdog_task:
             self._watchdog_task.cancel('connection lost')
-
-        if self._message_processor_task:
-            self._message_processor_task.cancel('connection lost')
 
         t = self._transport
         assert t
