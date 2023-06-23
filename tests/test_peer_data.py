@@ -124,6 +124,10 @@ def test_parse_stomp_toml():
     with pytest.raises(Exception):
         _parse_stomp_toml(f'{host}{destination}servers=1', node_id='1234')
 
+    # servers is an empty list
+    with pytest.raises(Exception):
+        _parse_stomp_toml(f'{host}{destination}servers=[]', node_id='1234')
+
     # servers is a list, but not all items are strings
     with pytest.raises(Exception):
         _parse_stomp_toml(

@@ -378,6 +378,9 @@ def _parse_node_type(s: str) -> NodeType:
 
 
 def _parse_servers_list(servers: list[object]) -> list[tuple[str, int]]:
+    if len(servers) == 0:
+        raise ValueError('empty server list')
+
     parsed_servers = []
     for server in servers:
         try:
