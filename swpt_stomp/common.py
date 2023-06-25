@@ -3,7 +3,6 @@ import os
 import asyncio
 from dataclasses import dataclass
 from typing import Callable, List, Any, Optional, TypeVar
-from aio_pika.abc import HeadersType
 
 Callback = Callable[[], Any]
 DEFAULT_MAX_NETWORK_DELAY = 10_000  # 10 seconds
@@ -33,15 +32,6 @@ class Message:
     type: str
     body: bytearray
     content_type: str
-
-
-@dataclass
-class RmqMessage:
-    body: bytearray
-    headers: HeadersType
-    type: str
-    content_type: str
-    routing_key: str
 
 
 class ServerError(Exception):
