@@ -93,6 +93,7 @@ def test_parse_stomp_toml():
             f'{servers}"host"="HOST"\n"destination"="DESTINATION"',
             f'{servers}host = "HOST"\n\ndestination = "DESTINATION"\n',
             f'{servers}host = "HOST"\r\ndestination = "DESTINATION"\r\n',
+            f'{servers}{host}{destination}accepted-content-types=[]',
     ]:
         config = _parse_stomp_toml(s, node_id='1234')
         assert config.host == 'HOST'
@@ -100,18 +101,22 @@ def test_parse_stomp_toml():
         assert config.servers == [("example.com", 1234), ("example.com", 1235)]
         assert config.login is None
         assert config.passcode is None
+        assert config.accepted_content_types == ['application/json']
+
 
     # test ${NODE_ID} substitution
     m = _parse_stomp_toml(
         f'{servers}'
         "host = '/${NODE_ID}'\n"
         "destination = '/exchange/${NODE_ID}/smp'\n"
-        "login = '/user/${NODE_ID}'\n",
+        "login = '/user/${NODE_ID}'\n"
+        "accepted-content-types = ['type1', 'type2']",
         node_id='1234'
     )
     assert m.host == '/1234'
     assert m.destination == '/exchange/1234/smp'
     assert m.login == '/user/1234'
+    assert m.accepted_content_types == ['type1', 'type2', 'application/json']
 
     with pytest.raises(Exception):
         _parse_stomp_toml('INVALID', node_id='1234')
@@ -161,6 +166,20 @@ def test_parse_stomp_toml():
     with pytest.raises(Exception):
         _parse_stomp_toml(
             f'{servers}{host}{destination}passcode=1',
+            node_id='1234',
+        )
+
+    # accepted-content-types is not a list
+    with pytest.raises(Exception):
+        _parse_stomp_toml(
+            f'{servers}{host}{destination}accepted-content-types=1',
+            node_id='1234',
+        )
+
+    # accepted-content-types are not all strings
+    with pytest.raises(Exception):
+        _parse_stomp_toml(
+            f'{servers}{host}{destination}accepted-content-types=["type1", 1]',
             node_id='1234',
         )
 

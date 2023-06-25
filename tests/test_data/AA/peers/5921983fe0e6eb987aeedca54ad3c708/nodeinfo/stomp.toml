@@ -1,3 +1,4 @@
 servers = ["127.0.0.1:1235"]
 host = "/${NODE_ID}"
 destination = "/exchange/smp"
+accepted-content-types = ["application/json"]

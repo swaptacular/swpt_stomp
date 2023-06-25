@@ -68,12 +68,14 @@ class StompConfig:
         'destination',
         'login',
         'passcode',
+        'accepted_content_types',
     )
     servers: list[tuple[str, int]]
     host: str
     destination: str
     login: Optional[str]
     passcode: Optional[str]
+    accepted_content_types: list[str]
 
 
 @dataclass
@@ -433,12 +435,19 @@ def _parse_stomp_toml(s: str, *, node_id: str) -> StompConfig:
     if not (passcode is None or isinstance(passcode, str)):
         raise ValueError('invalid passcode value')
 
+    accepted_content_types: object = data.get('accepted-content-types', [])
+    if not (isinstance(accepted_content_types, list)
+            and all(isinstance(x, str) for x in accepted_content_types)):
+        raise ValueError('invalid accepted-content-types')
+    accepted_content_types.append('application/json')
+
     return StompConfig(
         servers=parsed_servers,
         host=host,
         destination=destination,
         login=login,
         passcode=passcode,
+        accepted_content_types=accepted_content_types,
     )
 
 
