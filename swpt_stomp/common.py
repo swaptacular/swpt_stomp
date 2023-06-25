@@ -1,8 +1,9 @@
 import logging
 import os
+import asyncio
 from dataclasses import dataclass
 from typing import Callable, List, Any, Optional, TypeVar
-import asyncio
+from aio_pika.abc import HeadersType
 
 Callback = Callable[[], Any]
 DEFAULT_MAX_NETWORK_DELAY = 10_000  # 10 seconds
@@ -22,10 +23,25 @@ _logger = logging.getLogger(__name__)
 
 @dataclass
 class Message:
+    __slots__ = (
+        'id',
+        'type',
+        'body',
+        'content_type',
+    )
     id: str
     type: str
     body: bytearray
-    content_type: str = 'application/octet-stream'
+    content_type: str
+
+
+@dataclass
+class RmqMessage:
+    body: bytearray
+    headers: HeadersType
+    type: str
+    content_type: str
+    routing_key: str
 
 
 class ServerError(Exception):

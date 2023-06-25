@@ -5,13 +5,11 @@ import aio_pika
 from aio_pika.exceptions import CONNECTION_EXCEPTIONS
 from functools import partial
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from typing import Optional, Union, Callable, Awaitable, AsyncGenerator
 from collections import deque
-from aio_pika.abc import HeadersType
 from swpt_stomp.common import (
     Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY,
-    terminate_queue,
+    terminate_queue, RmqMessage,
 )
 
 _logger = logging.getLogger(__name__)
@@ -36,15 +34,6 @@ class _Delivery:
     def __init__(self, message_id: str):
         self.message_id = message_id
         self.confirmed = False
-
-
-@dataclass
-class RmqMessage:
-    body: bytearray
-    headers: HeadersType
-    type: str
-    content_type: str
-    routing_key: str
 
 
 async def consume_from_queue(
