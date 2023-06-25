@@ -93,7 +93,8 @@ async def test_publish_to_exchange(rmq_url):
 
     async def preprocess_message(m):
         return RmqMessage(
-            body=m.body,
+            id=m.id,
+            body=bytes(m.body),
             headers={
                 'message-type': m.type,
                 'debtor-id': 1,
@@ -143,7 +144,8 @@ async def test_publish_returned_message(caplog, rmq_url):
 
     async def preprocess_message(m):
         return RmqMessage(
-            body=m.body,
+            id=m.id,
+            body=bytes(m.body),
             headers={
                 'message-type': m.type,
                 'debtor-id': 1,

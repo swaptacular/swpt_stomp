@@ -62,11 +62,12 @@ async def NO_PPM(n: NodeData, p: PeerData, m: Message) -> RmqMessage:
     """This is mainly useful for testing purposes.
     """
     return RmqMessage(
-        body=m.body,
+        id=m.id,
+        body=bytes(m.body),
         headers={},
         type=m.type,
         content_type=m.content_type,
-        routing_key='',
+        routing_key=None,
     )
 
 

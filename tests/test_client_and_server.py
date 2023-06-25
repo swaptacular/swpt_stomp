@@ -61,7 +61,7 @@ async def test_connect_to_server(datadir, rmq_url):
     # Connect to the server.
     client_task = loop.create_task(client.connect(
         protocol_broker_url=rmq_url,
-        transform_message_body=client.NO_TMP,
+        transform_message=client.NO_TM,
         peer_node_id='1234abcd',
         server_cert=os.path.abspath(f'{datadir["CA"]}/server.crt'),
         server_key=os.path.abspath(f'{datadir["CA"]}/server.key'),

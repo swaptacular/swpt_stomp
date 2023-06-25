@@ -46,7 +46,7 @@ from swpt_stomp.common import (
     SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
     get_peer_serial_number, terminate_queue,
 )
-from swpt_stomp.rmq import consume_from_queue
+from swpt_stomp.rmq import consume_from_queue, RmqMessage
 from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
 from swpt_stomp.aio_protocols import StompClient
 
@@ -56,17 +56,22 @@ CLIENT_QUEUE_SIZE = int(os.environ.get('CLIENT_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
-def NO_TMP(n: NodeData, p: PeerData, body: bytes) -> bytearray:
+def NO_TM(n: NodeData, p: PeerData, m: RmqMessage) -> Message:
     """This is mainly useful for testing purposes.
     """
-    return bytearray(body)
+    return Message(
+        id=m.id,
+        type=m.type,
+        body=bytearray(m.body),
+        content_type=m.content_type,
+    )
 
 
 async def connect(
         *,
         # TODO: change the default to the real message body transformer.
-        transform_message_body: Callable[
-            [NodeData, PeerData, bytes], bytearray] = NO_TMP,
+        transform_message: Callable[
+            [NodeData, PeerData, RmqMessage], Message] = NO_TM,
         peer_node_id: str = PEER_NODE_ID,
         server_cert: str = SERVER_CERT,
         server_key: str = SERVER_KEY,
@@ -108,8 +113,8 @@ async def connect(
                     recv_queue,
                     url=protocol_broker_url,
                     queue_name=protocol_broker_queue,
-                    transform_message_body=partial(
-                        transform_message_body, owner_node_data, peer_data),
+                    transform_message=partial(
+                        transform_message, owner_node_data, peer_data),
                 )
 
         c = peer_data.stomp_config

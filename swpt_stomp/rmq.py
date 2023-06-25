@@ -18,6 +18,16 @@ _logger = logging.getLogger(__name__)
 _PERSISTENT = aio_pika.DeliveryMode.PERSISTENT
 _RMQ_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
 
+
+def _NO_TM(m: 'RmqMessage') -> Message:
+    return Message(
+        id=m.id,
+        type=m.type,
+        body=bytearray(m.body),
+        content_type=m.content_type,
+    )
+
+
 RMQ_CONNECTION_TIMEOUT_SECONDS = float(os.environ.get(
     'RMQ_CONNECTION_TIMEOUT_SECONDS',
     str(DEFAULT_MAX_NETWORK_DELAY / 1000),
@@ -40,11 +50,12 @@ class _Delivery:
 
 @dataclass
 class RmqMessage:
-    body: bytearray
+    id: str
+    body: bytes
     headers: HeadersType
     type: str
     content_type: str
-    routing_key: str
+    routing_key: Optional[str]
 
 
 async def consume_from_queue(
@@ -53,7 +64,7 @@ async def consume_from_queue(
         *,
         url: str,
         queue_name: str,
-        transform_message_body: Callable[[bytes], bytearray] = bytearray,
+        transform_message: Callable[[RmqMessage], Message] = _NO_TM,
         connection_timeout: float = RMQ_CONNECTION_TIMEOUT_SECONDS,
         prefetch_size: int = 0,
 ) -> None:
@@ -70,8 +81,8 @@ async def consume_from_queue(
     reason, no attempts to reconnect will be made.
 
     `send_queue.maxsize` will determine the RabbitMQ queue's prefetch count.
-    If passed, the `transform_message_body` function may change the message
-    body before adding the message to the `send_queue`.
+    If passed, the `transform_message` function may change the message
+    before adding it to the `send_queue`.
     """
     try:
         async with _open_channel(
@@ -85,7 +96,7 @@ async def consume_from_queue(
                 recv_queue,
                 channel=channel,
                 queue_name=queue_name,
-                transform_message_body=transform_message_body,
+                transform_message=transform_message,
             )
     except (asyncio.CancelledError, Exception) as e:  # pragma: nocover
         terminate_queue(send_queue, ServerError('Abruptly closed connection.'))
@@ -216,7 +227,7 @@ async def _consume_from_queue(
         *,
         channel: AbstractChannel,
         queue_name: str,
-        transform_message_body: Callable[[bytes], bytearray],
+        transform_message: Callable[[RmqMessage], Message],
 ) -> None:
     async def consume_queue() -> None:
         queue = await channel.get_queue(queue_name, ensure=False)
@@ -235,14 +246,15 @@ async def _consume_from_queue(
                 if delivery_tag is None:  # pragma: nocover
                     raise RuntimeError('Message without a delivery tag.')
 
-                message_body = transform_message_body(message.body)
-                await send_queue.put(
-                    Message(
-                        id=str(delivery_tag),
-                        type=message_type,
-                        body=message_body,
-                        content_type=message_content_type,
-                    ))
+                m = transform_message(RmqMessage(
+                    id=str(delivery_tag),
+                    body=message.body,
+                    headers=message.headers,
+                    type=message_type,
+                    content_type=message_content_type,
+                    routing_key=None,
+                ))
+                await send_queue.put(m)
 
     async def send_acks() -> None:
         aiormq_channel = await channel.get_underlay_channel()
@@ -316,7 +328,7 @@ async def _publish_to_exchange(
                 delivery_mode=_PERSISTENT,
                 app_id='swpt_stomp',
             ),
-            m.routing_key,
+            m.routing_key or '',
             mandatory=True,
             timeout=confirmation_timeout,
         )
