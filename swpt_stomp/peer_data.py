@@ -335,6 +335,16 @@ class _LocalDirectory(NodePeersDatabase):
         except FileNotFoundError:  # pragma: nocover
             return None
 
+        try:
+            # Peers that do not have a file with the name "ACTIVE" in their
+            # corresponding directories will be ignored. The existence of
+            # this file signals that all necessary objects related to the
+            # peer (configuration files, RabbitMQ queues, exchanges,
+            # bindings etc.) have been created.
+            await self._read_file(f'{dir}/ACTIVE')
+        except FileNotFoundError:  # pragma: nocover
+            return None
+
         root_cert = await self._read_cert_file(f'{dir}/root-ca.crt')
 
         node_type_str = await self._read_oneline(f'{dir}/nodetype.txt')
