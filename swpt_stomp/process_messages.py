@@ -130,12 +130,8 @@ def _change_subnet(creditor_id, *, from_: Subnet, to_: Subnet) -> int:
     """Translate `creditor_id` from one subnet to another.
     """
     mask = from_.subnet_mask
-    if mask != to_.subnet_mask:
-        raise ValueError('incompatible subnet masks')
-
+    assert mask == to_.subnet_mask
     subnet = creditor_id & mask
-    if subnet != from_.subnet:
-        raise ValueError(f'invalid creditor ID: {creditor_id}')
-
+    assert subnet == from_.subnet
     relative_id = subnet ^ creditor_id
     return to_.subnet | relative_id
