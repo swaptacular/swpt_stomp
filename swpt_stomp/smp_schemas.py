@@ -364,3 +364,17 @@ class AccountTransferMessageSchema(  # type: ignore
         if data['previous_transfer_number'] >= data['transfer_number']:
             raise ValidationError("transfer_number must be greater "
                                   "than previous_transfer_number.")
+
+
+JSON_SCHEMAS: dict[str, Schema] = {
+    'ConfigureAccount': ConfigureAccountMessageSchema(),
+    'RejectedConfig': RejectedConfigMessageSchema(),
+    'PrepareTransfer': PrepareTransferMessageSchema(),
+    'FinalizeTransfer': FinalizeTransferMessageSchema(),
+    'RejectedTransfer': RejectedTransferMessageSchema(),
+    'PreparedTransfer': PreparedTransferMessageSchema(),
+    'FinalizedTransfer': FinalizedTransferMessageSchema(),
+    'AccountUpdate': AccountUpdateMessageSchema(),
+    'AccountPurge': AccountPurgeMessageSchema(),
+    'AccountTransfer': AccountTransferMessageSchema(),
+}
