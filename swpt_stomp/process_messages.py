@@ -52,6 +52,8 @@ async def preprocess_message(
         peer_data: PeerData,
         message: Message,
 ) -> RmqMessage:
+    # TODO: raise `ServerError`s.
+
     owner_node_type = owner_node_data.node_type
     msg_data = _parse_message_body(
         message,
