@@ -60,7 +60,7 @@ async def preprocess_message(
     )
 
     creditor_id: int = msg_data['creditor_id']
-    if not owner_node_data.creditors_subnet.match(creditor_id):
+    if not peer_data.creditors_subnet.match(creditor_id):
         raise ValueError(f'invalid creditor ID: {creditor_id}')
 
     debtor_id: int = msg_data['debtor_id']
@@ -83,6 +83,7 @@ async def preprocess_message(
     if 'coordinator_id' in msg_data:
         headers['coordinator-id'] = msg_data['coordinator_id']
         headers['coordinator-type'] = msg_data['coordinator_type']
+        # TODO: Verify "coordinator-type".
 
     msg_json = JSON_SCHEMAS[msg_type].dumps(msg_data)
     return RmqMessage(
