@@ -1,5 +1,5 @@
 from typing import Union, Any
-from swpt_stomp.common import Message
+from swpt_stomp.common import Message, ServerError
 from swpt_stomp.peer_data import NodeData, PeerData, NodeType, Subnet
 from swpt_stomp.rmq import RmqMessage, HeadersType
 from swpt_stomp.smp_schemas import (
@@ -7,8 +7,12 @@ from swpt_stomp.smp_schemas import (
 )
 
 
-class ParseError(ValueError):
-    """Indicates that message can not be parsed."""
+class ProcessingError(Exception):
+    """Indicates that the message can not be processed.
+    """
+    def __init__(self, error_message: str):
+        super().__init__(error_message)
+        self.error_message = error_message
 
 
 def transform_message(
@@ -25,11 +29,13 @@ def transform_message(
 
     creditor_id: int = msg_data['creditor_id']
     if not owner_node_data.creditors_subnet.match(creditor_id):
-        raise ValueError(f'invalid creditor ID: {creditor_id}')
+        raise ProcessingError(
+            f'Invalid creditor ID: {_as_hex(creditor_id)}.')
 
     debtor_id: int = msg_data['debtor_id']
     if not peer_data.debtors_subnet.match(debtor_id):
-        raise ValueError(f'invalid debtor ID: {debtor_id}')
+        raise ProcessingError(
+            f'Invalid debtor ID: {_as_hex(debtor_id)}.')
 
     if owner_node_type == NodeType.CA:
         msg_data['creditor_id'] = _change_subnet(
@@ -52,50 +58,60 @@ async def preprocess_message(
         peer_data: PeerData,
         message: Message,
 ) -> RmqMessage:
-    # TODO: raise `ServerError`s.
-
-    owner_node_type = owner_node_data.node_type
-    msg_data = _parse_message_body(
-        message,
-        allow_client_messages=(owner_node_type == NodeType.AA),
-        allow_server_messages=(owner_node_type != NodeType.AA),
-    )
-
-    creditor_id: int = msg_data['creditor_id']
-    if not peer_data.creditors_subnet.match(creditor_id):
-        raise ValueError(f'invalid creditor ID: {creditor_id}')
-
-    debtor_id: int = msg_data['debtor_id']
-    if not peer_data.debtors_subnet.match(debtor_id):
-        raise ValueError(f'invalid debtor ID: {debtor_id}')
-
-    if owner_node_type == NodeType.CA:
-        msg_data['creditor_id'] = _change_subnet(
-            creditor_id,
-            from_=peer_data.creditors_subnet,
-            to_=owner_node_data.creditors_subnet,
+    try:
+        owner_node_type = owner_node_data.node_type
+        msg_data = _parse_message_body(
+            message,
+            allow_client_messages=(owner_node_type == NodeType.AA),
+            allow_server_messages=(owner_node_type != NodeType.AA),
         )
 
-    msg_type = message.type
-    headers: HeadersType = {
-        'message-type': msg_type,
-        'debtor-id': debtor_id,
-        'creditor-id': creditor_id,
-    }
-    if 'coordinator_id' in msg_data:
-        headers['coordinator-id'] = msg_data['coordinator_id']
-        headers['coordinator-type'] = msg_data['coordinator_type']
-        # TODO: Verify "coordinator-type".
+        creditor_id: int = msg_data['creditor_id']
+        if not peer_data.creditors_subnet.match(creditor_id):
+            raise ProcessingError(
+                f'Invalid creditor ID: {_as_hex(creditor_id)}.')
 
-    msg_json = JSON_SCHEMAS[msg_type].dumps(msg_data)
-    return RmqMessage(
-        id=message.id,
-        body=msg_json.encode('utf8'),
-        headers=headers,
-        type=msg_type,
-        content_type='application/json',
-        routing_key='',  # TODO: Set a routing key.
-    )
+        debtor_id: int = msg_data['debtor_id']
+        if not peer_data.debtors_subnet.match(debtor_id):
+            raise ProcessingError(
+                f'Invalid debtor ID: {_as_hex(debtor_id)}.')
+
+        if owner_node_type == NodeType.CA:
+            msg_data['creditor_id'] = _change_subnet(
+                creditor_id,
+                from_=peer_data.creditors_subnet,
+                to_=owner_node_data.creditors_subnet,
+            )
+
+        msg_type = message.type
+        headers: HeadersType = {
+            'message-type': msg_type,
+            'debtor-id': debtor_id,
+            'creditor-id': creditor_id,
+        }
+        if 'coordinator_id' in msg_data:
+            headers['coordinator-id'] = msg_data['coordinator_id']
+            headers['coordinator-type'] = msg_data['coordinator_type']
+            # TODO: Verify "coordinator-type".
+
+        msg_json = JSON_SCHEMAS[msg_type].dumps(msg_data)
+        return RmqMessage(
+            id=message.id,
+            body=msg_json.encode('utf8'),
+            headers=headers,
+            type=msg_type,
+            content_type='application/json',
+            routing_key='',  # TODO: Set a routing key.
+        )
+
+    except ProcessingError as e:
+        raise ServerError(
+            error_message=e.error_message,
+            receipt_id=message.id,
+            context=message.body,
+            context_type=message.type,
+            context_content_type=message.content_type,
+        )
 
 
 def _parse_message_body(
@@ -105,7 +121,7 @@ def _parse_message_body(
         allow_server_messages: bool = True,
 ) -> Any:
     if m.content_type != 'application/json':
-        raise ParseError(f'unsupported content type: {m.content_type}')
+        raise ProcessingError(f'Unsupported content type: {m.content_type}.')
 
     msg_type = m.type
     try:
@@ -115,17 +131,17 @@ def _parse_message_body(
             raise KeyError
         schema = JSON_SCHEMAS[msg_type]
     except KeyError:
-        raise ParseError(f'invalid message type: {msg_type}')
+        raise ProcessingError(f'Invalid message type: {msg_type}.')
 
     try:
         body = m.body.decode('utf8')
     except UnicodeDecodeError:
-        raise ParseError('UTF-8 decode error')
+        raise ProcessingError('UTF-8 decode error.')
 
     try:
         return schema.loads(body)
     except ValidationError as e:
-        raise ParseError(f'invalid {msg_type} message') from e
+        raise ProcessingError(f'Invalid {msg_type} message.') from e
 
 
 def _change_subnet(creditor_id, *, from_: Subnet, to_: Subnet) -> int:
@@ -137,3 +153,7 @@ def _change_subnet(creditor_id, *, from_: Subnet, to_: Subnet) -> int:
     assert subnet == from_.subnet
     relative_id = subnet ^ creditor_id
     return to_.subnet | relative_id
+
+
+def _as_hex(n: int) -> str:
+    return n.to_bytes(8, byteorder='big', signed=True).hex()
