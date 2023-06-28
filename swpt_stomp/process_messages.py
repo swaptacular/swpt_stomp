@@ -156,4 +156,4 @@ def _change_subnet(creditor_id, *, from_: Subnet, to_: Subnet) -> int:
 
 
 def _as_hex(n: int) -> str:
-    return n.to_bytes(8, byteorder='big', signed=True).hex()
+    return '0x' + n.to_bytes(8, byteorder='big', signed=True).hex()
