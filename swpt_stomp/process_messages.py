@@ -1,7 +1,7 @@
 from typing import Union, Any
 from swpt_stomp.common import Message
-from swpt_stomp.peer_data import NodeData, PeerData, NodeType
-from swpt_stomp.rmq import RmqMessage
+from swpt_stomp.peer_data import NodeData, PeerData, NodeType, Subnet
+from swpt_stomp.rmq import RmqMessage, HeadersType
 from swpt_stomp.smp_schemas import (
     JSON_SCHEMAS, CLIENT_MESSAGE_TYPES, SERVER_MESSAGE_TYPES, ValidationError,
 )
@@ -32,12 +32,11 @@ def transform_message(
         raise ValueError(f'invalid debtor ID: {debtor_id}')
 
     if owner_node_type == NodeType.CA:
-        # Translate "creditor_id" from owner's subnet to peer's subnet.
-        peer_subnet = peer_data.creditors_subnet
-        mask = peer_subnet.subnet_mask
-        assert mask == owner_node_data.creditors_subnet.subnet_mask
-        relative_id = (creditor_id & mask) ^ creditor_id
-        msg_data['creditor_id'] = peer_subnet.subnet | relative_id
+        msg_data['creditor_id'] = _change_subnet(
+            creditor_id,
+            from_=owner_node_data.creditors_subnet,
+            to_=peer_data.creditors_subnet,
+        )
 
     msg_json = JSON_SCHEMAS[message.type].dumps(msg_data)
     return Message(
@@ -53,13 +52,46 @@ async def preprocess_message(
         peer_data: PeerData,
         message: Message,
 ) -> RmqMessage:
+    owner_node_type = owner_node_data.node_type
+    msg_data = _parse_message_body(
+        message,
+        allow_client_messages=(owner_node_type == NodeType.AA),
+        allow_server_messages=(owner_node_type != NodeType.AA),
+    )
+
+    creditor_id: int = msg_data['creditor_id']
+    if not owner_node_data.creditors_subnet.match(creditor_id):
+        raise ValueError(f'invalid creditor ID: {creditor_id}')
+
+    debtor_id: int = msg_data['debtor_id']
+    if not peer_data.debtors_subnet.match(debtor_id):
+        raise ValueError(f'invalid debtor ID: {debtor_id}')
+
+    if owner_node_type == NodeType.CA:
+        msg_data['creditor_id'] = _change_subnet(
+            creditor_id,
+            from_=peer_data.creditors_subnet,
+            to_=owner_node_data.creditors_subnet,
+        )
+
+    msg_type = message.type
+    headers: HeadersType = {
+        'message-type': msg_type,
+        'debtor-id': debtor_id,
+        'creditor-id': creditor_id,
+    }
+    if 'coordinator_id' in msg_data:
+        headers['coordinator-id'] = msg_data['coordinator_id']
+        headers['coordinator-type'] = msg_data['coordinator_type']
+
+    msg_json = JSON_SCHEMAS[msg_type].dumps(msg_data)
     return RmqMessage(
         id=message.id,
-        body=bytes(message.body),
-        headers={},
-        type=message.type,
-        content_type=message.content_type,
-        routing_key='',
+        body=msg_json.encode('utf8'),
+        headers=headers,
+        type=msg_type,
+        content_type='application/json',
+        routing_key='',  # TODO: Set a routing key.
     )
 
 
@@ -91,3 +123,18 @@ def _parse_message_body(
         return schema.loads(body)
     except ValidationError as e:
         raise ParseError(f'invalid {msg_type} message') from e
+
+
+def _change_subnet(creditor_id, *, from_: Subnet, to_: Subnet) -> int:
+    """Translate `creditor_id` from one subnet to another.
+    """
+    mask = from_.subnet_mask
+    if mask != to_.subnet_mask:
+        raise ValueError('incompatible subnet masks')
+
+    subnet = creditor_id & mask
+    if subnet != from_.subnet:
+        raise ValueError(f'invalid creditor ID: {creditor_id}')
+
+    relative_id = subnet ^ creditor_id
+    return to_.subnet | relative_id
