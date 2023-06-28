@@ -4,7 +4,7 @@ from swpt_stomp.common import Message, ServerError
 from swpt_stomp.peer_data import NodeData, PeerData, NodeType, Subnet
 from swpt_stomp.rmq import RmqMessage, HeadersType
 from swpt_stomp.smp_schemas import (
-    JSON_SCHEMAS, CLIENT_MESSAGE_TYPES, SERVER_MESSAGE_TYPES, ValidationError,
+    JSON_SCHEMAS, IN_MESSAGE_TYPES, OUT_MESSAGE_TYPES, ValidationError,
 )
 
 
@@ -24,8 +24,8 @@ def transform_message(
     owner_node_type = owner_node_data.node_type
     msg_data = _parse_message_body(
         message,
-        allow_client_messages=(owner_node_type != NodeType.AA),
-        allow_server_messages=(owner_node_type == NodeType.AA),
+        allow_in_messages=(owner_node_type != NodeType.AA),
+        allow_out_messages=(owner_node_type == NodeType.AA),
     )
 
     creditor_id: int = msg_data['creditor_id']
@@ -63,8 +63,8 @@ async def preprocess_message(
         owner_node_type = owner_node_data.node_type
         msg_data = _parse_message_body(
             message,
-            allow_client_messages=(owner_node_type == NodeType.AA),
-            allow_server_messages=(owner_node_type != NodeType.AA),
+            allow_in_messages=(owner_node_type == NodeType.AA),
+            allow_out_messages=(owner_node_type != NodeType.AA),
         )
 
         creditor_id: int = msg_data['creditor_id']
@@ -118,17 +118,17 @@ async def preprocess_message(
 def _parse_message_body(
         m: Union[Message, RmqMessage],
         *,
-        allow_client_messages: bool = True,
-        allow_server_messages: bool = True,
+        allow_in_messages: bool = True,
+        allow_out_messages: bool = True,
 ) -> Any:
     if m.content_type != 'application/json':
         raise ProcessingError(f'Unsupported content type: {m.content_type}.')
 
     msg_type = m.type
     try:
-        if not allow_client_messages and msg_type in CLIENT_MESSAGE_TYPES:
+        if not allow_in_messages and msg_type in IN_MESSAGE_TYPES:
             raise KeyError
-        if not allow_server_messages and msg_type in SERVER_MESSAGE_TYPES:
+        if not allow_out_messages and msg_type in OUT_MESSAGE_TYPES:
             raise KeyError
         schema = JSON_SCHEMAS[msg_type]
     except KeyError:
