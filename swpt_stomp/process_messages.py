@@ -1,3 +1,4 @@
+import json
 from typing import Union, Any
 from swpt_stomp.common import Message, ServerError
 from swpt_stomp.peer_data import NodeData, PeerData, NodeType, Subnet
@@ -140,7 +141,7 @@ def _parse_message_body(
 
     try:
         return schema.loads(body)
-    except ValidationError as e:
+    except (json.JSONDecodeError, ValidationError) as e:
         raise ProcessingError(f'Invalid {msg_type} message.') from e
 
 
