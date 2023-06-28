@@ -15,11 +15,36 @@ def test_parse_subnet():
     assert sn.subnet == 0x1234567890abcdef
     assert sn.subnet_mask == 0xffffffffffffffff
 
+    sn = Subnet.parse('0000000000000000')
+    assert sn.subnet == 0
+    assert sn.subnet_mask == 0xffffffffffffffff
+
     with pytest.raises(ValueError):
         Subnet.parse('-02')  # negative
 
     with pytest.raises(ValueError):
         Subnet.parse('0a0000000000000013431545')  # too long
+
+
+def test_match_subnet():
+    sn = Subnet.parse('1234abcd')
+    assert sn.match(0x1234abcd00000000)
+    assert sn.match(0x1234abcd00000001)
+    assert sn.match(0x1234abcd80000000)
+    assert not sn.match(0x1234abcf00000000)
+    assert not sn.match(0x9234abcd00000000)
+    assert not sn.match(0xf1234abcd00000000)
+    assert not sn.match(0xffff1234abcd00000000)
+
+    universal_sn = Subnet.parse('')
+    assert universal_sn.match(0)
+    assert universal_sn.match(0x7fffffffffffffff)
+    assert universal_sn.match(-0x800000000000000)
+
+    zero_sn = Subnet.parse('0000000000000000')
+    assert zero_sn.match(0)
+    assert not zero_sn.match(1)
+    assert not zero_sn.match(-1)
 
 
 def test_parse_node_type():
@@ -196,21 +221,24 @@ async def test_get_node_data(datadir):
     data = await db.get_node_data()
     assert data.node_id == '5921983fe0e6eb987aeedca54ad3c708'
     assert data.node_type == NodeType.CA
-    assert data.subnet == Subnet.parse('000001')
+    assert data.creditors_subnet == Subnet.parse('000001')
+    assert data.debtors_subnet == Subnet.parse('')
     assert b'-----BEGIN CERTIFICATE-----\nMIIEqDCCAxCgAw' in data.root_cert
 
     db = get_database_instance(url=f'file://{datadir["DA"]}')
     data = await db.get_node_data()
     assert data.node_id == '060791aeca7637fa3357dfc0299fb4c5'
     assert data.node_type == NodeType.DA
-    assert data.subnet == Subnet.parse('1234abcd00')
+    assert data.creditors_subnet == Subnet.parse('0000000000000000')
+    assert data.debtors_subnet == Subnet.parse('1234abcd00')
     assert b'-----BEGIN CERTIFICATE-----\nMIIEozCCAwugAw' in data.root_cert
 
     db = get_database_instance(url=f'file://{datadir["AA"]}')
     data = await db.get_node_data()
     assert data.node_id == '1234abcd'
     assert data.node_type == NodeType.AA
-    assert data.subnet is None
+    assert data.creditors_subnet == Subnet.parse('')
+    assert data.debtors_subnet == Subnet.parse('1234abcd')
     assert b'-----BEGIN CERTIFICATE-----\nMIIEgzCCAuugAw' in data.root_cert
 
 
@@ -229,7 +257,8 @@ async def test_get_ca_peer_data(datadir):
                                          ('127.0.0.1', 1234)]
     assert data.stomp_config.host == '/'
     assert data.stomp_config.destination == '/exchange/smp'
-    assert data.subnet == Subnet.parse('000001')
+    assert data.creditors_subnet == Subnet.parse('000001')
+    assert data.debtors_subnet == Subnet.parse('1234abcd')
 
 
 @pytest.mark.asyncio
@@ -246,7 +275,8 @@ async def test_get_aa_peer_data(datadir):
     assert data.stomp_config.servers == [('127.0.0.1', 1235)]
     assert data.stomp_config.host == '/1234abcd'
     assert data.stomp_config.destination == '/exchange/smp'
-    assert data.subnet == Subnet.parse('000001')
+    assert data.creditors_subnet == Subnet.parse('000001')
+    assert data.debtors_subnet == Subnet.parse('1234abcd')
 
     data = await db.get_peer_data('060791aeca7637fa3357dfc0299fb4c5')
     assert data.node_id == '060791aeca7637fa3357dfc0299fb4c5'
@@ -256,7 +286,8 @@ async def test_get_aa_peer_data(datadir):
     assert data.stomp_config.servers == [('127.0.0.1', 1236)]
     assert data.stomp_config.host == '/'
     assert data.stomp_config.destination == '/exchange/smp'
-    assert data.subnet == Subnet.parse('1234abcd00')
+    assert data.creditors_subnet == Subnet.parse('0000000000000000')
+    assert data.debtors_subnet == Subnet.parse('1234abcd00')
 
 
 @pytest.mark.asyncio
@@ -274,7 +305,8 @@ async def test_get_da_peer_data(datadir):
                                          ('127.0.0.1', 1234)]
     assert data.stomp_config.host == '/'
     assert data.stomp_config.destination == '/exchange/smp'
-    assert data.subnet == Subnet.parse('1234abcd00')
+    assert data.creditors_subnet == Subnet.parse('0000000000000000')
+    assert data.debtors_subnet == Subnet.parse('1234abcd00')
 
 
 @pytest.mark.asyncio

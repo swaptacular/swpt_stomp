@@ -12,6 +12,8 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import NamedTuple, Optional
 
+_MIN_INT64 = -1 << 63
+_MAX_INT64 = (1 << 63) - 1
 _DN_PART_RE = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
 
 _PEM_CERTIFICATE_RE = re.compile(
@@ -57,6 +59,12 @@ class Subnet(NamedTuple):
 
         return Subnet(subnet, (-1 << (64 - n)) & 0xffffffffffffffff)
 
+    def match(self, n: int) -> bool:
+        """Return True if `n` is in the subnet.
+        """
+        return (_MIN_INT64 <= n <= _MAX_INT64
+                and n & self.subnet_mask == self.subnet)
+
 
 @dataclass
 class StompConfig:
@@ -86,12 +94,14 @@ class NodeData:
         'node_type',
         'node_id',
         'root_cert',
-        'subnet',
+        'creditors_subnet',
+        'debtors_subnet',
     )
     node_type: NodeType
     node_id: str
     root_cert: bytes
-    subnet: Optional[Subnet]
+    creditors_subnet: Subnet
+    debtors_subnet: Subnet
 
 
 @dataclass
@@ -104,14 +114,16 @@ class PeerData:
         'stomp_config',
         'root_cert',
         'sub_cert',
-        'subnet',
+        'creditors_subnet',
+        'debtors_subnet',
     )
     node_type: NodeType
     node_id: str
     stomp_config: StompConfig
     root_cert: bytes
     sub_cert: bytes
-    subnet: Subnet
+    creditors_subnet: Subnet
+    debtors_subnet: Subnet
 
 
 class DatabaseError(Exception):
@@ -235,6 +247,10 @@ class _PeerCacheRecord:
     time: float
 
 
+_ZERO_SUBNET = Subnet.parse(8 * '00')
+_UNIVERSAL_SUBNET = Subnet.parse('')
+
+
 class _LocalDirectory(NodePeersDatabase):
     def __init__(
             self,
@@ -308,18 +324,24 @@ class _LocalDirectory(NodePeersDatabase):
         node_type = _parse_node_type(node_type_str)
 
         if node_type == NodeType.AA:
-            subnet = None
+            creditors_subnet = _UNIVERSAL_SUBNET
+            debtors_subnet = Subnet.parse(node_id)
         elif node_type == NodeType.CA:
-            subnet = await self._read_subnet_file('creditors-subnet.txt')
+            creditors_subnet = await self._read_subnet_file(
+                'creditors-subnet.txt')
+            debtors_subnet = _UNIVERSAL_SUBNET
         else:
             assert node_type == NodeType.DA
-            subnet = await self._read_subnet_file('debtors-subnet.txt')
+            creditors_subnet = _ZERO_SUBNET
+            debtors_subnet = await self._read_subnet_file(
+                'debtors-subnet.txt')
 
         return NodeData(
             node_type=node_type,
             node_id=node_id,
             root_cert=root_cert,
-            subnet=subnet,
+            creditors_subnet=creditors_subnet,
+            debtors_subnet=debtors_subnet,
         )
 
     async def _get_peer_data(self, node_id: str) -> Optional[PeerData]:
@@ -361,12 +383,28 @@ class _LocalDirectory(NodePeersDatabase):
 
         if owner_node_type == NodeType.AA:
             subnet = await self._read_subnet_file(f'{dir}/subnet.txt')
+            if node_type == NodeType.CA:
+                creditors_subnet = subnet
+                debtors_subnet = owner_node_data.debtors_subnet
+            elif node_type == NodeType.DA:
+                creditors_subnet = _ZERO_SUBNET
+                debtors_subnet = subnet
+            else:  # pragma: nocover
+                raise ValueError('invalid peer node type')
         elif owner_node_type == NodeType.CA:
-            subnet = await self._read_subnet_file(f'{dir}/masq-subnet.txt')
+            if node_type == NodeType.AA:
+                creditors_subnet = await self._read_subnet_file(
+                    f'{dir}/masq-subnet.txt')
+                debtors_subnet = Subnet.parse(node_id)
+            else:  # pragma: nocover
+                raise ValueError('invalid peer node type')
         else:
             assert owner_node_type == NodeType.DA
-            assert owner_node_data.subnet is not None
-            subnet = owner_node_data.subnet
+            if node_type == NodeType.AA:
+                creditors_subnet = _ZERO_SUBNET
+                debtors_subnet = owner_node_data.debtors_subnet
+            else:  # pragma: nocover
+                raise ValueError('invalid peer node type')
 
         return PeerData(
             node_type=node_type,
@@ -374,7 +412,8 @@ class _LocalDirectory(NodePeersDatabase):
             stomp_config=stomp_config,
             root_cert=root_cert,
             sub_cert=sub_cert,
-            subnet=subnet,
+            creditors_subnet=creditors_subnet,
+            debtors_subnet=debtors_subnet,
         )
 
 
