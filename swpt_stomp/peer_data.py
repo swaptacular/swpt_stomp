@@ -390,21 +390,25 @@ class _LocalDirectory(NodePeersDatabase):
                 creditors_subnet = _ZERO_SUBNET
                 debtors_subnet = subnet
             else:  # pragma: nocover
-                raise ValueError('invalid peer node type')
+                raise ValueError('invalid peer type')
         elif owner_node_type == NodeType.CA:
             if node_type == NodeType.AA:
                 creditors_subnet = await self._read_subnet_file(
                     f'{dir}/masq-subnet.txt')
+                mask = owner_node_data.creditors_subnet.subnet_mask
+                if creditors_subnet.subnet_mask != mask:  # pragma: nocover
+                    raise ValueError(
+                        f'invalid sunbnet mask in {dir}/masq-subnet.txt')
                 debtors_subnet = Subnet.parse(node_id)
             else:  # pragma: nocover
-                raise ValueError('invalid peer node type')
+                raise ValueError('invalid peer type')
         else:
             assert owner_node_type == NodeType.DA
             if node_type == NodeType.AA:
                 creditors_subnet = _ZERO_SUBNET
                 debtors_subnet = owner_node_data.debtors_subnet
             else:  # pragma: nocover
-                raise ValueError('invalid peer node type')
+                raise ValueError('invalid peer type')
 
         return PeerData(
             node_type=node_type,
