@@ -19,6 +19,22 @@ CONTENT_TYPE_MAX_BYTES = 100
 DEBTOR_INFO_SHA256_REGEX = r'^([0-9A-F]{64}|[0-9a-f]{64})?$'
 ROOT_CREDITOR_ID = 0
 
+CLIENT_MESSAGE_TYPES: set[str] = set([
+    'ConfigureAccount',
+    'PrepareTransfer',
+    'FinalizeTransfer',
+])
+
+SERVER_MESSAGE_TYPES: set[str] = set([
+    'RejectedConfig',
+    'RejectedTransfer',
+    'PreparedTransfer',
+    'FinalizedTransfer',
+    'AccountUpdate',
+    'AccountPurge',
+    'AccountTransfer',
+])
+
 
 class _ValidateMixin:
     class Meta:

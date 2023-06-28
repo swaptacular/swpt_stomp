@@ -2,10 +2,12 @@ from typing import Union, Any
 from swpt_stomp.common import Message
 from swpt_stomp.peer_data import NodeData, PeerData, NodeType
 from swpt_stomp.rmq import RmqMessage
-from swpt_stomp.smp_schemas import JSON_SCHEMAS, ValidationError
+from swpt_stomp.smp_schemas import (
+    JSON_SCHEMAS, CLIENT_MESSAGE_TYPES, SERVER_MESSAGE_TYPES, ValidationError,
+)
 
 
-class ParseError(Exception):
+class ParseError(ValueError):
     """Indicates that message can not be parsed."""
 
 
@@ -14,7 +16,12 @@ def transform_message(
         peer_data: PeerData,
         message: RmqMessage,
 ) -> Message:
-    msg_data = _parse_message(message)
+    owner_node_type = owner_node_data.node_type
+    msg_data = _parse_message_body(
+        message,
+        allow_client_messages=(owner_node_type != NodeType.AA),
+        allow_server_messages=(owner_node_type == NodeType.AA),
+    )
 
     creditor_id: int = msg_data['creditor_id']
     if not owner_node_data.creditors_subnet.match(creditor_id):
@@ -24,7 +31,7 @@ def transform_message(
     if not peer_data.debtors_subnet.match(debtor_id):
         raise ValueError(f'invalid debtor ID: {debtor_id}')
 
-    if owner_node_data.node_type == NodeType.CA:
+    if owner_node_type == NodeType.CA:
         # Translate "creditor_id" from owner's subnet to peer's subnet.
         peer_subnet = peer_data.creditors_subnet
         mask = peer_subnet.subnet_mask
@@ -56,14 +63,24 @@ async def preprocess_message(
     )
 
 
-def _parse_message(m: Union[Message, RmqMessage]) -> Any:
+def _parse_message_body(
+        m: Union[Message, RmqMessage],
+        *,
+        allow_client_messages: bool = True,
+        allow_server_messages: bool = True,
+) -> Any:
     if m.content_type != 'application/json':
         raise ParseError(f'unsupported content type: {m.content_type}')
 
+    msg_type = m.type
     try:
-        schema = JSON_SCHEMAS[m.type]
+        if not allow_client_messages and msg_type in CLIENT_MESSAGE_TYPES:
+            raise KeyError
+        if not allow_server_messages and msg_type in SERVER_MESSAGE_TYPES:
+            raise KeyError
+        schema = JSON_SCHEMAS[msg_type]
     except KeyError:
-        raise ParseError(f'invalid message type: {m.type}')
+        raise ParseError(f'invalid message type: {msg_type}')
 
     try:
         body = m.body.decode('utf8')
@@ -73,4 +90,4 @@ def _parse_message(m: Union[Message, RmqMessage]) -> Any:
     try:
         return schema.loads(body)
     except ValidationError as e:
-        raise ParseError(f'invalid {m.type} message') from e
+        raise ParseError(f'invalid {msg_type} message') from e
