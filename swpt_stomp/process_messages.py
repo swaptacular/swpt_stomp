@@ -92,8 +92,12 @@ async def preprocess_message(
         }
         if 'coordinator_id' in msg_data:
             headers['coordinator-id'] = msg_data['coordinator_id']
-            headers['coordinator-type'] = msg_data['coordinator_type']
-            # TODO: Verify "coordinator-type".
+            headers['coordinator-type'] = c_type = msg_data['coordinator_type']
+            peer_type = peer_data.node_type
+            if peer_type == NodeType.CA and c_type != 'direct':
+                raise ProcessingError(f'Invalid coordinator type: {c_type}.')
+            if peer_type == NodeType.DA and c_type != 'issuing':
+                raise ProcessingError(f'Invalid coordinator type: {c_type}.')
 
         msg_json = JSON_SCHEMAS[msg_type].dumps(msg_data)
         return RmqMessage(
