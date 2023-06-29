@@ -48,6 +48,7 @@ from swpt_stomp.common import (
 from swpt_stomp.rmq import publish_to_exchange, open_robust_channel, RmqMessage
 from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
 from swpt_stomp.aio_protocols import StompServer
+from swpt_stomp.process_messages import preprocess_message
 
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '1234'))
 SERVER_BACKLOG = int(os.environ.get('SERVER_BACKLOG', '100'))
@@ -73,9 +74,9 @@ async def NO_PPM(n: NodeData, p: PeerData, m: Message) -> RmqMessage:
 
 async def serve(
         *,
-        # TODO: change the default to the real message preprocessor.
         preprocess_message: Callable[
-            [NodeData, PeerData, Message], Awaitable[RmqMessage]] = NO_PPM,
+            [NodeData, PeerData, Message], Awaitable[RmqMessage]
+        ] = preprocess_message,
         server_cert: str = SERVER_CERT,
         server_key: str = SERVER_KEY,
         server_port: int = SERVER_PORT,

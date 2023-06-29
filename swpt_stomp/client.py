@@ -49,6 +49,7 @@ from swpt_stomp.common import (
 from swpt_stomp.rmq import consume_from_queue, RmqMessage
 from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
 from swpt_stomp.aio_protocols import StompClient
+from swpt_stomp.process_messages import transform_message
 
 PROTOCOL_BROKER_QUEUE = os.environ.get('PROTOCOL_BROKER_QUEUE', 'default')
 PEER_NODE_ID = os.environ.get('PEER_NODE_ID', '00000000')
@@ -69,9 +70,8 @@ def NO_TM(n: NodeData, p: PeerData, m: RmqMessage) -> Message:
 
 async def connect(
         *,
-        # TODO: change the default to the real message body transformer.
         transform_message: Callable[
-            [NodeData, PeerData, RmqMessage], Message] = NO_TM,
+            [NodeData, PeerData, RmqMessage], Message] = transform_message,
         peer_node_id: str = PEER_NODE_ID,
         server_cert: str = SERVER_CERT,
         server_key: str = SERVER_KEY,

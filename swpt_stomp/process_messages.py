@@ -135,13 +135,8 @@ def _parse_message_body(
         raise ProcessingError(f'Invalid message type: {msg_type}.')
 
     try:
-        body = m.body.decode('utf8')
-    except UnicodeDecodeError:
-        raise ProcessingError('UTF-8 decode error.')
-
-    try:
-        return schema.loads(body)
-    except (json.JSONDecodeError, ValidationError) as e:
+        return schema.loads(m.body.decode('utf8'))
+    except (UnicodeDecodeError, json.JSONDecodeError, ValidationError) as e:
         raise ProcessingError(f'Invalid {msg_type} message.') from e
 
 
