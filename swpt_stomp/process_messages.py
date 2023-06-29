@@ -1,4 +1,5 @@
 import json
+from hashlib import md5
 from typing import Union, Any
 from swpt_stomp.common import Message, ServerError
 from swpt_stomp.peer_data import NodeData, PeerData, NodeType, Subnet
@@ -98,6 +99,14 @@ async def preprocess_message(
                     or (peer_type == NodeType.DA and c_type != 'issuing')):
                 raise ProcessingError(f'Invalid coordinator type: {c_type}.')
 
+        if owner_node_type == NodeType.AA:
+            routing_key = _calc_bin_routing_key(debtor_id, creditor_id)
+        elif owner_node_type == NodeType.CA:
+            routing_key = _calc_bin_routing_key(creditor_id)
+        else:
+            assert owner_node_type == NodeType.DA
+            routing_key = _calc_bin_routing_key(debtor_id)
+
         msg_json = JSON_SCHEMAS[msg_type].dumps(msg_data)
         return RmqMessage(
             id=message.id,
@@ -105,7 +114,7 @@ async def preprocess_message(
             headers=headers,
             type=msg_type,
             content_type='application/json',
-            routing_key='',  # TODO: Set a routing key.
+            routing_key=routing_key,
         )
 
     except ProcessingError as e:
@@ -156,3 +165,26 @@ def _change_subnet(creditor_id, *, from_: Subnet, to_: Subnet) -> int:
 
 def _as_hex(n: int) -> str:
     return '0x' + n.to_bytes(8, byteorder='big', signed=True).hex()
+
+
+def _calc_bin_routing_key(first: int, *rest: int) -> str:
+    """Calculate a binary RabbitMQ routing key from one or more i64 numbers.
+
+    The binary routing key is calculated by taking the highest 24
+    bits, separated with dots, of the MD5 digest of the passed
+    numbers. For example:
+
+      >>> calc_bin_routing_key(123)
+      '1.1.1.1.1.1.0.0.0.0.0.1.0.0.0.0.0.1.1.0.0.0.1.1'
+      >>> calc_bin_routing_key(-123)
+      '1.1.0.0.0.0.1.1.1.1.1.1.1.1.1.0.1.0.1.0.1.1.1.1'
+      >>> calc_bin_routing_key(123, 456)
+      '0.0.0.0.1.0.0.0.0.1.0.0.0.1.0.0.0.0.1.1.0.1.0.0'
+    """
+    m = md5()
+    m.update(first.to_bytes(8, byteorder='big', signed=True))
+    for n in rest:
+        m.update(n.to_bytes(8, byteorder='big', signed=True))
+    s = ''.join([format(byte, '08b') for byte in m.digest()[:3]])
+    assert len(s) == 24
+    return '.'.join(s)
