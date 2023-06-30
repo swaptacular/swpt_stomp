@@ -5,6 +5,7 @@ from swpt_stomp.rmq import RmqMessage
 from swpt_stomp.peer_data import Subnet, get_database_instance
 from swpt_stomp.process_messages import (
     ProcessingError, transform_message, preprocess_message,
+    _calc_bin_routing_key,
 )
 
 
@@ -43,7 +44,6 @@ def create_prepare_transfer_msg(
 
 
 def test_calc_bin_routing_key():
-    from swpt_stomp.process_messages import _calc_bin_routing_key
     assert _calc_bin_routing_key(123) == \
         '1.1.1.1.1.1.0.0.0.0.0.1.0.0.0.0.0.1.1.0.0.0.1.1'
     assert _calc_bin_routing_key(-123) == \
@@ -348,6 +348,8 @@ async def test_preprocess_message_aa(datadir):
         'coordinator-id': 0x0000010000000abc,
         'coordinator-type': 'direct',
     }
+    assert m.routing_key == _calc_bin_routing_key(
+        0x1234abcd00000001, 0x0000010000000abc)
     assert json.loads(m.body.decode('utf8')) == json.loads(s)
 
     s = create_prepare_transfer_msg(
@@ -384,6 +386,8 @@ async def test_preprocess_message_aa(datadir):
         'coordinator-id': 0x1234abcd00000001,
         'coordinator-type': 'issuing',
     }
+    assert m.routing_key == _calc_bin_routing_key(
+        0x1234abcd00000001, 0x0000000000000000)
     assert json.loads(m.body.decode('utf8')) == json.loads(s)
 
     s = create_prepare_transfer_msg(
@@ -431,6 +435,7 @@ async def test_preprocess_message_ca(datadir):
         'debtor-id': 0x1234abcd00000001,
         'creditor-id': 0x0000080000000abc,
     }
+    assert m.routing_key == _calc_bin_routing_key(0x0000080000000abc)
     assert json.loads(m.body.decode('utf8')) == json.loads(
         create_account_purge_msg(0x1234abcd00000001, 0x0000080000000abc))
 
@@ -471,6 +476,7 @@ async def test_preprocess_message_da(datadir):
         'debtor-id': 0x1234abcd00000001,
         'creditor-id': 0x0000000000000000,
     }
+    assert m.routing_key == _calc_bin_routing_key(0x1234abcd00000001)
     assert json.loads(m.body.decode('utf8')) == json.loads(s)
 
     s = create_account_purge_msg(0x1234abcd01000001, 0x0000000000000000)
