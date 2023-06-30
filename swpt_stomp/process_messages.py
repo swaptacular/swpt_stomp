@@ -79,7 +79,7 @@ async def preprocess_message(
                 f'Invalid debtor ID: {_as_hex(debtor_id)}.')
 
         if owner_node_type == NodeType.CA:
-            msg_data['creditor_id'] = _change_subnet(
+            msg_data['creditor_id'] = creditor_id = _change_subnet(
                 creditor_id,
                 from_=peer_data.creditors_subnet,
                 to_=owner_node_data.creditors_subnet,
