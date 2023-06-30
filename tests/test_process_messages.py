@@ -403,3 +403,82 @@ async def test_preprocess_message_aa(datadir):
     with pytest.raises(ServerError):
         # invalid coordinator type
         await preprocess(s)
+
+
+@pytest.mark.asyncio
+async def test_preprocess_message_ca(datadir):
+    db = get_database_instance(url=f'file://{datadir["CA"]}')
+    owner_node_data = await db.get_node_data()
+
+    async def preprocess(s: str) -> RmqMessage:
+        message = Message(
+            id='1',
+            type='AccountPurge',
+            body=bytearray(s.encode('utf8')),
+            content_type='application/json',
+        )
+        return await preprocess_message(owner_node_data, peer_data, message)
+
+    peer_data = await db.get_peer_data('1234abcd')
+    s = create_account_purge_msg(0x1234abcd00000001, 0x0000010000000abc)
+    m = await preprocess(s)
+    assert isinstance(m, RmqMessage)
+    assert m.id == '1'
+    assert m.type == 'AccountPurge'
+    assert m.content_type == 'application/json'
+    assert m.headers == {
+        'message-type': 'AccountPurge',
+        'debtor-id': 0x1234abcd00000001,
+        'creditor-id': 0x0000080000000abc,
+    }
+    assert json.loads(m.body.decode('utf8')) == json.loads(
+        create_account_purge_msg(0x1234abcd00000001, 0x0000080000000abc))
+
+    s = create_account_purge_msg(0x1234abce00000001, 0x0000010000000abc)
+    with pytest.raises(ServerError):
+        # invalid debtor ID
+        await preprocess(s)
+
+    s = create_account_purge_msg(0x1234abcd00000001, 0x0000020000000abc)
+    with pytest.raises(ServerError):
+        # invalid creditor ID
+        await preprocess(s)
+
+
+@pytest.mark.asyncio
+async def test_preprocess_message_da(datadir):
+    db = get_database_instance(url=f'file://{datadir["DA"]}')
+    owner_node_data = await db.get_node_data()
+
+    async def preprocess(s: str) -> RmqMessage:
+        message = Message(
+            id='1',
+            type='AccountPurge',
+            body=bytearray(s.encode('utf8')),
+            content_type='application/json',
+        )
+        return await preprocess_message(owner_node_data, peer_data, message)
+
+    peer_data = await db.get_peer_data('1234abcd')
+    s = create_account_purge_msg(0x1234abcd00000001, 0x0000000000000000)
+    m = await preprocess(s)
+    assert isinstance(m, RmqMessage)
+    assert m.id == '1'
+    assert m.type == 'AccountPurge'
+    assert m.content_type == 'application/json'
+    assert m.headers == {
+        'message-type': 'AccountPurge',
+        'debtor-id': 0x1234abcd00000001,
+        'creditor-id': 0x0000000000000000,
+    }
+    assert json.loads(m.body.decode('utf8')) == json.loads(s)
+
+    s = create_account_purge_msg(0x1234abcd01000001, 0x0000000000000000)
+    with pytest.raises(ServerError):
+        # invalid debtor ID
+        await preprocess(s)
+
+    s = create_account_purge_msg(0x1234abcd00000001, 0x0000000000000001)
+    with pytest.raises(ServerError):
+        # invalid creditor ID
+        await preprocess(s)
