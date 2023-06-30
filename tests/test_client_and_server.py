@@ -2,8 +2,36 @@ import pytest
 import asyncio
 import os.path
 import aio_pika
+import json
+from typing import Optional
 from contextlib import suppress
 from swpt_stomp import server, client
+
+
+def create_prepare_transfer_msg(
+        debtor_id: int,
+        creditor_id: int,
+        coordinator_type: str = 'direct',
+        coordinator_id: Optional[int] = None,
+) -> str:
+    if coordinator_id is None:
+        coordinator_id = creditor_id
+
+    props = f"""
+      "type": "PrepareTransfer",
+      "debtor_id": {debtor_id},
+      "creditor_id": {creditor_id},
+      "min_locked_amount": 1000,
+      "max_locked_amount": 2000,
+      "recipient": "RECIPIENT",
+      "min_interest_rate": -10.0,
+      "max_commit_delay": 100000,
+      "coordinator_type": "{coordinator_type}",
+      "coordinator_id": {coordinator_id},
+      "coordinator_request_id": 1111,
+      "ts": "2023-01-01T12:00:00+00:00"
+    """
+    return '{' + props + '}'
 
 
 def test_server_allowed_peer_connection():
@@ -27,9 +55,9 @@ async def test_connect_to_server(datadir, rmq_url):
     connection = await aio_pika.connect(rmq_url)
     channel = await connection.channel()
     client_queue = await channel.declare_queue('test_client')
-    server_exchange = await channel.declare_exchange('smp')
+    server_exchange = await channel.declare_exchange('smp', 'topic')
     server_queue = await channel.declare_queue('test_server')
-    await server_queue.bind(server_exchange, '')
+    await server_queue.bind(server_exchange, '#')
 
     # Empty client and server queues.
     while await client_queue.get(no_ack=True, fail=False):
@@ -39,10 +67,11 @@ async def test_connect_to_server(datadir, rmq_url):
 
     # Add 100 messages to the client queue.
     for i in range(1, 101):
+        s = create_prepare_transfer_msg(0x1234abcd00000001, 0x0000080000000001)
         message = aio_pika.Message(
-            str(i).encode('ascii'),
-            type='TestMessage',
-            content_type='text/plain',
+            s.encode('utf8'),
+            type='PrepareTransfer',
+            content_type='application/json',
         )
         await channel.default_exchange.publish(message, 'test_client')
 
@@ -50,7 +79,6 @@ async def test_connect_to_server(datadir, rmq_url):
     server_started = asyncio.Event()
     server_task = loop.create_task(server.serve(
         protocol_broker_url=rmq_url,
-        preprocess_message=server.NO_PPM,
         server_cert=os.path.abspath(f'{datadir["AA"]}/server.crt'),
         server_key=os.path.abspath(f'{datadir["AA"]}/server.key'),
         nodedata_url=f'file://{datadir["AA"]}',
@@ -61,7 +89,6 @@ async def test_connect_to_server(datadir, rmq_url):
     # Connect to the server.
     client_task = loop.create_task(client.connect(
         protocol_broker_url=rmq_url,
-        transform_message=client.NO_TM,
         peer_node_id='1234abcd',
         server_cert=os.path.abspath(f'{datadir["CA"]}/server.crt'),
         server_key=os.path.abspath(f'{datadir["CA"]}/server.key'),
@@ -75,9 +102,18 @@ async def test_connect_to_server(datadir, rmq_url):
         async with server_queue.iterator() as q:
             async for message in q:
                 i += 1
-                assert message.body == str(i).encode('ascii')
-                assert message.type == 'TestMessage'
-                assert message.content_type == 'text/plain'
+                assert message.type == 'PrepareTransfer'
+                assert message.content_type == 'application/json'
+                assert json.loads(message.body.decode('utf8')) == \
+                    json.loads(create_prepare_transfer_msg(
+                        0x1234abcd00000001, 0x0000010000000001))
+                assert message.headers == {
+                    'message-type': 'PrepareTransfer',
+                    'debtor-id': 0x1234abcd00000001,
+                    'creditor-id': 0x0000010000000001,
+                    'coordinator-type': 'direct',
+                    'coordinator-id': 0x0000010000000001,
+                }
                 await message.ack()
                 if i == 100:
                     break

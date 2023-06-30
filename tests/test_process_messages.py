@@ -1,5 +1,6 @@
 import pytest
 import json
+from typing import Optional
 from swpt_stomp.common import Message, ServerError
 from swpt_stomp.rmq import RmqMessage
 from swpt_stomp.peer_data import Subnet, get_database_instance
@@ -23,9 +24,12 @@ def create_account_purge_msg(debtor_id: int, creditor_id: int) -> str:
 def create_prepare_transfer_msg(
         debtor_id: int,
         creditor_id: int,
-        coordinator_type: str = 'test',
-        coordinator_id: int = 789,
+        coordinator_type: str = 'direct',
+        coordinator_id: Optional[int] = None,
 ) -> str:
+    if coordinator_id is None:
+        coordinator_id = creditor_id
+
     props = f"""
       "type": "PrepareTransfer",
       "debtor_id": {debtor_id},
@@ -38,6 +42,29 @@ def create_prepare_transfer_msg(
       "coordinator_type": "{coordinator_type}",
       "coordinator_id": {coordinator_id},
       "coordinator_request_id": 1111,
+      "ts": "2023-01-01T12:00:00+00:00"
+    """
+    return '{' + props + '}'
+
+
+def create_rejected_transfer_msg(
+        debtor_id: int,
+        creditor_id: int,
+        coordinator_type: str = 'direct',
+        coordinator_id: Optional[int] = None,
+) -> str:
+    if coordinator_id is None:
+        coordinator_id = creditor_id
+
+    props = f"""
+      "type": "RejectedTransfer",
+      "debtor_id": {debtor_id},
+      "creditor_id": {creditor_id},
+      "coordinator_type": "{coordinator_type}",
+      "coordinator_id": {coordinator_id},
+      "coordinator_request_id": 1111,
+      "status_code": "TEST_ERROR",
+      "total_locked_amount": 0,
       "ts": "2023-01-01T12:00:00+00:00"
     """
     return '{' + props + '}'
@@ -91,7 +118,7 @@ def test_parse_message_body():
     acc_purge_body = bytearray(
         create_account_purge_msg(123, 456).encode('utf8'))
     prep_transfer_body = bytearray(
-        create_prepare_transfer_msg(123, 456).encode('utf8'))
+        create_prepare_transfer_msg(123, 456, 'test', 789).encode('utf8'))
 
     with pytest.raises(ProcessingError):
         _parse_message_body(Message(
@@ -417,34 +444,36 @@ async def test_preprocess_message_ca(datadir):
     async def preprocess(s: str) -> RmqMessage:
         message = Message(
             id='1',
-            type='AccountPurge',
+            type='RejectedTransfer',
             body=bytearray(s.encode('utf8')),
             content_type='application/json',
         )
         return await preprocess_message(owner_node_data, peer_data, message)
 
     peer_data = await db.get_peer_data('1234abcd')
-    s = create_account_purge_msg(0x1234abcd00000001, 0x0000010000000abc)
+    s = create_rejected_transfer_msg(0x1234abcd00000001, 0x0000010000000abc)
     m = await preprocess(s)
     assert isinstance(m, RmqMessage)
     assert m.id == '1'
-    assert m.type == 'AccountPurge'
+    assert m.type == 'RejectedTransfer'
     assert m.content_type == 'application/json'
     assert m.headers == {
-        'message-type': 'AccountPurge',
+        'message-type': 'RejectedTransfer',
         'debtor-id': 0x1234abcd00000001,
         'creditor-id': 0x0000080000000abc,
+        'coordinator-id': 0x0000080000000abc,
+        'coordinator-type': 'direct',
     }
     assert m.routing_key == _calc_bin_routing_key(0x0000080000000abc)
     assert json.loads(m.body.decode('utf8')) == json.loads(
-        create_account_purge_msg(0x1234abcd00000001, 0x0000080000000abc))
+        create_rejected_transfer_msg(0x1234abcd00000001, 0x0000080000000abc))
 
-    s = create_account_purge_msg(0x1234abce00000001, 0x0000010000000abc)
+    s = create_rejected_transfer_msg(0x1234abce00000001, 0x0000010000000abc)
     with pytest.raises(ServerError):
         # invalid debtor ID
         await preprocess(s)
 
-    s = create_account_purge_msg(0x1234abcd00000001, 0x0000020000000abc)
+    s = create_rejected_transfer_msg(0x1234abcd00000001, 0x0000020000000abc)
     with pytest.raises(ServerError):
         # invalid creditor ID
         await preprocess(s)

@@ -57,17 +57,6 @@ CLIENT_QUEUE_SIZE = int(os.environ.get('CLIENT_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
-def NO_TM(n: NodeData, p: PeerData, m: RmqMessage) -> Message:
-    """This is mainly useful for testing purposes.
-    """
-    return Message(
-        id=m.id,
-        type=m.type,
-        body=bytearray(m.body),
-        content_type=m.content_type,
-    )
-
-
 async def connect(
         *,
         transform_message: Callable[

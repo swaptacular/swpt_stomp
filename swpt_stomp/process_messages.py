@@ -35,11 +35,22 @@ def transform_message(
         if not owner_node_data.creditors_subnet.match(creditor_id):
             raise ProcessingError(
                 f'Invalid creditor ID: {_as_hex(creditor_id)}.')
+
+        # NOTE: For creditors agent nodes, before we send a message to an
+        # accounting authority, we must update "creditor_id" and
+        # "coordinator_id" fields, so as they are in the range (subnet)
+        # reserved for the creditors agent.
+        orig_id = creditor_id
         msg_data['creditor_id'] = creditor_id = _change_subnet(
             creditor_id,
             from_=owner_node_data.creditors_subnet,
             to_=peer_data.creditors_subnet,
         )
+        if ('coordinator_id' in msg_data
+                and msg_data['coordinator_type'] == 'direct'):
+            if msg_data['coordinator_id'] != orig_id:  # pragma: nocover
+                raise ProcessingError('Invalid coordinator ID.')
+            msg_data['coordinator_id'] = creditor_id
 
     if not peer_data.creditors_subnet.match(creditor_id):
         raise ProcessingError(
@@ -82,11 +93,21 @@ async def preprocess_message(
                 f'Invalid debtor ID: {_as_hex(debtor_id)}.')
 
         if owner_node_type == NodeType.CA:
+            # NOTE: For creditors agent nodes, before we accept a message
+            # from an accounting authority, we must update "creditor_id" and
+            # "coordinator_id" fields, so as they are in the range (subnet)
+            # used by the creditors agent.
+            orig_id = creditor_id
             msg_data['creditor_id'] = creditor_id = _change_subnet(
                 creditor_id,
                 from_=peer_data.creditors_subnet,
                 to_=owner_node_data.creditors_subnet,
             )
+            if ('coordinator_id' in msg_data
+                    and msg_data['coordinator_type'] == 'direct'):
+                if msg_data['coordinator_id'] != orig_id:  # pragma: nocover
+                    raise ProcessingError('Invalid coordinator ID.')
+                msg_data['coordinator_id'] = creditor_id
 
         msg_type = message.type
         headers: HeadersType = {
