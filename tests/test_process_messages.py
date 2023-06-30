@@ -72,7 +72,6 @@ def test_change_subnet():
             from_=Subnet.parse('01'),
             to_=Subnet.parse('002'),
         )
-
     with pytest.raises(Exception):
         _change_subnet(
             0x0100000000000abc,
@@ -96,7 +95,6 @@ def test_parse_message_body():
             body=acc_purge_body,
             content_type='application/unknown',
         ))
-
     with pytest.raises(ProcessingError):
         _parse_message_body(Message(
             id='1',
@@ -104,7 +102,6 @@ def test_parse_message_body():
             body=acc_purge_body,
             content_type='application/json',
         ))
-
     with pytest.raises(ProcessingError):
         _parse_message_body(Message(
             id='1',
@@ -112,7 +109,6 @@ def test_parse_message_body():
             body=bytearray(b'\xa0\x20'),
             content_type='application/json',
         ))
-
     with pytest.raises(ProcessingError):
         _parse_message_body(Message(
             id='1',
@@ -120,7 +116,6 @@ def test_parse_message_body():
             body=bytearray(b'INVALID JSON'),
             content_type='application/json',
         ))
-
     with pytest.raises(ProcessingError):
         _parse_message_body(Message(
             id='1',
@@ -128,7 +123,6 @@ def test_parse_message_body():
             body=bytearray(b'{}'),
             content_type='application/json',
         ))
-
     with pytest.raises(ProcessingError):
         _parse_message_body(Message(
             id='1',
@@ -155,8 +149,7 @@ def test_parse_message_body():
                 body=acc_purge_body,
                 content_type='application/json',
             ),
-            allow_out_messages=False,
-        )
+            allow_out_messages=False)
 
     with pytest.raises(ProcessingError):
         _parse_message_body(
@@ -166,9 +159,7 @@ def test_parse_message_body():
                 body=acc_purge_body,
                 content_type='application/json',
             ),
-            allow_out_messages=False,
-        )
-
+            allow_out_messages=False)
     with pytest.raises(ProcessingError):
         _parse_message_body(
             Message(
@@ -177,8 +168,7 @@ def test_parse_message_body():
                 body=prep_transfer_body,
                 content_type='application/json',
             ),
-            allow_in_messages=False,
-        )
+            allow_in_messages=False)
 
     obj = _parse_message_body(Message(
         id='1',
