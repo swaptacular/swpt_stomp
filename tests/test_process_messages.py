@@ -1,6 +1,6 @@
 import pytest
 import json
-from swpt_stomp.common import Message
+from swpt_stomp.common import Message, ServerError
 from swpt_stomp.rmq import RmqMessage
 from swpt_stomp.peer_data import Subnet, get_database_instance
 from swpt_stomp.process_messages import (
@@ -19,7 +19,12 @@ def create_account_purge_msg(debtor_id: int, creditor_id: int) -> str:
     return '{' + props + '}'
 
 
-def create_prepare_transfer_msg(debtor_id: int, creditor_id: int) -> str:
+def create_prepare_transfer_msg(
+        debtor_id: int,
+        creditor_id: int,
+        coordinator_type: str = 'test',
+        coordinator_id: int = 789,
+) -> str:
     props = f"""
       "type": "PrepareTransfer",
       "debtor_id": {debtor_id},
@@ -29,8 +34,8 @@ def create_prepare_transfer_msg(debtor_id: int, creditor_id: int) -> str:
       "recipient": "RECIPIENT",
       "min_interest_rate": -10.0,
       "max_commit_delay": 100000,
-      "coordinator_type": "test",
-      "coordinator_id": 789,
+      "coordinator_type": "{coordinator_type}",
+      "coordinator_id": {coordinator_id},
       "coordinator_request_id": 1111,
       "ts": "2023-01-01T12:00:00+00:00"
     """
@@ -311,3 +316,90 @@ async def test_transform_message_da(datadir):
     s = create_prepare_transfer_msg(0x1234abcd00000001, 0x00000000000000001)
     with pytest.raises(ProcessingError):
         transform(s)
+
+
+@pytest.mark.asyncio
+async def test_preprocess_message_aa(datadir):
+    db = get_database_instance(url=f'file://{datadir["AA"]}')
+    owner_node_data = await db.get_node_data()
+
+    async def preprocess(s: str) -> RmqMessage:
+        message = Message(
+            id='1',
+            type='PrepareTransfer',
+            body=bytearray(s.encode('utf8')),
+            content_type='application/json',
+        )
+        return await preprocess_message(owner_node_data, peer_data, message)
+
+    # Test receiving PrepareTransfer messages from CA:
+    peer_data = await db.get_peer_data('5921983fe0e6eb987aeedca54ad3c708')
+    s = create_prepare_transfer_msg(
+        0x1234abcd00000001, 0x0000010000000abc, 'direct', 0x0000010000000abc)
+    m = await preprocess(s)
+    assert isinstance(m, RmqMessage)
+    assert m.id == '1'
+    assert m.type == 'PrepareTransfer'
+    assert m.content_type == 'application/json'
+    assert m.headers == {
+        'message-type': 'PrepareTransfer',
+        'debtor-id': 0x1234abcd00000001,
+        'creditor-id': 0x0000010000000abc,
+        'coordinator-id': 0x0000010000000abc,
+        'coordinator-type': 'direct',
+    }
+    assert json.loads(m.body.decode('utf8')) == json.loads(s)
+
+    s = create_prepare_transfer_msg(
+        0x1234abce00000001, 0x0000010000000abc, 'direct', 0x0000010000000abc)
+    with pytest.raises(ServerError):
+        # invalid debtor ID
+        await preprocess(s)
+
+    s = create_prepare_transfer_msg(
+        0x1234abcd00000001, 0x0000020000000abc, 'direct', 0x0000020000000abc)
+    with pytest.raises(ServerError):
+        # invalid creditor ID
+        await preprocess(s)
+
+    s = create_prepare_transfer_msg(
+        0x1234abcd00000001, 0x0000010000000abc, 'invalid', 0x0000020000000abc)
+    with pytest.raises(ServerError):
+        # invalid coordinator type
+        await preprocess(s)
+
+    # Test receiving PrepareTransfer messages from DA:
+    peer_data = await db.get_peer_data('060791aeca7637fa3357dfc0299fb4c5')
+    s = create_prepare_transfer_msg(
+        0x1234abcd00000001, 0x0000000000000000, 'issuing', 0x1234abcd00000001)
+    m = await preprocess(s)
+    assert isinstance(m, RmqMessage)
+    assert m.id == '1'
+    assert m.type == 'PrepareTransfer'
+    assert m.content_type == 'application/json'
+    assert m.headers == {
+        'message-type': 'PrepareTransfer',
+        'debtor-id': 0x1234abcd00000001,
+        'creditor-id': 0x0000000000000000,
+        'coordinator-id': 0x1234abcd00000001,
+        'coordinator-type': 'issuing',
+    }
+    assert json.loads(m.body.decode('utf8')) == json.loads(s)
+
+    s = create_prepare_transfer_msg(
+        0x1234abce01000001, 0x0000000000000000, 'issuing', 0x1234abce01000001)
+    with pytest.raises(ServerError):
+        # invalid debtor ID
+        await preprocess(s)
+
+    s = create_prepare_transfer_msg(
+        0x1234abcd00000001, 0x0000000000000001, 'issuing', 0x1234abcd00000001)
+    with pytest.raises(ServerError):
+        # invalid creditor ID
+        await preprocess(s)
+
+    s = create_prepare_transfer_msg(
+        0x1234abcd00000001, 0x0000000000000000, 'invalid', 0x1234abcd00000001)
+    with pytest.raises(ServerError):
+        # invalid coordinator type
+        await preprocess(s)
