@@ -257,7 +257,44 @@ async def test_transform_message_ca(datadir):
         )
         return transform_message(owner_node_data, peer_data, message)
 
-    s = create_prepare_transfer_msg(0x1234abcd00000001, 0x0000010000000abc)
+    s = create_prepare_transfer_msg(0x1234abcd00000001, 0x0000080000000abc)
+    m = transform(s)
+    assert isinstance(m, Message)
+    assert m.id == '1'
+    assert m.type == 'PrepareTransfer'
+    assert m.content_type == 'application/json'
+    assert json.loads(m.body.decode('utf8')) == json.loads(
+        create_prepare_transfer_msg(0x1234abcd00000001, 0x0000010000000abc))
+
+    # Invalid debtor ID:
+    s = create_prepare_transfer_msg(0x1234abce00000001, 0x0000080000000abc)
+    with pytest.raises(ProcessingError):
+        transform(s)
+
+    # Invalid creditor ID:
+    s = create_prepare_transfer_msg(0x1234abcd00000001, 0x0000020000000abc)
+    with pytest.raises(ProcessingError):
+        transform(s)
+
+
+@pytest.mark.asyncio
+async def test_transform_message_da(datadir):
+    db = get_database_instance(url=f'file://{datadir["DA"]}')
+    owner_node_data = await db.get_node_data()
+    peer_data = await db.get_peer_data('1234abcd')
+
+    def transform(s: str) -> Message:
+        message = RmqMessage(
+            id='1',
+            type='PrepareTransfer',
+            body=s.encode('utf8'),
+            content_type='application/json',
+            headers={},
+            routing_key=None,
+        )
+        return transform_message(owner_node_data, peer_data, message)
+
+    s = create_prepare_transfer_msg(0x1234abcd00000001, 0x0000000000000000)
     m = transform(s)
     assert isinstance(m, Message)
     assert m.id == '1'
@@ -265,12 +302,12 @@ async def test_transform_message_ca(datadir):
     assert m.content_type == 'application/json'
     assert json.loads(m.body.decode('utf8')) == json.loads(s)
 
-    # Invalid creditor ID:
-    s = create_prepare_transfer_msg(0x1234abcd00000001, 0x0000020000000abc)
+    # Invalid debtor ID:
+    s = create_prepare_transfer_msg(0x1234abcd01000001, 0x0000000000000000)
     with pytest.raises(ProcessingError):
         transform(s)
 
-    # Invalid debtor ID:
-    s = create_prepare_transfer_msg(0x1234abce00000001, 0x0000010000000abc)
+    # Invalid creditor ID:
+    s = create_prepare_transfer_msg(0x1234abcd00000001, 0x00000000000000001)
     with pytest.raises(ProcessingError):
         transform(s)

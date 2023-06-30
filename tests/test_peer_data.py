@@ -221,7 +221,7 @@ async def test_get_node_data(datadir):
     data = await db.get_node_data()
     assert data.node_id == '5921983fe0e6eb987aeedca54ad3c708'
     assert data.node_type == NodeType.CA
-    assert data.creditors_subnet == Subnet.parse('000001')
+    assert data.creditors_subnet == Subnet.parse('000008')
     assert data.debtors_subnet == Subnet.parse('')
     assert b'-----BEGIN CERTIFICATE-----\nMIIEqDCCAxCgAw' in data.root_cert
 
