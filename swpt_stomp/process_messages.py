@@ -28,23 +28,26 @@ def transform_message(
         allow_in_messages=(owner_node_type != NodeType.AA),
         allow_out_messages=(owner_node_type == NodeType.AA),
     )
-
     creditor_id: int = msg_data['creditor_id']
-    if not owner_node_data.creditors_subnet.match(creditor_id):
-        raise ProcessingError(
-            f'Invalid creditor ID: {_as_hex(creditor_id)}.')
-
     debtor_id: int = msg_data['debtor_id']
-    if not peer_data.debtors_subnet.match(debtor_id):
-        raise ProcessingError(
-            f'Invalid debtor ID: {_as_hex(debtor_id)}.')
 
     if owner_node_type == NodeType.CA:
-        msg_data['creditor_id'] = _change_subnet(
+        if not owner_node_data.creditors_subnet.match(creditor_id):
+            raise ProcessingError(
+                f'Invalid creditor ID: {_as_hex(creditor_id)}.')
+        msg_data['creditor_id'] = creditor_id = _change_subnet(
             creditor_id,
             from_=owner_node_data.creditors_subnet,
             to_=peer_data.creditors_subnet,
         )
+
+    if not peer_data.creditors_subnet.match(creditor_id):
+        raise ProcessingError(
+            f'Invalid creditor ID: {_as_hex(creditor_id)}.')
+
+    if not peer_data.debtors_subnet.match(debtor_id):
+        raise ProcessingError(
+            f'Invalid debtor ID: {_as_hex(debtor_id)}.')
 
     msg_json = JSON_SCHEMAS[message.type].dumps(msg_data)
     return Message(
@@ -67,13 +70,13 @@ async def preprocess_message(
             allow_in_messages=(owner_node_type == NodeType.AA),
             allow_out_messages=(owner_node_type != NodeType.AA),
         )
-
         creditor_id: int = msg_data['creditor_id']
+        debtor_id: int = msg_data['debtor_id']
+
         if not peer_data.creditors_subnet.match(creditor_id):
             raise ProcessingError(
                 f'Invalid creditor ID: {_as_hex(creditor_id)}.')
 
-        debtor_id: int = msg_data['debtor_id']
         if not peer_data.debtors_subnet.match(debtor_id):
             raise ProcessingError(
                 f'Invalid debtor ID: {_as_hex(debtor_id)}.')
