@@ -26,7 +26,7 @@ document are to be interpreted as described in RFC 2119.
 STOMP Protocol
 ==============
 
-  The Simple Text Oriented Messaging Protocol (STOMP) [#stomp]_ is a simple
+  STOMP [#stomp]_ (Simple Text Oriented Messaging Protocol) is a simple
   interoperable protocol designed for asynchronous message passing between
   clients via mediating servers. It defines a text based wire-format for
   messages passed between these clients and servers.
