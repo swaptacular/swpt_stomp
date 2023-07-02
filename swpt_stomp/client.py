@@ -151,7 +151,7 @@ async def connect(
 
 
 if __name__ == '__main__':  # pragma: nocover
-    from swpt_stomp.logging import configure_logging
+    from swpt_stomp.loggers import configure_logging
 
     configure_logging()
     asyncio.run(connect(), debug=True)

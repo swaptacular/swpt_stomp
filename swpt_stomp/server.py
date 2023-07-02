@@ -158,7 +158,7 @@ def _allowed_peer_connection(node_id: str):
 
 
 if __name__ == '__main__':  # pragma: nocover
-    from swpt_stomp.logging import configure_logging
+    from swpt_stomp.loggers import configure_logging
 
     configure_logging()
     asyncio.run(serve(), debug=True)
