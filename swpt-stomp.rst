@@ -37,13 +37,13 @@ post messages. Servers and clients MUST support the following subset of the
 STOMP 1.2 specification:
 
 - The STOMP 1.2 commands ``STOMP``, ``CONNECT``, ``CONNECTED``, ``SEND``,
-  ``RECEIPT``, ``ERROR``, and ``DISCONNECT`` MUST be fully supported.
+  ``RECEIPT``, ``ERROR``, and ``DISCONNECT`` **MUST be fully supported**.
 
 - Support for STOMP 1.2 *subscriptions* and *transactions* is OPTIONAL. That
   is: ``SUBSCRIBE``, ``UNSUBSCRIBE``, ``MESSAGE``, ``ACK``, ``NACK``,
-  ``BEGIN``, ``COMMIT``, and ``ABORT`` STOMP commands may not be
-  implemented. Swaptacular nodes MUST NOT expect peer nodes to understand
-  these commands.
+  ``BEGIN``, ``COMMIT``, and ``ABORT`` commands may not be implemented.
+  Swaptacular nodes MUST NOT expect all peer nodes to understand these
+  commands.
 
 - In addition to the requirements given by the STOMP 1.2 specification,
   every ``SEND`` command MUST include the following headers:
@@ -76,25 +76,37 @@ STOMP 1.2 specification:
    persistent
      MUST have the value ``true``.
 
-In addition to the above described protocol, servers and clients MAY support
-other message transport protocols. If some other message transport protocol
-is supported by both the server and the client, they MAY agree to use it
-instead.
+In addition to the above described STOMP subset, servers and clients MAY
+support other message transport protocols. If some other message transport
+protocol is supported by both the server and the client, they MAY agree to
+use it instead.
 
      
 STOMP Connections
 =================
 
-When a Swaptacular node needs to send some messages to a peer node, the
-Swaptacular node opens a client STOMP connection to the peer node's servers,
-and issues a ``SEND`` command for each of the messages. The client MUST
-consider a sent message to be successfully delivered, only after a
-``RECEIPT`` command has been received from the server, confirming that the
-message has been processed [#multiple-ack]_.
+When a Swaptacular node wants to send some SMP messages to a peer
+Swaptacular node, the first node opens a client STOMP connection to the
+second node's servers, and issues a ``SEND`` command for each of the
+messages. The client MUST consider a message to be successfully delivered,
+only after a ``RECEIPT`` command has been received from the server,
+confirming that the message has been processed [#multiple-ack]_.
 
 The client MAY decide to keep the STOMP connection open for any length of
 time, and the server SHOULD NOT terminate the connection unilaterally,
 without a reason.
+
+Connections between the client and the server MUST be secured by using
+**Transport Layer Security** version 1.3 or higher. *Both the client and the
+server* must present a certificate, which the other side can verify before
+proceeding with the connection. That is:
+
+- Clients MUST require servers to authenticate themselves by presenting a
+  trusted certificate chain. Clients SHOULD NOT perform *hostname
+  verification* [#host-check]_.
+
+- Servers MUST require clients to authenticate themselves by presenting a
+  trusted certificate chain.
 
 .. [#smp] Swaptacular Messaging Protocol
      
@@ -102,3 +114,79 @@ without a reason.
 
 .. [#multiple-ack] Note that every STOMP ``RECEIPT`` command confirms the
   delivery of all preceding messages.
+
+.. [#host-check] The *hostname verification* involves looking at the
+  certificate sent by the server, and verifying that the ``dnsName`` in the
+  ``subjectAltName`` field of the certificate matches the host portion of
+  the URL used to make the connection.
+
+
+STOMP Server Manifest Files
+===========================
+
+For a Swaptacular node to be able to automatically initiate connections to
+peer nodes' STOMP servers, some basic information about the servers
+(hostname, TCP port etc.) needs to be available in a machine-readable
+format.
+
+*STOMP Server Manifest Files* are TOML [#toml]_ files than contain the
+following configuration keys:
+
+servers
+  A list of server addresses in the form ``"hostname:port"``.
+  
+  The ``hostname`` can be a fully qualified domain name, or an IP address;
+  ``port`` specifies the TCP port that the servers listens on. To initiate a
+  new connection, the client SHOULD randomly choose one of the server
+  addresses from the list. Note that the list MAY contain the same server
+  address more than once, which would increase the chances for that address
+  to be chosen by clients.
+
+host
+  A value for the ``CONNECT`` [#connect]_ command's ``host`` header.
+
+  The client MUST substitute all occurrences of the string ``${NODE_ID}`` in
+  the value, with the ID of the client's Swaptacular node. For example, if
+  the value is ``"/peer/${NODE_ID}"``, and the client's node ID is
+  ``12345678``, then the client must send the header
+  ``"host:/peer/12345678"`` with its ``CONNECT`` command to the server.
+
+login  
+  An *optional* value for the ``CONNECT`` command's ``login`` header.
+
+  Servers SHOULD NOT require clients to include a ``login`` header (an
+  username) with the ``CONNECT`` command.
+
+  The client MUST substitute all occurrences of the string ``${NODE_ID}`` in
+  the value, with the ID of the client's Swaptacular node.
+
+passcode  
+  An *optional* value for the ``CONNECT`` command's ``passcode`` header.
+
+  Servers SHOULD NOT require clients to include a ``passcode`` header (a
+  password) with the ``CONNECT`` command.
+
+destination
+  A value for the ``SEND`` command's ``destination`` header.
+
+  The client MUST substitute all occurrences of the string ``${NODE_ID}`` in
+  the value, with the ID of the client's Swaptacular node.
+
+accepted-content-types
+  TODO
+
+For example::
+
+  servers = ["server1.example.com:1234", "server2.example.com:1234"]
+  host = "/"
+  destination = "/smp/${NODE_ID}"
+  accepted-content-types = [
+    ""
+  ]
+
+.. [#toml] https://toml.io/en/
+
+.. [#connect] The STOMP protocol specification requires servers to handle
+  the ``STOMP`` command in the same manner as the ``CONNECT`` command.
+  Therefore, everything said in this section applies to the ``STOMP``
+  command as well.
