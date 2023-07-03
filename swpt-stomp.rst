@@ -96,7 +96,7 @@ The client MAY decide to keep the STOMP connection open for any length of
 time, and the server SHOULD NOT terminate the connection unilaterally,
 without a reason.
 
-Connections between the client and the server MUST be secured by using
+STOMP connections between the client and the server MUST be secured by using
 **Transport Layer Security** version 1.3 or higher. *Both the client and the
 server* must present a certificate, which the other side can verify before
 proceeding with the connection. That is:
