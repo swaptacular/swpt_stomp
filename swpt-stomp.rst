@@ -14,27 +14,29 @@ STOMP Message Transport for the Swaptacular Messaging Protocol
 Overview
 ========
 
+Each Swaptacular node should run one or more publicly accessible servers,
+allowing peer Swaptacular nodes to connect to these servers as clients, and
+post messages.
+
 This document specifies how Swaptacular nodes can use a subset of the STOMP
-1.2 protocol, to interoperably send Swaptacular Messaging Protocol messages
-from one peer node to another.
+1.2 protocol, to interoperably send Swaptacular Messaging Protocol (SMP)
+messages from one peer node to another.
 
 **Note:** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
 NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
 document are to be interpreted as described in RFC 2119.
 
 
-STOMP Protocol Subset
-=====================
+A Subset of the STOMP Protocol
+==============================
 
   STOMP [#stomp]_ is a simple interoperable protocol designed for
   asynchronous message passing between clients via mediating servers. It
   defines a text based wire-format for messages passed between these clients
   and servers.
 
-Every Swaptacular node MUST run one or more publicly accessible servers,
-allowing peer Swaptacular nodes to connect to these servers as clients, and
-post messages. Servers and clients MUST support the following subset of the
-STOMP 1.2 specification:
+Swaptacular nodes must support, both as servers, and as clients, the
+following subset of the STOMP 1.2 specification:
 
 - The STOMP 1.2 commands ``STOMP``, ``CONNECT``, ``CONNECTED``, ``SEND``,
   ``RECEIPT``, ``ERROR``, and ``DISCONNECT`` MUST be fully supported.
@@ -52,7 +54,7 @@ STOMP 1.2 specification:
      Specifies a message ID.
      
    type
-     Specifies the type of the SMP [#smp]_ message.
+     Specifies the type of the SMP message.
 
      Here is a non-exhaustive list of possible message types:
      - ``ConfigureAccount``
@@ -76,22 +78,23 @@ STOMP 1.2 specification:
    persistent
      MUST have the value ``true``.
 
-**Note:** In addition to the servers that support the above described STOMP
+Each Swaptacular node MUST run one or more publicly accessible servers that
+support the above described STOMP subset.
+
+**Note:** In addition to servers that support the above described STOMP
 subset, Swaptacular nodes MAY run servers that support other message
 transport protocols. When some other message transport protocol is supported
 by both the server and the client, they MAY agree to use it instead.
 
 .. [#stomp] Simple Text Oriented Messaging Protocol: https://stomp.github.io/
 
-.. [#smp] Swaptacular Messaging Protocol
-
      
 STOMP Connections
 =================
 
 When a Swaptacular node wants to send some SMP messages to a peer
-Swaptacular node, the first node opens a client STOMP connection to the
-second node's servers, and issues a ``SEND`` command for each of the
+Swaptacular node, the sending node opens a client STOMP connection to the
+receiving node's servers, and issues a ``SEND`` command for each of the
 messages. The client MUST consider a message to be successfully delivered,
 only after a ``RECEIPT`` command has been received from the server,
 confirming that the message has been processed [#multiple-ack]_.
@@ -121,14 +124,15 @@ connection. That is:
   the URL used to make the connection.
 
 
-STOMP Servers Manifest File
-===========================
+STOMP Servers Manifest Files
+============================
 
-To allow automated connectivity between peer nodes, every Swaptacular node
-should publicly provide some basic information about the servers that it
-runs, in a standard machine-readable format. The *STOMP Servers Manifest
-File* is a TOML[#toml]_ file that contains values for the following
-configuration keys:
+Every Swaptacular node MUST publicly provide a *STOMP servers manifest
+file*, which describes the STOMP servers that the node runs. The RECOMMENDED
+name for this file is ``stomp.toml``.
+
+*STOMP Servers Manifest Files* are regular TOML[#toml]_ files that contain
+values for the following configuration keys:
 
 servers
   A list of server addresses in the form ``"hostname:port"``.
@@ -137,8 +141,8 @@ servers
   ``port`` specifies the TCP port that the servers listens on. To initiate a
   new connection, the client SHOULD randomly choose one of the server
   addresses from the list. Note that the list MAY contain the same server
-  address more than once, which would increase the chances for that address
-  to be chosen by clients.
+  address more than once, which would simply increase the probability for
+  that address to be chosen by clients.
 
 host
   A value for the ``host`` header in ``CONNECT`` [#connect]_ commands.
@@ -177,10 +181,13 @@ accepted-content-types
   Support for the ``application/json`` MIME type is implied. Therefore, an
   empty (or missing) list means that only ``application/json`` is supported.
 
-**Note:** STOMP servers manifest files MAY contain additional configuration
-key/value pairs, which are not described in this document.
+*STOMP Servers Manifest Files* MAY contain additional key/value pairs, which
+are not described in this document.
 
-An example STOMP servers manifest file::
+Example ``stomp.toml`` file:
+============================
+
+::
 
   servers = [
     "server1.example.com:1234",
@@ -194,11 +201,6 @@ An example STOMP servers manifest file::
     "application/msgpack",
   ]
   not-described-here = true
-
-Every Swaptacular node MUST publicly provide a STOMP servers manifest file,
-which describes the STOMP servers that the node runs. The RECOMMENDED name
-for the file is ``stomp.toml``. Additional information may be provided in
-other files and file formats.
 
 .. [#toml] Tom's Obvious Minimal Language: https://toml.io/en/
 
