@@ -1,12 +1,12 @@
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 STOMP Message Transport for the Swaptacular Messaging Protocol
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-:Description: Specifies how Swaptacular nodes use a subset of the STOMP
+:Description: Specifies how Swaptacular nodes can use a subset of the STOMP
               protocol, to interoperably send SMP messages from one peer
               node to another.
 :Author: Evgeni Pandurksi
 :Contact: epandurski@gmail.com
-:Date: 2023-07-10
+:Date: 2023-07-04
 :Version: 1.0
 :Copyright: This document has been placed in the public domain.
 
@@ -14,9 +14,9 @@ STOMP Message Transport for the Swaptacular Messaging Protocol
 Overview
 ========
 
-This document specifies how Swaptacular nodes use a subset of the STOMP 1.2
-protocol, to interoperably send Swaptacular Messaging Protocol messages from
-one peer node to another.
+This document specifies how Swaptacular nodes can use a subset of the STOMP
+1.2 protocol, to interoperably send Swaptacular Messaging Protocol messages
+from one peer node to another.
 
 **Note:** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
 NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
@@ -26,10 +26,10 @@ document are to be interpreted as described in RFC 2119.
 STOMP Protocol
 ==============
 
-  STOMP [#stomp]_ (Simple Text Oriented Messaging Protocol) is a simple
-  interoperable protocol designed for asynchronous message passing between
-  clients via mediating servers. It defines a text based wire-format for
-  messages passed between these clients and servers.
+  STOMP [#stomp]_ is a simple interoperable protocol designed for
+  asynchronous message passing between clients via mediating servers. It
+  defines a text based wire-format for messages passed between these clients
+  and servers.
 
 Every Swaptacular node MUST run one or more publicly accessible servers,
 allowing peer Swaptacular nodes to connect to these servers as clients, and
@@ -39,10 +39,10 @@ STOMP 1.2 specification:
 - The STOMP 1.2 commands ``STOMP``, ``CONNECT``, ``CONNECTED``, ``SEND``,
   ``RECEIPT``, ``ERROR``, and ``DISCONNECT`` **MUST be fully supported**.
 
-- Support for STOMP 1.2 *subscriptions* and *transactions* is OPTIONAL. That
-  is: ``SUBSCRIBE``, ``UNSUBSCRIBE``, ``MESSAGE``, ``ACK``, ``NACK``,
-  ``BEGIN``, ``COMMIT``, and ``ABORT`` commands may not be implemented.
-  Swaptacular nodes MUST NOT expect all peer nodes to understand these
+- Support for STOMP *subscriptions* and *transactions* is OPTIONAL. That is:
+  ``SUBSCRIBE``, ``UNSUBSCRIBE``, ``MESSAGE``, ``ACK``, ``NACK``, ``BEGIN``,
+  ``COMMIT``, and ``ABORT`` commands may not be implemented. Swaptacular
+  nodes MUST NOT presume that their peer nodes will understand these
   commands.
 
 - In addition to the requirements given by the STOMP 1.2 specification,
@@ -81,6 +81,10 @@ support other message transport protocols. If some other message transport
 protocol is supported by both the server and the client, they MAY agree to
 use it instead.
 
+.. [#stomp] Simple Text Oriented Messaging Protocol: https://stomp.github.io/
+
+.. [#smp] Swaptacular Messaging Protocol
+
      
 STOMP Connections
 =================
@@ -96,10 +100,10 @@ The client MAY decide to keep the STOMP connection open for any length of
 time, and the server SHOULD NOT terminate the connection unilaterally,
 without a reason.
 
-STOMP connections between the client and the server MUST be secured by using
-**Transport Layer Security** version 1.3 or higher. *Both the client and the
-server* must present a certificate, which the other side can verify before
-proceeding with the connection. That is:
+STOMP connections MUST be secured by using **Transport Layer Security**
+version 1.3 or higher. Both the client and the server must present a
+certificate, which the other side verifies before proceeding with the
+connection. That is:
 
 - Clients MUST require servers to authenticate themselves by presenting a
   trusted certificate chain. Clients SHOULD NOT perform *hostname
@@ -108,12 +112,8 @@ proceeding with the connection. That is:
 - Servers MUST require clients to authenticate themselves by presenting a
   trusted certificate chain.
 
-.. [#smp] Swaptacular Messaging Protocol
-     
-.. [#stomp] https://stomp.github.io/
-
-.. [#multiple-ack] Note that every STOMP ``RECEIPT`` command confirms the
-  delivery of all preceding messages.
+.. [#multiple-ack] Every STOMP ``RECEIPT`` command confirms the delivery of
+  all preceding messages.
 
 .. [#host-check] The *hostname verification* involves looking at the
   certificate sent by the server, and verifying that the ``dnsName`` in the
@@ -121,16 +121,13 @@ proceeding with the connection. That is:
   the URL used to make the connection.
 
 
-STOMP Server Manifest Files
+STOMP Servers Manifest File
 ===========================
 
-For a Swaptacular node to be able to automatically initiate connections to
-peer nodes' STOMP servers, some basic information about the servers
-(hostname, TCP port etc.) needs to be available in a machine-readable
-format.
-
-*STOMP Server Manifest Files* are TOML [#toml]_ files than contain the
-following configuration keys:
+To allow automated connectivity between peer nodes, every Swaptacular node
+must provide some basic public information about the servers that it runs,
+in a standard machine-readable format. *STOMP Servers Manifest File* is a
+TOML[#toml]_ file than contains values for the following configuration keys:
 
 servers
   A list of server addresses in the form ``"hostname:port"``.
@@ -143,16 +140,16 @@ servers
   to be chosen by clients.
 
 host
-  A value for the ``CONNECT`` [#connect]_ command's ``host`` header.
+  A value for the ``host`` header in ``CONNECT`` [#connect]_ commands.
 
   The client MUST substitute all occurrences of the string ``${NODE_ID}`` in
   the value, with the ID of the client's Swaptacular node. For example, if
   the value is ``"/peer/${NODE_ID}"``, and the client's node ID is
   ``12345678``, then the client must send the header
-  ``"host:/peer/12345678"`` with its ``CONNECT`` command to the server.
+  ``"host:/peer/12345678"`` with each ``CONNECT`` command to the server.
 
 login  
-  An *optional* value for the ``CONNECT`` command's ``login`` header.
+  An *optional* value for the ``login`` header in ``CONNECT`` commands.
 
   Servers SHOULD NOT require clients to include a ``login`` header (an
   username) with the ``CONNECT`` command.
@@ -161,30 +158,44 @@ login
   the value, with the ID of the client's Swaptacular node.
 
 passcode  
-  An *optional* value for the ``CONNECT`` command's ``passcode`` header.
+  An *optional* value for the ``passcode`` header in ``CONNECT`` commands.
 
   Servers SHOULD NOT require clients to include a ``passcode`` header (a
   password) with the ``CONNECT`` command.
 
 destination
-  A value for the ``SEND`` command's ``destination`` header.
+  A value for the ``destination`` header in ``SEND`` commands.
 
   The client MUST substitute all occurrences of the string ``${NODE_ID}`` in
   the value, with the ID of the client's Swaptacular node.
 
 accepted-content-types
-  TODO
+  An *optional* list of MIME types for the message bodies, which the server
+  understands, starting with the most preferable.
+  
+  Support for the ``application/json`` MIME type is implied. Therefore, an
+  empty (or missing) list means that only ``application/json`` is supported.
 
-For example::
+An example STOMP servers manifest file::
 
-  servers = ["server1.example.com:1234", "server2.example.com:1234"]
+  servers = [
+    "server1.example.com:1234",
+    "server2.example.com:1234",
+    "201.202.203.204:2345",
+  ]
   host = "/"
-  destination = "/smp/${NODE_ID}"
+  destination = "/peer/${NODE_ID}"
   accepted-content-types = [
-    ""
+    "application/vnd.google.protobuf",
+    "application/msgpack",
   ]
 
-.. [#toml] https://toml.io/en/
+Every Swaptacular node MUST publicly provide a STOMP servers manifest file,
+which describes the STOMP servers that the node runs. The RECOMMENDED name
+for the file is ``stomp.toml``. Additional information MAY be provided in
+other file formats.
+
+.. [#toml] Tom's Obvious Minimal Language: https://toml.io/en/
 
 .. [#connect] The STOMP protocol specification requires servers to handle
   the ``STOMP`` command in the same manner as the ``CONNECT`` command.
