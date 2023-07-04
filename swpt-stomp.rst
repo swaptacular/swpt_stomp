@@ -37,7 +37,7 @@ post messages. Servers and clients MUST support the following subset of the
 STOMP 1.2 specification:
 
 - The STOMP 1.2 commands ``STOMP``, ``CONNECT``, ``CONNECTED``, ``SEND``,
-  ``RECEIPT``, ``ERROR``, and ``DISCONNECT`` **MUST be fully supported**.
+  ``RECEIPT``, ``ERROR``, and ``DISCONNECT`` MUST be fully supported.
 
 - Support for STOMP *subscriptions* and *transactions* is OPTIONAL. That is:
   ``SUBSCRIBE``, ``UNSUBSCRIBE``, ``MESSAGE``, ``ACK``, ``NACK``, ``BEGIN``,
@@ -76,10 +76,10 @@ STOMP 1.2 specification:
    persistent
      MUST have the value ``true``.
 
-In addition to the above described STOMP subset, servers and clients MAY
-support other message transport protocols. When some other message transport
-protocol is supported by both the server and the client, they MAY agree to
-use it instead.
+**Note:** In addition to the servers that support the above described STOMP
+subset, Swaptacular nodes MAY run servers that support other message
+transport protocols. When some other message transport protocol is supported
+by both the server and the client, they MAY agree to use it instead.
 
 .. [#stomp] Simple Text Oriented Messaging Protocol: https://stomp.github.io/
 
