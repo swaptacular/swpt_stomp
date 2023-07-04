@@ -121,14 +121,14 @@ connection. That is:
   the URL used to make the connection.
 
 
-STOMP Servers Manifest Files
-============================
+STOMP Servers Manifest File
+===========================
 
 To allow automated connectivity between peer nodes, every Swaptacular node
-must publicly provide some basic information about the servers that it runs,
-in a standard machine-readable format. *STOMP Servers Manifest Files* are
-TOML[#toml]_ files than contains values for the following configuration
-keys:
+should publicly provide some basic information about the servers that it
+runs, in a standard machine-readable format. The *STOMP Servers Manifest
+File* is a TOML[#toml]_ file that contains values for the following
+configuration keys:
 
 servers
   A list of server addresses in the form ``"hostname:port"``.
@@ -171,11 +171,14 @@ destination
   the value, with the ID of the client's Swaptacular node.
 
 accepted-content-types
-  An *optional* list of MIME types for the message bodies, which the server
-  understands, starting with the most preferable.
+  An *optional* list of supported MIME types for the message bodies,
+  starting with the most preferable.
   
   Support for the ``application/json`` MIME type is implied. Therefore, an
   empty (or missing) list means that only ``application/json`` is supported.
+
+**Note:** STOMP servers manifest files MAY contain additional configuration
+key/value pairs, which are not described in this document.
 
 An example STOMP servers manifest file::
 
@@ -190,11 +193,12 @@ An example STOMP servers manifest file::
     "application/vnd.google.protobuf",
     "application/msgpack",
   ]
+  not-described-here = true
 
 Every Swaptacular node MUST publicly provide a STOMP servers manifest file,
 which describes the STOMP servers that the node runs. The RECOMMENDED name
-for the file is ``stomp.toml``. Additional information MAY be provided in
-other file formats.
+for the file is ``stomp.toml``. Additional information may be provided in
+other files and file formats.
 
 .. [#toml] Tom's Obvious Minimal Language: https://toml.io/en/
 
