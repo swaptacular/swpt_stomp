@@ -23,8 +23,8 @@ NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
 document are to be interpreted as described in RFC 2119.
 
 
-STOMP Protocol
-==============
+STOMP Protocol Subset
+=====================
 
   STOMP [#stomp]_ is a simple interoperable protocol designed for
   asynchronous message passing between clients via mediating servers. It
@@ -45,7 +45,7 @@ STOMP 1.2 specification:
   nodes MUST NOT presume that their peer nodes will understand these
   commands.
 
-- In addition to the requirements given by the STOMP 1.2 specification,
+- In addition to the requirements stated in the STOMP 1.2 specification,
   every ``SEND`` command MUST include the following headers:
 
    receipt
@@ -77,7 +77,7 @@ STOMP 1.2 specification:
      MUST have the value ``true``.
 
 In addition to the above described STOMP subset, servers and clients MAY
-support other message transport protocols. If some other message transport
+support other message transport protocols. When some other message transport
 protocol is supported by both the server and the client, they MAY agree to
 use it instead.
 
@@ -121,13 +121,14 @@ connection. That is:
   the URL used to make the connection.
 
 
-STOMP Servers Manifest File
-===========================
+STOMP Servers Manifest Files
+============================
 
 To allow automated connectivity between peer nodes, every Swaptacular node
-must provide some basic public information about the servers that it runs,
-in a standard machine-readable format. *STOMP Servers Manifest File* is a
-TOML[#toml]_ file than contains values for the following configuration keys:
+must publicly provide some basic information about the servers that it runs,
+in a standard machine-readable format. *STOMP Servers Manifest Files* are
+TOML[#toml]_ files than contains values for the following configuration
+keys:
 
 servers
   A list of server addresses in the form ``"hostname:port"``.
@@ -152,7 +153,7 @@ login
   An *optional* value for the ``login`` header in ``CONNECT`` commands.
 
   Servers SHOULD NOT require clients to include a ``login`` header (an
-  username) with the ``CONNECT`` command.
+  username) in ``CONNECT`` commands.
 
   The client MUST substitute all occurrences of the string ``${NODE_ID}`` in
   the value, with the ID of the client's Swaptacular node.
@@ -161,7 +162,7 @@ passcode
   An *optional* value for the ``passcode`` header in ``CONNECT`` commands.
 
   Servers SHOULD NOT require clients to include a ``passcode`` header (a
-  password) with the ``CONNECT`` command.
+  password) in ``CONNECT`` commands.
 
 destination
   A value for the ``destination`` header in ``SEND`` commands.
