@@ -144,9 +144,9 @@ host
 
   The client MUST substitute all occurrences of the string ``${NODE_ID}`` in
   the value, with the ID of the client's Swaptacular node. For example, if
-  the value is ``"/peer/${NODE_ID}"``, and the client's node ID is
-  ``12345678``, then the client must send the header
-  ``"host:/peer/12345678"`` with each ``CONNECT`` command to the server.
+  the value is ``"/${NODE_ID}"``, and the client's node ID is ``12345678``,
+  then the client must send the header ``"host:/12345678"`` with each
+  ``CONNECT`` command to the server.
 
 login  
   An *optional* value for the ``login`` header in ``CONNECT`` commands.
@@ -184,7 +184,7 @@ An example STOMP servers manifest file::
     "201.202.203.204:2345",
   ]
   host = "/"
-  destination = "/peer/${NODE_ID}"
+  destination = "/exchange/${NODE_ID}"
   accepted-content-types = [
     "application/vnd.google.protobuf",
     "application/msgpack",
