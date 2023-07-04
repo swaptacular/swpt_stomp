@@ -93,11 +93,11 @@ STOMP Connections
 =================
 
 When a Swaptacular node wants to send some SMP messages to a peer
-Swaptacular node, the sending node opens a client STOMP connection to the
-receiving node's servers, and issues a ``SEND`` command for each of the
-messages. The client MUST consider a message to be successfully delivered,
-only after a ``RECEIPT`` command has been received from the server,
-confirming that the message has been processed [#multiple-ack]_.
+Swaptacular node, the sending node opens a client STOMP connection to one
+(or more) of the receiving node's servers, and issues a ``SEND`` command for
+each of the messages. The client MUST consider a message to be successfully
+delivered, only after a ``RECEIPT`` command has been received from the
+server, confirming that the message has been processed [#multiple-ack]_.
 
 The client MAY decide to keep the STOMP connection open for any length of
 time, and the server SHOULD NOT terminate the connection unilaterally,
