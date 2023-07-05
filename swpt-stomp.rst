@@ -57,6 +57,7 @@ following subset of the STOMP 1.2 specification:
      Specifies the type of the SMP message.
 
      Here is a non-exhaustive list of possible message types:
+
      - ``ConfigureAccount``
      - ``PrepareTransfer``
      - ``FinalizeTransfer``
@@ -131,7 +132,7 @@ Every Swaptacular node MUST publicly provide a *STOMP servers manifest
 file*, which describes the STOMP servers that the node runs. The RECOMMENDED
 name for this file is ``stomp.toml``.
 
-*STOMP Servers Manifest Files* are regular TOML[#toml]_ files that contain
+*STOMP Servers Manifest Files* are regular TOML [#toml]_ files that contain
 values for the following configuration keys:
 
 servers
