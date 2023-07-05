@@ -210,10 +210,3 @@ Example ``stomp.toml`` file:
     "application/msgpack",
   ]
   not-described-here = true
-
-.. [#toml] Tom's Obvious Minimal Language: https://toml.io/en/
-
-.. [#connect] The STOMP protocol specification requires servers to handle
-  the ``STOMP`` command in the same manner as the ``CONNECT`` command.
-  Therefore, everything said in this section applies to the ``STOMP``
-  command as well.
