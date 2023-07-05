@@ -58,17 +58,17 @@ following subset of the STOMP 1.2 specification:
 
      Here is a non-exhaustive list of possible message types:
 
-     - ``ConfigureAccount``
-     - ``PrepareTransfer``
-     - ``FinalizeTransfer``
-     - ``RejectedConfig``
-     - ``RejectedTransfer``
-     - ``PreparedTransfer``
-     - ``FinalizedTransfer``
-     - ``AccountUpdate``
-     - ``AccountPurge``
-     - ``AccountTransfer``
-        
+     + ``ConfigureAccount``
+     + ``PrepareTransfer``
+     + ``FinalizeTransfer``
+     + ``RejectedConfig``
+     + ``RejectedTransfer``
+     + ``PreparedTransfer``
+     + ``FinalizedTransfer``
+     + ``AccountUpdate``
+     + ``AccountPurge``
+     + ``AccountTransfer``
+
    content-type
      Specifies the MIME type of the message body.
 
@@ -184,6 +184,14 @@ accepted-content-types
 
 *STOMP Servers Manifest Files* MAY contain additional key/value pairs, which
 are not described in this document.
+
+.. [#toml] Tom's Obvious Minimal Language: https://toml.io/en/
+
+.. [#connect] The STOMP protocol specification requires servers to handle
+  the ``STOMP`` command in the same manner as the ``CONNECT`` command.
+  Therefore, everything said in this section applies to the ``STOMP``
+  command as well.
+
 
 Example ``stomp.toml`` file:
 ============================
