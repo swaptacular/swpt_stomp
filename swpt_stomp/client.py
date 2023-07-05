@@ -43,7 +43,7 @@ from typing import Union, Callable
 from functools import partial
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
-    SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
+    STOMP_SERVER_KEY, STOMP_SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
     get_peer_serial_number, terminate_queue,
 )
 from swpt_stomp.rmq import consume_from_queue, RmqMessage
@@ -53,7 +53,7 @@ from swpt_stomp.process_messages import transform_message
 
 PROTOCOL_BROKER_QUEUE = os.environ.get('PROTOCOL_BROKER_QUEUE', 'default')
 PEER_NODE_ID = os.environ.get('PEER_NODE_ID', '00000000')
-CLIENT_QUEUE_SIZE = int(os.environ.get('CLIENT_QUEUE_SIZE', '100'))
+STOMP_CLIENT_QUEUE_SIZE = int(os.environ.get('STOMP_CLIENT_QUEUE_SIZE', '100'))
 _logger = logging.getLogger(__name__)
 
 
@@ -62,13 +62,13 @@ async def connect(
         transform_message: Callable[
             [NodeData, PeerData, RmqMessage], Message] = transform_message,
         peer_node_id: str = PEER_NODE_ID,
-        server_cert: str = SERVER_CERT,
-        server_key: str = SERVER_KEY,
+        server_cert: str = STOMP_SERVER_CERT,
+        server_key: str = STOMP_SERVER_KEY,
         nodedata_url: str = NODEDATA_URL,
         protocol_broker_url: str = PROTOCOL_BROKER_URL,
         protocol_broker_queue: str = PROTOCOL_BROKER_QUEUE,
         ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
-        client_queue_size: int = CLIENT_QUEUE_SIZE,
+        client_queue_size: int = STOMP_CLIENT_QUEUE_SIZE,
 ):
     loop = asyncio.get_running_loop()
     db = get_database_instance(url=nodedata_url)

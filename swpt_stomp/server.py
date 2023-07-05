@@ -42,7 +42,7 @@ from typing import Union, Callable, Awaitable, Optional
 from functools import partial
 from swpt_stomp.common import (
     WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
-    SERVER_KEY, SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
+    STOMP_SERVER_KEY, STOMP_SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
     get_peer_serial_number, terminate_queue,
 )
 from swpt_stomp.rmq import publish_to_exchange, open_robust_channel, RmqMessage
@@ -50,9 +50,9 @@ from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
 from swpt_stomp.aio_protocols import StompServer
 from swpt_stomp.process_messages import preprocess_message
 
-SERVER_PORT = int(os.environ.get('SERVER_PORT', '1234'))
-SERVER_BACKLOG = int(os.environ.get('SERVER_BACKLOG', '100'))
-SERVER_QUEUE_SIZE = int(os.environ.get('SERVER_QUEUE_SIZE', '100'))
+STOMP_SERVER_PORT = int(os.environ.get('STOMP_SERVER_PORT', '1234'))
+STOMP_SERVER_BACKLOG = int(os.environ.get('STOMP_SERVER_BACKLOG', '100'))
+STOMP_SERVER_QUEUE_SIZE = int(os.environ.get('STOMP_SERVER_QUEUE_SIZE', '100'))
 MAX_CONNECTIONS_PER_PEER = int(
     os.environ.get('MAX_CONNECTIONS_PER_PEER', '10'))
 _connection_counters: dict[str, int] = dict()
@@ -64,15 +64,15 @@ async def serve(
         preprocess_message: Callable[
             [NodeData, PeerData, Message], Awaitable[RmqMessage]
         ] = preprocess_message,
-        server_cert: str = SERVER_CERT,
-        server_key: str = SERVER_KEY,
-        server_port: int = SERVER_PORT,
-        server_backlog: int = SERVER_BACKLOG,
+        server_cert: str = STOMP_SERVER_CERT,
+        server_key: str = STOMP_SERVER_KEY,
+        server_port: int = STOMP_SERVER_PORT,
+        server_backlog: int = STOMP_SERVER_BACKLOG,
         nodedata_url: str = NODEDATA_URL,
         protocol_broker_url: str = PROTOCOL_BROKER_URL,
         ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
         max_connections_per_peer: int = MAX_CONNECTIONS_PER_PEER,
-        server_queue_size: int = SERVER_QUEUE_SIZE,
+        server_queue_size: int = STOMP_SERVER_QUEUE_SIZE,
         server_started_event: Optional[asyncio.Event] = None,
 ):
     loop = asyncio.get_running_loop()
