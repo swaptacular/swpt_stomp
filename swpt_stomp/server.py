@@ -192,7 +192,8 @@ def _allowed_peer_connection(node_id: str):
     default='file:///var/lib/swpt-nodedata',
     show_envvar=True,
     show_default=True,
-    help="A path to a directory containing the database of node's peers.")
+    help="URL of the database that contains current node's data, including "
+         "information about peer nodes.")
 @click.option(
     '-u', '--broker-url',
     envvar='PROTOCOL_BROKER_URL',
