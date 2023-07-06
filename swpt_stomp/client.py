@@ -187,7 +187,7 @@ async def connect(
     '-b', '--client-buffer',
     type=int,
     envvar='SWPT_CLIENT_BUFFER',
-    default='100',
+    default=100,
     show_envvar=True,
     show_default=True,
     help="Maximum number of messages to store in memory.")

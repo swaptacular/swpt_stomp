@@ -205,7 +205,7 @@ def _allowed_peer_connection(node_id: str):
     '-b', '--server-buffer',
     type=int,
     envvar='SWPT_SERVER_BUFFER',
-    default='100',
+    default=100,
     show_envvar=True,
     show_default=True,
     help="Maximum number of messages to store in memory.")
