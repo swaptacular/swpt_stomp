@@ -6,18 +6,8 @@ from typing import Callable, List, Any, Optional, TypeVar
 
 Callback = Callable[[], Any]
 DEFAULT_MAX_NETWORK_DELAY = 10_000  # 10 seconds
-
-PROTOCOL_BROKER_URL = os.environ.get(
-    'PROTOCOL_BROKER_URL',
-    'amqp://guest:guest@localhost:5672',
-)
-NODEDATA_URL = os.environ.get(
-    'NODEDATA_URL', 'file:///var/lib/nodedata')
-STOMP_SERVER_CERT = os.environ.get(
-    'STOMP_SERVER_CERT', '/etc/swpt-stomp/server.crt')
-STOMP_SERVER_KEY = os.environ.get(
-    'STOMP_SERVER_KEY', '/secrets/swpt-stomp-server.key')
-SSL_HANDSHAKE_TIMEOUT = float(os.environ.get('SSL_HANDSHAKE_TIMEOUT', '5'))
+APP_SSL_HANDSHAKE_TIMEOUT = float(
+    os.environ.get('APP_SSL_HANDSHAKE_TIMEOUT', '5'))
 
 _T = TypeVar("_T")
 _PUT_TASK_ATTR_NAME = '_EnsurePut__task'
@@ -169,3 +159,10 @@ def terminate_queue(queue: asyncio.Queue[_T], item: _T) -> None:
             loop = asyncio.get_running_loop()
             task = loop.create_task(queue.put(item))
             setattr(queue, _PUT_TASK_ATTR_NAME, task)
+
+
+def set_event_loop_policy():
+    import platform
+    if platform.python_implementation() == 'CPython':
+        import uvloop
+        uvloop.install()

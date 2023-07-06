@@ -35,45 +35,47 @@
 
 import logging
 import os
+import os.path
 import asyncio
 import ssl
+import click
+from swpt_stomp.loggers import configure_logging
 from contextlib import contextmanager
 from typing import Union, Callable, Awaitable, Optional
 from functools import partial
 from swpt_stomp.common import (
-    WatermarkQueue, ServerError, Message, SSL_HANDSHAKE_TIMEOUT,
-    STOMP_SERVER_KEY, STOMP_SERVER_CERT, NODEDATA_URL, PROTOCOL_BROKER_URL,
-    get_peer_serial_number, terminate_queue,
+    WatermarkQueue, ServerError, Message, APP_SSL_HANDSHAKE_TIMEOUT,
+    get_peer_serial_number, terminate_queue, set_event_loop_policy,
 )
 from swpt_stomp.rmq import publish_to_exchange, open_robust_channel, RmqMessage
 from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
 from swpt_stomp.aio_protocols import StompServer
 from swpt_stomp.process_messages import preprocess_message
 
-STOMP_SERVER_PORT = int(os.environ.get('STOMP_SERVER_PORT', '1234'))
-STOMP_SERVER_BACKLOG = int(os.environ.get('STOMP_SERVER_BACKLOG', '100'))
-STOMP_SERVER_QUEUE_SIZE = int(os.environ.get('STOMP_SERVER_QUEUE_SIZE', '100'))
-MAX_CONNECTIONS_PER_PEER = int(
-    os.environ.get('MAX_CONNECTIONS_PER_PEER', '10'))
+APP_STOMP_SERVER_BACKLOG = int(
+    os.environ.get('APP_STOMP_SERVER_BACKLOG', '100'))
+APP_MAX_CONNECTIONS_PER_PEER = int(
+    os.environ.get('APP_MAX_CONNECTIONS_PER_PEER', '10'))
+
 _connection_counters: dict[str, int] = dict()
 _logger = logging.getLogger(__name__)
 
 
 async def serve(
         *,
+        server_cert: str,
+        server_key: str,
+        server_port: int,
+        server_queue_size: int,
+        nodedata_url: str,
+        protocol_broker_url: str,
+        server_backlog: int = APP_STOMP_SERVER_BACKLOG,
+        server_started_event: Optional[asyncio.Event] = None,
+        ssl_handshake_timeout: float = APP_SSL_HANDSHAKE_TIMEOUT,
+        max_connections_per_peer: int = APP_MAX_CONNECTIONS_PER_PEER,
         preprocess_message: Callable[
             [NodeData, PeerData, Message], Awaitable[RmqMessage]
         ] = preprocess_message,
-        server_cert: str = STOMP_SERVER_CERT,
-        server_key: str = STOMP_SERVER_KEY,
-        server_port: int = STOMP_SERVER_PORT,
-        server_backlog: int = STOMP_SERVER_BACKLOG,
-        nodedata_url: str = NODEDATA_URL,
-        protocol_broker_url: str = PROTOCOL_BROKER_URL,
-        ssl_handshake_timeout: float = SSL_HANDSHAKE_TIMEOUT,
-        max_connections_per_peer: int = MAX_CONNECTIONS_PER_PEER,
-        server_queue_size: int = STOMP_SERVER_QUEUE_SIZE,
-        server_started_event: Optional[asyncio.Event] = None,
 ):
     loop = asyncio.get_running_loop()
     db = get_database_instance(url=nodedata_url)
@@ -127,8 +129,10 @@ async def serve(
     ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
     ssl_context.load_verify_locations(
         cadata=owner_node_data.root_cert.decode('ascii'))
-    ssl_context.load_cert_chain(certfile=server_cert, keyfile=server_key)
-
+    ssl_context.load_cert_chain(
+        certfile=os.path.normpath(server_cert),
+        keyfile=os.path.normpath(server_key),
+    )
     async with connection, channel:
         server = await loop.create_server(
             create_protocol,
@@ -157,8 +161,92 @@ def _allowed_peer_connection(node_id: str):
             _connection_counters[node_id] = n
 
 
-if __name__ == '__main__':  # pragma: nocover
-    from swpt_stomp.loggers import configure_logging
+@click.command()
+@click.option(
+    '-p', '--server-port',
+    type=int,
+    envvar='SWPT_SERVER_PORT',
+    default=1234,
+    show_envvar=True,
+    show_default=True,
+    help="TCP port to accept connections on.")
+@click.option(
+    '-c', '--server-cert',
+    envvar='SWPT_SERVER_CERT',
+    default='/etc/swpt/server.crt',
+    show_envvar=True,
+    show_default=True,
+    help="A path to a server certificate PEM file. The certificate will be "
+         "used to authenticate before STOMP clients.")
+@click.option(
+    '-k', '--server-key',
+    envvar='SWPT_SERVER_KEY',
+    default='/secrets/swpt-server.key',
+    show_envvar=True,
+    show_default=True,
+    help="A path to a PEM file containing an unencrypted private key. The "
+         "key will be used to authenticate before STOMP clients.")
+@click.option(
+    '-n', '--nodedata-url',
+    envvar='SWPT_NODEDATA_URL',
+    default='file:///var/lib/swpt-nodedata',
+    show_envvar=True,
+    show_default=True,
+    help="A path to a directory containing the database of node's peers.")
+@click.option(
+    '-u', '--broker-url',
+    envvar='PROTOCOL_BROKER_URL',
+    default='amqp://guest:guest@localhost:5672',
+    show_envvar=True,
+    show_default=True,
+    help="URL of the RabbitMQ broker to connect to.")
+@click.option(
+    '-b', '--server-buffer',
+    type=int,
+    envvar='SWPT_SERVER_BUFFER',
+    default='100',
+    show_envvar=True,
+    show_default=True,
+    help="Maximum number of messages to store in memory.")
+@click.option(
+    '-l', '--log-level',
+    type=click.Choice(['error', 'warning', 'info', 'debug']),
+    envvar='APP_LOG_LEVEL',
+    default='warning',
+    show_envvar=True,
+    show_default=True,
+    help="Application log level.")
+@click.option(
+    '-f', '--log-format',
+    type=click.Choice(['text', 'json']),
+    envvar='APP_LOG_FORMAT',
+    default='text',
+    show_envvar=True,
+    show_default=True,
+    help="Application log format.")
+def server(
+        server_port: int,
+        server_cert: str,
+        server_key: str,
+        nodedata_url: str,
+        broker_url: str,
+        server_buffer: int,
+        log_level: str,
+        log_format: str,
+):
+    """Starts a STOMP server for a Swaptacular node.
+    """
+    set_event_loop_policy()
+    configure_logging(level=log_level, format=log_format)
+    asyncio.run(serve(
+        server_cert=server_cert,
+        server_key=server_key,
+        server_port=server_port,
+        nodedata_url=nodedata_url,
+        server_queue_size=server_buffer,
+        protocol_broker_url=broker_url,
+    ))
 
-    configure_logging()
-    asyncio.run(serve(), debug=True)
+
+if __name__ == '__main__':  # pragma: nocover
+    server()

@@ -14,6 +14,7 @@ aio-pika = "^9.0.7"
 uvloop = "^0.17.0"
 tomli = "^2.0.1"
 marshmallow = "^3.19.0"
+click = "^8.1.3"
 
 [tool.poetry.group.dev.dependencies]
 python-lsp-server = {extras = ["all"], version = "^1.7.1"}
@@ -21,6 +22,10 @@ pytest = "^7.3.1"
 pytest-cov = "^4.0.0"
 pylsp-mypy = "^0.6.6"
 pytest-asyncio = "^0.21.0"
+
+[tool.poetry.scripts]
+swpt-client = "swpt_stomp.client:client"
+swpt-server = "swpt_stomp.server:server"
 
 [tool.pylsp-mypy]
 enabled = true

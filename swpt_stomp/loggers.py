@@ -11,7 +11,7 @@ APP_ASSOCIATED_LOGGERS = os.environ.get('APP_ASSOCIATED_LOGGERS', '').split()
 APP_ASSOCIATED_LOGGERS.append('__main__')
 
 
-def _excepthook(exc_type, exc_value, traceback):
+def _excepthook(exc_type, exc_value, traceback):  # pragma: nocover
     logging.error("Uncaught exception occured",
                   exc_info=(exc_type, exc_value, traceback))
 
@@ -30,7 +30,7 @@ def _create_console_hander(format: str) -> logging.Handler:
     elif format == 'json':
         from pythonjsonlogger import jsonlogger
         handler.setFormatter(jsonlogger.JsonFormatter(fmt))
-    else:
+    else:  # pragma: nocover
         raise RuntimeError(f'invalid log format: {format}')
 
     # Use `handler.addFilter(...)` here, to add log filters.
@@ -77,7 +77,7 @@ def configure_logging(
 
     # Make sure that the root logger's log level (that is: the log level for
     # all third party libraires) is not lower than the specified level.
-    if app_logger_level > root_logger.getEffectiveLevel():
+    if app_logger_level > root_logger.getEffectiveLevel():  # pragma: nocover
         root_logger.setLevel(app_logger_level)
 
     # Make sure uncaught exceptions are logged as errors.

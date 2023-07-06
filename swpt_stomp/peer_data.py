@@ -25,10 +25,11 @@ _PEM_CERTIFICATE_RE = re.compile(
     """,
     re.VERBOSE | re.DOTALL | re.MULTILINE)
 
-MAX_CACHED_PEERS = int(os.environ.get('MAX_CACHED_PEERS', '5000'))
-PEERS_CACHE_SECONDS = float(os.environ.get('PEERS_CACHE_SECONDS', '600'))
-FILE_READ_THREADS = int(os.environ.get(
-    'FILE_READ_THREADS',
+APP_MAX_CACHED_PEERS = int(os.environ.get('APP_MAX_CACHED_PEERS', '5000'))
+APP_PEERS_CACHE_SECONDS = float(
+    os.environ.get('APP_PEERS_CACHE_SECONDS', '600'))
+APP_FILE_READ_THREADS = int(os.environ.get(
+    'APP_FILE_READ_THREADS',
     str(5 * (os.cpu_count() or 1)),
 ))
 
@@ -140,9 +141,9 @@ class NodePeersDatabase(ABC):
             peers_cache_seconds: Optional[float] = None,
     ):
         if max_cached_peers is None:
-            max_cached_peers = MAX_CACHED_PEERS
+            max_cached_peers = APP_MAX_CACHED_PEERS
         if peers_cache_seconds is None:
-            peers_cache_seconds = PEERS_CACHE_SECONDS
+            peers_cache_seconds = APP_PEERS_CACHE_SECONDS
 
         assert max_cached_peers >= 1
         assert peers_cache_seconds == peers_cache_seconds  # not a NaN
@@ -269,7 +270,7 @@ class _LocalDirectory(NodePeersDatabase):
         self._loop = asyncio.get_event_loop()
 
         if file_read_threads is None:
-            file_read_threads = FILE_READ_THREADS
+            file_read_threads = APP_FILE_READ_THREADS
 
         assert file_read_threads >= 1
         self._executor = ThreadPoolExecutor(max_workers=file_read_threads)

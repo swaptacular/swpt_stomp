@@ -81,6 +81,8 @@ async def test_connect_to_server(datadir, rmq_url):
         protocol_broker_url=rmq_url,
         server_cert=os.path.abspath(f'{datadir["AA"]}/server.crt'),
         server_key=os.path.abspath(f'{datadir["AA"]}/server.key'),
+        server_port=1234,
+        server_queue_size=100,
         nodedata_url=f'file://{datadir["AA"]}',
         server_started_event=server_started,
     ))
@@ -94,6 +96,7 @@ async def test_connect_to_server(datadir, rmq_url):
         server_key=os.path.abspath(f'{datadir["CA"]}/server.key'),
         nodedata_url=f'file://{datadir["CA"]}',
         protocol_broker_queue='test_client',
+        client_queue_size=100,
     ))
 
     async def read_messages():

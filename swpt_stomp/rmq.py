@@ -28,12 +28,12 @@ def _NO_TM(m: 'RmqMessage') -> Message:
     )
 
 
-RMQ_CONNECTION_TIMEOUT_SECONDS = float(os.environ.get(
-    'RMQ_CONNECTION_TIMEOUT_SECONDS',
+APP_RMQ_CONNECTION_TIMEOUT_SECONDS = float(os.environ.get(
+    'APP_RMQ_CONNECTION_TIMEOUT_SECONDS',
     str(DEFAULT_MAX_NETWORK_DELAY / 1000),
 ))
-RMQ_CONFIRMATION_TIMEOUT_SECONDS = float(os.environ.get(
-    'RMQ_CONFIRMATION_TIMEOUT_SECONDS',
+APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS = float(os.environ.get(
+    'APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS',
     '20',
 ))
 AbstractConnection = aio_pika.abc.AbstractConnection
@@ -65,7 +65,7 @@ async def consume_from_queue(
         url: str,
         queue_name: str,
         transform_message: Callable[[RmqMessage], Message] = _NO_TM,
-        connection_timeout: float = RMQ_CONNECTION_TIMEOUT_SECONDS,
+        connection_timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
         prefetch_size: int = 0,
 ) -> None:
     """Consumes messages from a RabbitMQ queue.
@@ -114,8 +114,8 @@ async def publish_to_exchange(
         url: str,
         exchange_name: str,
         preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
-        confirmation_timeout: float = RMQ_CONFIRMATION_TIMEOUT_SECONDS,
-        connection_timeout: float = RMQ_CONNECTION_TIMEOUT_SECONDS,
+        confirmation_timeout: float = APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS,
+        connection_timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
         channel: Optional[AbstractChannel] = None,
 ) -> None:
     """Publishes messages to a RabbitMQ exchange.
@@ -170,7 +170,7 @@ async def publish_to_exchange(
 
 async def open_robust_channel(
         url: str,
-        timeout: float = RMQ_CONNECTION_TIMEOUT_SECONDS,
+        timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
 ) -> tuple[AbstractConnection, AbstractChannel]:
     """Returns a robust RabbitMQ connection, and a robust RabbitMQ channel
     suitable for publishing messages.
