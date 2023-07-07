@@ -54,8 +54,8 @@ async def test_consume_from_queue(rmq_url):
         ))
     confirm_task = loop.create_task(confirm_sent_messages())
 
-    await consume_task
-    await confirm_task
+    await asyncio.wait_for(consume_task, 10.0)
+    await asyncio.wait_for(confirm_task, 10.0)
     assert n == message_count
 
 
@@ -117,9 +117,9 @@ async def test_publish_to_exchange(rmq_url):
     generate_task = loop.create_task(generate_messages())
     read_task = loop.create_task(read_receipts())
 
-    await publish_task
-    await generate_task
-    await read_task
+    await asyncio.wait_for(publish_task, 10.0)
+    await asyncio.wait_for(generate_task, 10.0)
+    await asyncio.wait_for(read_task, 10.0)
     assert last_receipt == message_count
 
 
@@ -169,8 +169,8 @@ async def test_publish_returned_message(caplog, rmq_url):
             channel=channel,
         ))
 
-    await publish_task
-    await generate_task
+    await asyncio.wait_for(publish_task, 10.0)
+    await asyncio.wait_for(generate_task, 10.0)
     await channel.close()
     await connection.close()
 
@@ -210,7 +210,7 @@ async def test_publish_server_error(rmq_url):
             preprocess_message=preprocess_message,
         ))
 
-    await publish_task
+    await asyncio.wait_for(publish_task, 10.0)
     m = await send_queue.get()
     assert isinstance(m, ServerError)
     assert m.error_message == 'Test error'

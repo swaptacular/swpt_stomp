@@ -128,7 +128,10 @@ async def test_connect_to_server(datadir, rmq_url):
     messages_ok = False
     read_task = loop.create_task(read_messages())
     with suppress(asyncio.CancelledError):
-        await asyncio.gather(server_task, client_task, read_task)
+        await asyncio.wait_for(
+            asyncio.gather(server_task, client_task, read_task),
+            15.0,
+        )
 
     assert messages_ok
     await channel.close()

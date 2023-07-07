@@ -908,7 +908,7 @@ async def test_simple_communication():
         server_confirm_task,
         client_publish_task,
         client_ack_task,
-    ])
+    ], timeout=10.0)
     server_task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await server_task
