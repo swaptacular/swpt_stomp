@@ -13,7 +13,6 @@ def test_client_cli(datadir):
         f'--nodedata-url=file://{datadir["AA"]}',
     ])
     assert result.exit_code == 1
-    assert result.output == ''
     assert isinstance(result.exception, ConnectionRefusedError)
 
 
@@ -26,5 +25,4 @@ def test_server_cli(datadir):
         '--log-format=json',
     ])
     assert result.exit_code == 1
-    assert result.output == ''
     assert isinstance(result.exception, FileNotFoundError)

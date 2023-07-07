@@ -195,7 +195,7 @@ async def connect(
     '-l', '--log-level',
     type=click.Choice(['error', 'warning', 'info', 'debug']),
     envvar='APP_LOG_LEVEL',
-    default='warning',
+    default='info',
     show_envvar=True,
     show_default=True,
     help="Application log level.")
