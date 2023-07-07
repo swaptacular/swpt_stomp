@@ -83,6 +83,7 @@ async def test_connect_to_server(datadir, rmq_url):
         server_key=os.path.abspath(f'{datadir["AA"]}/server.key'),
         server_port=1234,
         server_queue_size=100,
+        exchange_name='smp',
         nodedata_url=f'file://{datadir["AA"]}',
         server_started_event=server_started,
     ))

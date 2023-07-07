@@ -69,6 +69,7 @@ async def serve(
         server_queue_size: int,
         nodedata_url: str,
         protocol_broker_url: str,
+        exchange_name: str,
         server_backlog: int = APP_STOMP_SERVER_BACKLOG,
         server_started_event: Optional[asyncio.Event] = None,
         ssl_handshake_timeout: float = APP_SSL_HANDSHAKE_TIMEOUT,
@@ -112,7 +113,7 @@ async def serve(
                         send_queue,
                         recv_queue,
                         url=protocol_broker_url,
-                        exchange_name='smp',
+                        exchange_name=exchange_name,
                         preprocess_message=partial(
                             preprocess_message, owner_node_data, peer_data),
                         channel=channel,
@@ -121,6 +122,7 @@ async def serve(
         return StompServer(
             send_queue,
             recv_queue,
+            recv_destination=f'/exchange/{exchange_name}',
             start_message_processor=lambda t: loop.create_task(publish(t)),
         )
 
@@ -162,6 +164,7 @@ def _allowed_peer_connection(node_id: str):
 
 
 @click.command()
+@click.argument('exchange_name')
 @click.option(
     '-p', '--server-port',
     type=int,
@@ -226,6 +229,7 @@ def _allowed_peer_connection(node_id: str):
     show_default=True,
     help="Application log format.")
 def server(
+        exchange_name: str,
         server_port: int,
         server_cert: str,
         server_key: str,
@@ -236,6 +240,8 @@ def server(
         log_format: str,
 ):
     """Starts a STOMP server for a Swaptacular node.
+
+    EXCHANGE_NAME: The name of the RabbitMQ exchange to publish messages to.
     """
     set_event_loop_policy()
     configure_logging(level=log_level, format=log_format)
@@ -246,6 +252,7 @@ def server(
         nodedata_url=nodedata_url,
         server_queue_size=server_buffer,
         protocol_broker_url=broker_url,
+        exchange_name=exchange_name,
     ))
 
 
