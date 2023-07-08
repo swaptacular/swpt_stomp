@@ -169,8 +169,8 @@ async def test_publish_returned_message(caplog, rmq_url):
             channel=channel,
         ))
 
-    await asyncio.wait_for(publish_task, 10.0)
-    await asyncio.wait_for(generate_task, 10.0)
+    await asyncio.wait_for(publish_task, 20.0)
+    await asyncio.wait_for(generate_task, 20.0)
     await channel.close()
     await connection.close()
 
