@@ -48,7 +48,9 @@ from swpt_stomp.common import (
     get_peer_serial_number, terminate_queue, set_event_loop_policy,
 )
 from swpt_stomp.rmq import publish_to_exchange, open_robust_channel, RmqMessage
-from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
+from swpt_stomp.peer_data import (
+    get_database_instance, NodeData, PeerData, NodeType,
+)
 from swpt_stomp.aio_protocols import StompServer
 from swpt_stomp.process_messages import preprocess_message
 
@@ -57,6 +59,11 @@ APP_STOMP_SERVER_BACKLOG = int(
 APP_MAX_CONNECTIONS_PER_PEER = int(
     os.environ.get('APP_MAX_CONNECTIONS_PER_PEER', '10'))
 
+_EXCHANGE_NAMES = {
+    NodeType.AA: 'accounts_in',
+    NodeType.CA: 'creditors_in',
+    NodeType.DA: 'debtors_in'
+}
 _connection_counters: dict[str, int] = dict()
 _logger = logging.getLogger(__name__)
 
@@ -69,7 +76,6 @@ async def serve(
         server_queue_size: int,
         nodedata_url: str,
         protocol_broker_url: str,
-        exchange_name: str,
         server_backlog: int = APP_STOMP_SERVER_BACKLOG,
         server_started_event: Optional[asyncio.Event] = None,
         ssl_handshake_timeout: float = APP_SSL_HANDSHAKE_TIMEOUT,
@@ -81,6 +87,7 @@ async def serve(
     loop = asyncio.get_running_loop()
     db = get_database_instance(url=nodedata_url)
     owner_node_data = await db.get_node_data()
+    exchange_name = _EXCHANGE_NAMES[owner_node_data.node_type]
     connection, channel = await open_robust_channel(protocol_broker_url)
 
     def create_protocol() -> StompServer:
@@ -164,7 +171,6 @@ def _allowed_peer_connection(node_id: str):
 
 
 @click.command()
-@click.argument('exchange_name')
 @click.option(
     '-p', '--server-port',
     type=int,
@@ -229,7 +235,6 @@ def _allowed_peer_connection(node_id: str):
     show_default=True,
     help="Application log format.")
 def server(
-        exchange_name: str,
         server_port: int,
         server_cert: str,
         server_key: str,
@@ -252,7 +257,6 @@ def server(
         nodedata_url=nodedata_url,
         server_queue_size=server_buffer,
         protocol_broker_url=broker_url,
-        exchange_name=exchange_name,
     ))
 
 

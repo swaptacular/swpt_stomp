@@ -256,7 +256,7 @@ async def test_get_ca_peer_data(datadir):
     assert data.stomp_config.servers == [('127.0.0.1', 1234),
                                          ('127.0.0.1', 1234)]
     assert data.stomp_config.host == '/'
-    assert data.stomp_config.destination == '/exchange/smp'
+    assert data.stomp_config.destination == '/exchange/accounts_in'
     assert data.creditors_subnet == Subnet.parse('000001')
     assert data.debtors_subnet == Subnet.parse('1234abcd')
 
@@ -274,7 +274,7 @@ async def test_get_aa_peer_data(datadir):
     assert b'-----BEGIN CERTIFICATE-----\nMIIFWjCCA8KgAw' in data.sub_cert
     assert data.stomp_config.servers == [('127.0.0.1', 1235)]
     assert data.stomp_config.host == '/1234abcd'
-    assert data.stomp_config.destination == '/exchange/smp'
+    assert data.stomp_config.destination == '/exchange/creditors_in'
     assert data.creditors_subnet == Subnet.parse('000001')
     assert data.debtors_subnet == Subnet.parse('1234abcd')
 
@@ -285,7 +285,7 @@ async def test_get_aa_peer_data(datadir):
     assert b'-----BEGIN CERTIFICATE-----\nMIIFVzCCA7+gAw' in data.sub_cert
     assert data.stomp_config.servers == [('127.0.0.1', 1236)]
     assert data.stomp_config.host == '/'
-    assert data.stomp_config.destination == '/exchange/smp'
+    assert data.stomp_config.destination == '/exchange/debtors_in'
     assert data.creditors_subnet == Subnet.parse('0000000000000000')
     assert data.debtors_subnet == Subnet.parse('1234abcd00')
 
@@ -304,7 +304,7 @@ async def test_get_da_peer_data(datadir):
     assert data.stomp_config.servers == [('127.0.0.1', 1234),
                                          ('127.0.0.1', 1234)]
     assert data.stomp_config.host == '/'
-    assert data.stomp_config.destination == '/exchange/smp'
+    assert data.stomp_config.destination == '/exchange/accounts_in'
     assert data.creditors_subnet == Subnet.parse('0000000000000000')
     assert data.debtors_subnet == Subnet.parse('1234abcd00')
 

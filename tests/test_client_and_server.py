@@ -55,7 +55,7 @@ async def test_connect_to_server(datadir, rmq_url):
     connection = await aio_pika.connect(rmq_url)
     channel = await connection.channel()
     client_queue = await channel.declare_queue('test_client')
-    server_exchange = await channel.declare_exchange('smp', 'topic')
+    server_exchange = await channel.declare_exchange('accounts_in', 'topic')
     server_queue = await channel.declare_queue('test_server')
     await server_queue.bind(server_exchange, '#')
 
@@ -83,7 +83,6 @@ async def test_connect_to_server(datadir, rmq_url):
         server_key=os.path.abspath(f'{datadir["AA"]}/server.key'),
         server_port=1234,
         server_queue_size=100,
-        exchange_name='smp',
         nodedata_url=f'file://{datadir["AA"]}',
         server_started_event=server_started,
     ))

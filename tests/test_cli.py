@@ -19,7 +19,6 @@ def test_client_cli(datadir):
 def test_server_cli(datadir):
     runner = CliRunner()
     result = runner.invoke(server, [
-        'smp',
         f'--server-cert={datadir["AA"]}/server.crt',
         f'--server-key={datadir["AA"]}/INVALID.key',
         f'--nodedata-url=file://{datadir["AA"]}',
