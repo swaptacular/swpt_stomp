@@ -1,0 +1,4 @@
+servers = ["127.0.0.1:1235"]
+host = "/${NODE_ID}"
+destination = "/exchange/creditors_in"
+accepted-content-types = ["application/json"]
