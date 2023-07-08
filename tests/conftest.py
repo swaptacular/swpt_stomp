@@ -6,11 +6,11 @@ def datadir(request):
     import os.path
 
     filename = request.module.__file__
-    test_dir, _ = os.path.splitext(filename)
+    test_dir = os.path.join(filename, '../../test_data')
     return {
-        'AA': os.path.join(test_dir, '../test_data/AA'),
-        'CA': os.path.join(test_dir, '../test_data/CA'),
-        'DA': os.path.join(test_dir, '../test_data/DA'),
+        'AA': os.path.join(test_dir, 'AA'),
+        'CA': os.path.join(test_dir, 'CA'),
+        'DA': os.path.join(test_dir, 'DA'),
     }
 
 

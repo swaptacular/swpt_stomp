@@ -86,7 +86,7 @@ async def test_connect_to_server(datadir, rmq_url):
         nodedata_url=f'file://{datadir["AA"]}',
         server_started_event=server_started,
     ))
-    await server_started.wait()
+    await asyncio.wait_for(server_started.wait(), 10.0)
 
     # Connect to the server.
     client_task = loop.create_task(client.connect(
