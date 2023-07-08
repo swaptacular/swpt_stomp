@@ -1,0 +1,30 @@
+version: '3.6'
+
+services:
+
+  tests-rabbitmq:
+    image: rabbitmq:$RABBITMQ_VERSION
+    volumes:
+      - './docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf'
+    environment:
+      - 'RABBITMQ_LOGS=-'
+    ports:
+      - $RABBITMQ_MANAGEMENT_LOCAL_PORT:15672
+
+
+  tests-dummy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app-image
+    volumes:
+      - './swpt_stomp:/usr/src/app/swpt_stomp'
+      - './tests:/usr/src/app/tests'
+      - './test_data:/usr/src/app/test_data'
+    env_file: .env
+    environment:
+      - 'PROTOCOL_BROKER_URL=amqp://guest:guest@tests-rabbitmq:5672'
+      - 'PYTHONDONTWRITEBYTECODE=1'
+    command: echo This is a dummy container used only to run the tests.
+    depends_on:
+      - tests-rabbitmq

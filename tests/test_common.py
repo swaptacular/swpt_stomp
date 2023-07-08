@@ -109,9 +109,7 @@ def test_remove_watermark_callbacks():
         q.remove_high_watermark_callback('invalid')
 
 
-def test_watermark_queue_put():
-    import asyncio
-
+def test_watermark_queue_put(loop):
     cb_called = 0
 
     def cb():
@@ -121,7 +119,6 @@ def test_watermark_queue_put():
     q = WatermarkQueue(0, 0)
     q.add_high_watermark_callback(cb)
 
-    loop = asyncio.get_event_loop()
     assert cb_called == 0
     loop.run_until_complete(q.put('item'))
     assert cb_called == 1

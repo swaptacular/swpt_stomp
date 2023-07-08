@@ -69,6 +69,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
             self,
             send_queue: asyncio.Queue[Union[_U, None, ServerError]],
             recv_queue: WatermarkQueue[Union[_V, None]],
+            loop: Optional[asyncio.AbstractEventLoop],
             start_message_processor: MessageProcessorStarter,
             hb_send_min: int,
             hb_recv_desired: int,
@@ -90,7 +91,7 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self._hb_recv = 0
         self._connection_started_at = 0.0
         self._data_receved_at = 0.0
-        self._loop = asyncio.get_event_loop()
+        self._loop = loop or asyncio.get_running_loop()
         self._parser = StompParser()
         self._transport: Optional[asyncio.Transport] = None
         self._writer_task: Optional[asyncio.Task] = None
@@ -252,6 +253,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
             send_queue: asyncio.Queue[Union[Message, None, ServerError]],
             recv_queue: WatermarkQueue[Union[str, None]],
             *,
+            loop: Optional[asyncio.AbstractEventLoop] = None,
             start_message_processor: MessageProcessorStarter = _NO_MP,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
@@ -264,6 +266,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
         super().__init__(
             send_queue,
             recv_queue,
+            loop=loop,
             start_message_processor=start_message_processor,
             hb_send_min=hb_send_min,
             hb_recv_desired=hb_recv_desired,
@@ -431,6 +434,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             send_queue: asyncio.Queue[Union[str, None, ServerError]],
             recv_queue: WatermarkQueue[Union[Message, None]],
             *,
+            loop: Optional[asyncio.AbstractEventLoop] = None,
             start_message_processor: MessageProcessorStarter = _NO_MP,
             hb_send_min: int = DEFAULT_HB_SEND_MIN,
             hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
@@ -440,6 +444,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
         super().__init__(
             send_queue,
             recv_queue,
+            loop=loop,
             start_message_processor=start_message_processor,
             hb_send_min=hb_send_min,
             hb_recv_desired=hb_recv_desired,

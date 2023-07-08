@@ -267,7 +267,6 @@ class _LocalDirectory(NodePeersDatabase):
         )
         assert url.startswith('file:///')
         self._root_dir: str = os.path.normpath(url[7:])
-        self._loop = asyncio.get_event_loop()
 
         if file_read_threads is None:
             file_read_threads = APP_FILE_READ_THREADS
@@ -285,7 +284,8 @@ class _LocalDirectory(NodePeersDatabase):
         return abspath if os.path.isdir(abspath) else None
 
     async def _read_file(self, filepath: str) -> bytes:
-        return await self._loop.run_in_executor(
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
             self._executor,
             partial(self._fetch_file, filepath),
         )
@@ -346,7 +346,8 @@ class _LocalDirectory(NodePeersDatabase):
         )
 
     async def _get_peer_data(self, node_id: str) -> Optional[PeerData]:
-        dir = await self._loop.run_in_executor(
+        loop = asyncio.get_running_loop()
+        dir = await loop.run_in_executor(
             self._executor,
             partial(self._get_peer_dir, node_id),
         )

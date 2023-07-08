@@ -13,7 +13,7 @@ def transport():
     )
 
 
-def test_task_set_error(caplog):
+def test_task_set_error(caplog, loop):
     import logging
     from swpt_stomp.aio_protocols import _TaskSet
 
@@ -21,7 +21,6 @@ def test_task_set_error(caplog):
         raise Exception('test error')
 
     caplog.set_level(logging.ERROR)
-    loop = asyncio.get_event_loop()
     task = loop.create_task(raise_error(), name='MyTestTask')
     ts = _TaskSet()
     assert len(ts.tasks) == 0
@@ -40,7 +39,7 @@ def test_task_set_error(caplog):
     assert len(ts.tasks) == 0
 
 
-def test_task_set_cancel(caplog):
+def test_task_set_cancel(caplog, loop):
     import logging
     from swpt_stomp.aio_protocols import _TaskSet
 
@@ -49,7 +48,6 @@ def test_task_set_cancel(caplog):
             await asyncio.sleep(0)
 
     caplog.set_level(logging.ERROR)
-    loop = asyncio.get_event_loop()
     task = loop.create_task(infinite_loop(), name='MyLoopTask')
     task.cancel()
     ts = _TaskSet()
@@ -71,8 +69,7 @@ def test_task_set_cancel(caplog):
 # `StompClient` tests #
 #######################
 
-def test_client_connection(transport):
-    loop = asyncio.get_event_loop()
+def test_client_connection(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
     start_message_processor_called = asyncio.Event()
@@ -88,6 +85,7 @@ def test_client_connection(transport):
     c = StompClient(
         send_queue,
         recv_queue,
+        loop=loop,
         start_message_processor=start_message_processor,
         hb_send_min=1000,
         hb_recv_desired=90,
@@ -197,10 +195,10 @@ def test_client_connection(transport):
     b'CONNECTED\nversion:1.2\nheart-beat:-10,0\n\n\x00',
     b'RECEIPT\nreceipt-id:m1\n\n\x00',
 ])
-def test_client_connection_error(transport, data):
+def test_client_connection_error(transport, data, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompClient(send_queue, recv_queue)
+    c = StompClient(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     transport.write.reset_mock()
     c.data_received(data)
@@ -219,10 +217,11 @@ def test_client_connection_error(transport, data):
     b'CONNECTED\nversion:1.2\nheart-beat:500,8000\n\n\x00',
     b'RECEIPT\n\n\x00',
 ])
-def test_client_post_connection_error(transport, data):
+def test_client_post_connection_error(transport, data, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompClient(send_queue, recv_queue, hb_send_min=0, hb_recv_desired=0)
+    c = StompClient(send_queue, recv_queue, loop=loop,
+                    hb_send_min=0, hb_recv_desired=0)
     c.connection_made(transport)
     transport.write.reset_mock()
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
@@ -240,8 +239,7 @@ def test_client_post_connection_error(transport, data):
     assert recv_queue.get_nowait() is None
 
 
-def test_client_pause_writing(transport):
-    loop = asyncio.get_event_loop()
+def test_client_pause_writing(transport, loop):
 
     def run_once():
         loop.call_soon(loop.stop)
@@ -250,7 +248,7 @@ def test_client_pause_writing(transport):
     # Make a proper connection.
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompClient(send_queue, recv_queue)
+    c = StompClient(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
     transport.write.reset_mock()
@@ -274,10 +272,10 @@ def test_client_pause_writing(transport):
     assert recv_queue.get_nowait() is None
 
 
-def test_client_pause_reading(transport):
+def test_client_pause_reading(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(2)
-    c = StompClient(send_queue, recv_queue)
+    c = StompClient(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
     transport.pause_reading.assert_not_called()
@@ -305,10 +303,10 @@ def test_client_pause_reading(transport):
     assert recv_queue.get_nowait() is None
 
 
-def test_client_send_heartbeats(transport):
+def test_client_send_heartbeats(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompClient(send_queue, recv_queue, hb_send_min=1)
+    c = StompClient(send_queue, recv_queue, hb_send_min=1, loop=loop)
     c.connection_made(transport)
     c.data_received(b'CONNECTED\nversion:1.2\nheart-beat:0,1\n\n\x00')
     transport.write.reset_mock()
@@ -319,7 +317,6 @@ def test_client_send_heartbeats(transport):
             await asyncio.sleep(0)
 
     transport.write.assert_not_called()
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_for_write())
     transport.write.assert_called_with(b'\n')
 
@@ -328,11 +325,11 @@ def test_client_send_heartbeats(transport):
 
 
 @patch('swpt_stomp.aio_protocols.DEFAULT_HB_SEND_MIN', new=1)
-def test_client_recv_heartbeats(transport):
+def test_client_recv_heartbeats(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompClient(
-        send_queue, recv_queue, hb_recv_desired=1, max_network_delay=1)
+    c = StompClient(send_queue, recv_queue,
+                    loop=loop, hb_recv_desired=1, max_network_delay=1)
     c.connection_made(transport)
     c.data_received(b'CONNECTED\nversion:1.2\nheart-beat:1,0\n\n\x00')
     assert c._hb_recv == 1
@@ -341,33 +338,32 @@ def test_client_recv_heartbeats(transport):
         while not c._done:
             await asyncio.sleep(0)
 
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_disconnect())
 
     c.connection_lost(None)
 
 
-def test_client_connected_timeout(transport):
+def test_client_connected_timeout(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompClient(send_queue, recv_queue, max_network_delay=1)
+    c = StompClient(send_queue, recv_queue, loop=loop, max_network_delay=1)
     c.connection_made(transport)
 
     async def wait_disconnect():
         while not c._done:
             await asyncio.sleep(0)
 
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_disconnect())
 
     c.connection_lost(None)
     assert recv_queue.get_nowait() is None
 
 
-def test_client_graceful_disconnect_no_messages(transport):
+def test_client_graceful_disconnect_no_messages(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompClient(send_queue, recv_queue, hb_send_min=0, hb_recv_desired=0)
+    c = StompClient(send_queue, recv_queue,
+                    loop=loop, hb_send_min=0, hb_recv_desired=0)
     c.connection_made(transport)
     transport.write.reset_mock()
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
@@ -378,7 +374,6 @@ def test_client_graceful_disconnect_no_messages(transport):
 
     # The connection is closed immediately.
     send_queue.put_nowait(None)
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_disconnect())
     assert c._done
 
@@ -386,10 +381,11 @@ def test_client_graceful_disconnect_no_messages(transport):
     assert recv_queue.get_nowait() is None
 
 
-def test_client_graceful_disconnect(transport):
+def test_client_graceful_disconnect(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompClient(send_queue, recv_queue, hb_send_min=0, hb_recv_desired=0)
+    c = StompClient(send_queue, recv_queue,
+                    loop=loop, hb_send_min=0, hb_recv_desired=0)
     c.connection_made(transport)
     transport.write.reset_mock()
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
@@ -403,7 +399,6 @@ def test_client_graceful_disconnect(transport):
 
     # The connection is NOT closed immediately.
     send_queue.put_nowait(None)
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_disconnect())
     assert not c._done
     assert transport.write.call_count == 2  # the message, then disconnect
@@ -420,10 +415,11 @@ def test_client_graceful_disconnect(transport):
     assert recv_queue.get_nowait() is None
 
 
-def test_client_error_disconnect(transport):
+def test_client_error_disconnect(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompClient(send_queue, recv_queue, hb_send_min=0, hb_recv_desired=0)
+    c = StompClient(send_queue, recv_queue,
+                    loop=loop, hb_send_min=0, hb_recv_desired=0)
     c.connection_made(transport)
     transport.write.reset_mock()
     c.data_received(b'CONNECTED\nversion:1.2\n\n\x00')
@@ -437,7 +433,6 @@ def test_client_error_disconnect(transport):
 
     # The connection is closed immediately.
     send_queue.put_nowait(ServerError('test client error'))
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_done())
     assert c._done
     assert transport.write.call_count == 1  # only the message
@@ -497,7 +492,7 @@ async def test_client_with_external_server():
 #######################
 
 @pytest.mark.parametrize("cmd", [b'CONNECT', b'STOMP'])
-def test_server_connection(transport, cmd):
+def test_server_connection(transport, cmd, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
 
@@ -505,6 +500,7 @@ def test_server_connection(transport, cmd):
     c = StompServer(
         send_queue,
         recv_queue,
+        loop=loop,
         hb_send_min=1000,
         hb_recv_desired=90,
         recv_destination='dest',
@@ -565,7 +561,6 @@ def test_server_connection(transport, cmd):
     # Send confirmations to the client.
     send_queue.put_nowait('m1')
     send_queue.put_nowait('m2')
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(send_queue.join())
     assert transport.write.call_count == 2
     assert transport.write.call_args_list == [
@@ -608,7 +603,6 @@ def test_server_connection(transport, cmd):
         while not (c._writer_task.cancelled() and c._watchdog_task.cancelled()):
             await asyncio.sleep(0)
 
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_for_cancelation())
     transport.write.assert_not_called()
     transport.close.assert_not_called()
@@ -626,10 +620,10 @@ def test_server_connection(transport, cmd):
     b'DISCONNECT\nreceipt:m1\n\n\x00',
     b'SEND\ndestination:dest\nreceipt:m1\ntype:t1\n\n\body\x00',
 ])
-def test_server_connection_error(transport, data):
+def test_server_connection_error(transport, data, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(send_queue, recv_queue)
+    c = StompServer(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     assert not c._connected
     assert not c._done
@@ -653,10 +647,10 @@ def test_server_connection_error(transport, data):
     b'SEND\ndestination:/exchange/smp\ntype:t1\n\nbody\x00',
     b'SEND\ndestination:xxx\nreceipt:m1\ntype:t1\n\nbody\x00',
 ])
-def test_server_post_connection_error(transport, data):
+def test_server_post_connection_error(transport, data, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(send_queue, recv_queue)
+    c = StompServer(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
@@ -674,10 +668,10 @@ def test_server_post_connection_error(transport, data):
     assert recv_queue.get_nowait() is None
 
 
-def test_server_command_after_disconnect(transport):
+def test_server_command_after_disconnect(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(send_queue, recv_queue)
+    c = StompServer(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
@@ -702,10 +696,10 @@ def test_server_command_after_disconnect(transport):
     assert recv_queue.get_nowait() is None
 
 
-def test_server_close_gracefully(transport):
+def test_server_close_gracefully(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(send_queue, recv_queue)
+    c = StompServer(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
@@ -713,7 +707,6 @@ def test_server_close_gracefully(transport):
     assert not c._done
 
     send_queue.put_nowait(None)
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(send_queue.join())
     transport.write.assert_called_once()
     transport.write.assert_called_with(
@@ -726,10 +719,10 @@ def test_server_close_gracefully(transport):
     assert recv_queue.get_nowait() is None
 
 
-def test_server_close_gracefully_with_error(transport):
+def test_server_close_gracefully_with_error(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(send_queue, recv_queue)
+    c = StompServer(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
@@ -738,7 +731,6 @@ def test_server_close_gracefully_with_error(transport):
 
     send_queue.put_nowait(
         ServerError('err1', 'm1', bytearray(b'c1'), 'msg-type', 'text/plain'))
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(send_queue.join())
     transport.write.assert_called_once()
     error_frame = transport.write.call_args[0][0]
@@ -756,10 +748,10 @@ def test_server_close_gracefully_with_error(transport):
     assert recv_queue.get_nowait() is None
 
 
-def test_server_immediate_disconnect(transport):
+def test_server_immediate_disconnect(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(send_queue, recv_queue)
+    c = StompServer(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
@@ -774,10 +766,10 @@ def test_server_immediate_disconnect(transport):
     assert recv_queue.get_nowait() is None
 
 
-def test_server_disconnect_without_receipt(transport):
+def test_server_disconnect_without_receipt(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(send_queue, recv_queue)
+    c = StompServer(send_queue, recv_queue, loop=loop)
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,0\n\n\x00')
     transport.write.reset_mock()
@@ -791,10 +783,10 @@ def test_server_disconnect_without_receipt(transport):
     assert recv_queue.get_nowait() is None
 
 
-def test_server_send_heartbeats(transport):
+def test_server_send_heartbeats(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(send_queue, recv_queue, hb_send_min=1)
+    c = StompServer(send_queue, recv_queue, loop=loop, hb_send_min=1)
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:0,1\n\n\x00')
     transport.write.reset_mock()
@@ -805,7 +797,6 @@ def test_server_send_heartbeats(transport):
             await asyncio.sleep(0)
 
     transport.write.assert_not_called()
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_for_write())
     transport.write.assert_called_with(b'\n')
 
@@ -814,11 +805,11 @@ def test_server_send_heartbeats(transport):
 
 
 @patch('swpt_stomp.aio_protocols.DEFAULT_HB_SEND_MIN', new=1)
-def test_server_recv_heartbeats(transport):
+def test_server_recv_heartbeats(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(
-        send_queue, recv_queue, hb_recv_desired=1, max_network_delay=1)
+    c = StompServer(send_queue, recv_queue,
+                    loop=loop, hb_recv_desired=1, max_network_delay=1)
     c.connection_made(transport)
     c.data_received(b'CONNECT\naccept-version:1.2\nheart-beat:1,0\n\n\x00')
     assert c._hb_recv == 1
@@ -827,23 +818,21 @@ def test_server_recv_heartbeats(transport):
         while not c._done:
             await asyncio.sleep(0)
 
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_disconnect())
 
     c.connection_lost(None)
 
 
-def test_server_connected_timeout(transport):
+def test_server_connected_timeout(transport, loop):
     send_queue = asyncio.Queue()
     recv_queue = WatermarkQueue(10)
-    c = StompServer(send_queue, recv_queue, max_network_delay=1)
+    c = StompServer(send_queue, recv_queue, loop=loop, max_network_delay=1)
     c.connection_made(transport)
 
     async def wait_disconnect():
         while not c._done:
             await asyncio.sleep(0)
 
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(wait_disconnect())
 
     c.connection_lost(None)
