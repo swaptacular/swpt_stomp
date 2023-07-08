@@ -44,11 +44,14 @@ COPY --from=venv-image /opt/venv /opt/venv
 
 WORKDIR /usr/src/app
 
+COPY $APP_NAME/ $APP_NAME/
 COPY docker/entrypoint.sh \
      docker/rmq_connect.py \
      pytest.ini \
      ./
-RUN rm -f .env
+RUN python -m compileall -x '^\./(migrations|tests)/' . \
+    && rm -f .env \
+    && chown -R "$APP_NAME:$APP_NAME" .
 
 USER $APP_NAME
 ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
