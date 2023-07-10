@@ -2,8 +2,8 @@ STOMP protocol client and server for Swaptacular
 ================================================
 
 [Swaptacular] nodes use [STOMP] to interoperably send [Swaptacular Messaging
-Protocol] messages to each other. This project implements both a STOMP
-client (sending messages), and a STOMP server (receiving messages). The
+Protocol] (SMP) messages to each other. This project implements both a STOMP
+client (to send messages), and a STOMP server (to receive messages). The
 ultimate deliverable is a [docker image], generated from the project's
 [Dockerfile](../master/Dockerfile).
 
@@ -19,9 +19,9 @@ following services:
 
 1. [RabbitMQ] server instance, which acts as broker for SMP messages.
 
-   A [RabbitMQ queue] must be configured on the broker instance, so
-   that all incoming SMP messages for the accounts stored on the
-   PostgreSQL server instance, are routed to this queue.
+   For each peer node a [RabbitMQ queue] must be configured on the broker
+   instance, so that all SMP messages coming from the given peer, are placed
+   in given peer's respective queue.
 
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
    or **`accounts_in`** (depending on the type of the Swaptacular node) must
@@ -38,9 +38,8 @@ following services:
 
 2. A file database that contains current Swaptacular node's data (including
    information about all peer nodes) must be available to the container as a
-   local mount.
-
-   To create and maintain such a database, you can use [these scripts].
+   local mount. To create and maintain such a database, you can use [these
+   scripts].
 
 
 Configuration
