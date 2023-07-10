@@ -1,11 +1,11 @@
 STOMP protocol client and server for Swaptacular
 ================================================
 
-This project is used by [Swaptacular] nodes to interoperably send messages
-to each other. More precisely, it utilizes the [STOMP protocol] as a message
-transport protocol for [Swaptacular Messaging Protocol] messages. The
-ultimate deliverable is a [docker image], generated from the project's
-[Dockerfile](../master/Dockerfile).
+[Swaptacular] nodes use the [STOMP protocol] to interoperably send
+[Swaptacular Messaging Protocol] messages to each other. This project
+implements both a STOMP client (sending messages), and a STOMP server
+(receiving messages). The ultimate deliverable is a [docker image],
+generated from the project's [Dockerfile](../master/Dockerfile).
 
 **Note:** This implementation supports only [JSON serialization for the
 Swaptacular Messaging Protocol].
