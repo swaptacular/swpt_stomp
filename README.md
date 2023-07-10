@@ -22,7 +22,7 @@ following services:
    **For each peer node**, at least one [RabbitMQ queue] must be configured
    on the broker instance, so that all SMP messages that need to be send to
    the given peer, are placed in the peer's respective queue(s). The STOMP
-   client for each peer will read from this queue(s).
+   client for each peer node will read from this queue(s).
 
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
    or **`accounts_in`** (depending on the type of the Swaptacular node) must
@@ -118,9 +118,9 @@ container allows you to execute the following *documented commands*:
 
 * `swpt-client`
 
-  Initiate a client STOMP connection to a peer Swaptacular node. A peer node
-  ID, and a queue name should be specified as arguments. You can start
-  simultaneously as many clients as you like.
+  Initiate a long-lived client STOMP connection to a peer Swaptacular node.
+  A peer node ID, and a queue name should be specified as arguments. You can
+  start simultaneously as many clients as you like.
 
   For more information, run `swpt-client --help`.
 

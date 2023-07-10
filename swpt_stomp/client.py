@@ -218,7 +218,7 @@ def client(
         log_level: str,
         log_format: str,
 ):
-    """Initiate a client STOMP connection to a peer Swaptacular node.
+    """Initiate a long-lived client STOMP connection to a peer Swaptacular node.
 
     PEER_NODE_ID: The node ID of the peer Swaptacular node.
 
