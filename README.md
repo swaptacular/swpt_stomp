@@ -118,7 +118,7 @@ container allows you to execute the following *documented commands*:
 
 * `swpt-client`
 
-  Initiate a long-lived client STOMP connection to a peer Swaptacular node.
+  Initiates a long-lived client STOMP connection to a peer Swaptacular node.
   A peer node ID, and a queue name should be specified as arguments. You can
   start simultaneously as many clients as you like.
 
