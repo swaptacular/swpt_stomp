@@ -25,7 +25,7 @@ following services:
 
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
    or **`accounts_in`** (depending on the type of the Swaptacular node) must
-   be configured on the broker instance. This exchange is for received
+   be configured on the broker instance. This exchange is for the received
    messages, which should be processed by the current Swaptacular node. The
    routing key will represent the highest 24 bits of the MD5 digest of the
    creditor ID, the debtor ID, or the debtor/creditor ID pair (again,
@@ -42,10 +42,10 @@ following services:
    mount in the container. To create and maintain such a database, you can
    use these [scripts].
 
-3. A server SSL certificate, and its corresponding private key. Those will
-   be used by both the client and the server, to authenticate before peer
-   nodes. You can use the same [scripts] to generate the server certificate
-   and the private key.
+3. A server SSL certificate, and its corresponding private key must be
+   available. Those will be used by both the client and the server, to
+   authenticate before peer nodes. You can use the same [scripts] to
+   generate the server certificate and the private key.
 
 
 Configuration
@@ -78,10 +78,10 @@ SWPT_SERVER_BUFFER=100
 # to store in memory. The default is 100.
 SWPT_CLIENT_BUFFER=100
 
-# URL of the database that contains current node's data,
-# including information about peer nodes. Currently, only
-# the "file://" scheme is supported for the URL. The default
-# is "file:///var/lib/swpt-nodedata".
+# The URL of the database containing the current Swaptacular
+# node's data, including information about all peer nodes.
+# Currently, only the "file://" scheme is supported for the URL.
+# The default is "file:///var/lib/swpt-nodedata".
 SWPT_NODEDATA_URL=file:///var/lib/swpt-nodedata
 
 # The URL for initiating connections with the RabbitMQ server
