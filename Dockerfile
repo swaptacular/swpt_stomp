@@ -34,6 +34,7 @@ ENV APP_NAME=$APP_NAME
 ENV APP_ROOT_DIR=/usr/src/app
 ENV PYTHONPATH="$APP_ROOT_DIR"
 ENV PATH="/opt/venv/bin:$PATH"
+ENV APP_LOG_LEVEL=warning
 
 RUN apk add --no-cache \
     libffi \
