@@ -113,15 +113,15 @@ container allows you to execute the following *documented commands*:
   Starts a STOMP server for a Swaptacular node. You can start simultaneously
   as many servers as you like.
 
+  For more information, run `swpt-server --help`.
+
 * `swpt-client`
 
   Initiate a client STOMP connection to a peer Swaptacular node. A peer node
   ID, and a queue name should be specified as arguments. You can start
   simultaneously as many clients as you like.
 
-This [docker-compose example](../master/docker-compose-all.yml) shows
-how to use the generated docker image, along with the PostgerSQL
-server, and the RabbitMQ server.
+  For more information, run `swpt-client --help`.
 
 
 How to run the tests
