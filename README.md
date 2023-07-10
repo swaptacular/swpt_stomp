@@ -1,9 +1,10 @@
-STOMP protocol client and server for [Swaptacular]
-==================================================
+STOMP protocol client and server for Swaptacular
+================================================
 
 This project implements [STOMP protocol] message transport for the
-[Swaptacular Messaging Protocol]. The ultimate deliverable is a [docker
-image], generated from the project's [Dockerfile](../master/Dockerfile).
+[Swaptacular Messaging Protocol] (SMP). The ultimate deliverable is a
+[docker image], generated from the project's
+[Dockerfile](../master/Dockerfile).
 
 **Note:** This implementation supports only [JSON serialization for the
 Swaptacular Messaging Protocol].
@@ -15,18 +16,17 @@ Dependencies
 Containers started from the generated docker image must have access to
 the following servers:
 
-1. [RabbitMQ] server instance, which acts as broker for [Swaptacular
-   Messaging Protocol] (SMP) messages.
+1. [RabbitMQ] server instance, which acts as broker for SMP messages.
 
    A [RabbitMQ queue] must be configured on the broker instance, so
    that all incoming SMP messages for the accounts stored on the
    PostgreSQL server instance, are routed to this queue.
 
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
-   or **`accounts_in`** (depending on the type of the Swaptacular node) must
-   be configured on the broker instance. This exchange is for messages that
-   are about to be processed by the Swaptacular node. The routing key will
-   represent the highest 24 bits of the MD5 digest of the creditor ID,
+   or **`accounts_in`** (depending on the type of the [Swaptacular] node)
+   must be configured on the broker instance. This exchange is for messages
+   that are about to be processed by the Swaptacular node. The routing key
+   will represent the highest 24 bits of the MD5 digest of the creditor ID,
    debtor ID, or the debtor/creditor ID pair (again, depending on the type
    of the Swaptacular node). For example, for an "Accounting Authority"
    node, if debtor ID is equal to 123, and creditor ID is equal to 456,
@@ -160,7 +160,7 @@ How to setup a development environment
 [docker image]: https://www.geeksforgeeks.org/what-is-docker-images/
 [RabbitMQ]: https://www.rabbitmq.com/
 [RabbitMQ queue]: https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html
-[RabbitMQ exchanges]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
+[RabbitMQ exchange]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
 [Docker Engine]: https://docs.docker.com/engine/
 [Docker Compose]: https://docs.docker.com/compose/
 [Poetry]: https://poetry.eustace.io/docs/
