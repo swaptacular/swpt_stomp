@@ -15,54 +15,25 @@ Dependencies
 Containers started from the generated docker image must have access to
 the following servers:
 
-1. [PostgreSQL] server instance, which stores accounts' data.
-
-2. [RabbitMQ] server instance, which acts as broker for [Swaptacular
+1. [RabbitMQ] server instance, which acts as broker for [Swaptacular
    Messaging Protocol] (SMP) messages.
 
    A [RabbitMQ queue] must be configured on the broker instance, so
    that all incoming SMP messages for the accounts stored on the
    PostgreSQL server instance, are routed to this queue.
 
-   Also, the following [RabbitMQ exchanges] must be configured on the
-   broker instance:
-
-   - **`to_creditors`**: For messages that must be send to the
-     creditors agents. The routing key will represent the creditor ID
-     as hexadecimal. For example, for creditor ID equal to 2, the
-     routing key will be "00.00.00.00.00.00.00.02".
-
-   - **`to_debtors`**: For messages that must be send to the debtors
-     agents. The routing key will represent the debtor ID as
-     hexadecimal. For example, for debtor ID equal to -2, the routing
-     key will be "ff.ff.ff.ff.ff.ff.ff.fe".
-
-   - **`to_coordinators`**: For messages that must be send to the
-     transfer coordinators. Different types of transfer coordinators
-     are responsible for performing different types of transfers. The
-     most important types are: "direct" (the message must be sent to
-     the creditors agent), and "issuing" (the message must be sent to
-     the debtors agent). All the messages sent to this exchange, will
-     have a correctly set "coordinator_type" header. The routing key
-     will represent the coordinator ID as hexadecimal. Note that for
-     "direct" transfers, the coordinator ID is guaranteed to be the
-     same as the creditor ID; and for "issuing" transfers, the
-     coordinator ID is guaranteed to be the same as the debtor ID.
-
-   - **`accounts_in`**: For messages that must be send to this
-     accounting authority itself (self-posting). The routing key will
-     represent the highest 24 bits of the MD5 digest of the (debtor
-     ID, creditor ID) pair. For example, if debtor ID is equal to 123,
-     and creditor ID is equal to 456, the routing key will be
-     "0.0.0.0.1.0.0.0.0.1.0.0.0.1.0.0.0.0.1.1.0.1.0.0". This allows
-     different accounts to be located on different database servers
-     (sharding).
-
-   **Note:** If you execute the "configure" command (see below), with
-   the environment variable `SETUP_RABBITMQ_BINDINGS` set to `yes`, an
-   attempt will be made to automatically setup all the required
-   RabbitMQ queues, exchanges, and the bindings between them. However,
-   this works only for the most basic setup.
+   Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
+   or **`accounts_in`** (depending on the type of the Swaptacular node) must
+   be configured on the broker instance. This exchange is for messages that
+   are about to be processed by the Swaptacular node. The routing key will
+   represent the highest 24 bits of the MD5 digest of the creditor ID,
+   debtor ID, or the debtor/creditor ID pair (again, depending on the type
+   of the Swaptacular node). For example, for an "Accounting Authority"
+   node, if debtor ID is equal to 123, and creditor ID is equal to 456,
+   messages will be published to the **`accounts_in`** exchange, and the
+   routing key will be "0.0.0.0.1.0.0.0.0.1.0.0.0.1.0.0.0.0.1.1.0.1.0.0".
+   This allows different accounts to be located on different database
+   servers (sharding).
 
 
 Configuration
@@ -187,7 +158,6 @@ How to setup a development environment
 [JSON serialization for the Swaptacular Messaging Protocol]: https://github.com/swaptacular/swpt_accounts/blob/master/protocol-json.rst
 [Swaptacular Messaging Protocol]: https://github.com/swaptacular/swpt_accounts/blob/master/protocol.rst
 [docker image]: https://www.geeksforgeeks.org/what-is-docker-images/
-[PostgreSQL]: https://www.postgresql.org/
 [RabbitMQ]: https://www.rabbitmq.com/
 [RabbitMQ queue]: https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html
 [RabbitMQ exchanges]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
