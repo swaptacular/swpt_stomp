@@ -19,22 +19,23 @@ following services:
 
 1. [RabbitMQ] server instance, which acts as broker for SMP messages.
 
-   For each peer node, at least one [RabbitMQ queue] must be configured on
-   the broker instance, so that all SMP messages that need to be send to the
-   given peer, are placed in given peer's respective queue(s).
+   **For each peer node**, at least one [RabbitMQ queue] must be configured
+   on the broker instance, so that all SMP messages that need to be send to
+   the given peer, are placed in the peer's respective queue(s).
 
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
    or **`accounts_in`** (depending on the type of the Swaptacular node) must
    be configured on the broker instance. This exchange is for received
-   messages that need to be processed by the current Swaptacular node. The
+   messages that should be processed by the current Swaptacular node. The
    routing key will represent the highest 24 bits of the MD5 digest of the
-   creditor ID, debtor ID, or the debtor/creditor ID pair (again, depending
-   on the type of the Swaptacular node). For example, if an "Accounting
-   Authority" node receives a message with debtor ID "123", and creditor ID
-   "456", the STOMP server will publish the message to the **`accounts_in`**
-   exchange, and the routing key will be
-   "0.0.0.0.1.0.0.0.0.1.0.0.0.1.0.0.0.0.1.1.0.1.0.0". This allows different
-   accounts to be located on different database servers (sharding).
+   creditor ID, the debtor ID, or the debtor/creditor ID pair (again,
+   depending on the type of the Swaptacular node). For example, if an
+   "Accounting Authority" node receives a message with debtor ID "123", and
+   creditor ID "456", the STOMP server will publish the message to the
+   **`accounts_in`** exchange, and the routing key will be
+   "0.0.0.0.1.0.0.0.0.1.0.0.0.1.0.0.0.0.1.1.0.1.0.0". This allows messages
+   for different accounts to be routed to different servers for processing
+   (sharding).
 
 2. A database containing the current Swaptacular node's data (including
    information about all peer nodes) must be available as a local directory
