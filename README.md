@@ -19,27 +19,27 @@ following services:
 
 1. [RabbitMQ] server instance, which acts as broker for SMP messages.
 
-   For each peer node a [RabbitMQ queue] must be configured on the broker
-   instance, so that all SMP messages coming from the given peer, are placed
-   in given peer's respective queue.
+   For each peer node, at least one [RabbitMQ queue] must be configured on
+   the broker instance, so that all SMP messages coming from the given peer,
+   are placed in given peer's respective queue(s).
 
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
    or **`accounts_in`** (depending on the type of the Swaptacular node) must
    be configured on the broker instance. This exchange is for messages that
-   are about to be processed by the Swaptacular node. The routing key will
+   need to be processed by the Swaptacular node. The routing key will
    represent the highest 24 bits of the MD5 digest of the creditor ID,
    debtor ID, or the debtor/creditor ID pair (again, depending on the type
    of the Swaptacular node). For example, for an "Accounting Authority"
    node, if debtor ID is equal to 123, and creditor ID is equal to 456, the
-   STOMP server will publish all received messages to the **`accounts_in`**
+   STOMP server will publish the received message to the **`accounts_in`**
    exchange, and the routing key will be
    "0.0.0.0.1.0.0.0.0.1.0.0.0.1.0.0.0.0.1.1.0.1.0.0". This allows different
    accounts to be located on different database servers (sharding).
 
-2. A file database that contains current Swaptacular node's data (including
-   information about all peer nodes) must be available to the container as a
-   local mount. To create and maintain such a database, you can use [these
-   scripts].
+2. A database containing the current Swaptacular node's data (including
+   information about all peer nodes) must be available as a local directory
+   mount in the container. To create and maintain such a database, you can
+   use [these scripts].
 
 
 Configuration
