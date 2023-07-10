@@ -20,8 +20,8 @@ following services:
 1. [RabbitMQ] server instance, which acts as broker for SMP messages.
 
    For each peer node, at least one [RabbitMQ queue] must be configured on
-   the broker instance, so that all SMP messages coming from the given peer,
-   are placed in given peer's respective queue(s).
+   the broker instance, so that all SMP messages that need to be send to the
+   given peer, are placed in given peer's respective queue(s).
 
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
    or **`accounts_in`** (depending on the type of the Swaptacular node) must
