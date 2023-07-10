@@ -13,8 +13,8 @@ Swaptacular Messaging Protocol].
 Dependencies
 ------------
 
-Containers started from the generated docker image must have access to
-the following servers:
+Containers started from the generated docker image must have access to the
+following services:
 
 1. [RabbitMQ] server instance, which acts as broker for SMP messages.
 
@@ -29,11 +29,17 @@ the following servers:
    will represent the highest 24 bits of the MD5 digest of the creditor ID,
    debtor ID, or the debtor/creditor ID pair (again, depending on the type
    of the Swaptacular node). For example, for an "Accounting Authority"
-   node, if debtor ID is equal to 123, and creditor ID is equal to 456,
-   messages will be published to the **`accounts_in`** exchange, and the
-   routing key will be "0.0.0.0.1.0.0.0.0.1.0.0.0.1.0.0.0.0.1.1.0.1.0.0".
-   This allows different accounts to be located on different database
-   servers (sharding).
+   node, if debtor ID is equal to 123, and creditor ID is equal to 456, the
+   STOMP server will publish all received messages to the **`accounts_in`**
+   exchange, and the routing key will be
+   "0.0.0.0.1.0.0.0.0.1.0.0.0.1.0.0.0.0.1.1.0.1.0.0". This allows different
+   accounts to be located on different database servers (sharding).
+
+2. A file database that contains current Swaptacular node's data (including
+   information about all peer nodes) must be available to the container as a
+   local mount.
+
+   To create and maintain such a database, you can use [these scripts].
 
 
 Configuration
@@ -161,6 +167,7 @@ How to setup a development environment
 [RabbitMQ]: https://www.rabbitmq.com/
 [RabbitMQ queue]: https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html
 [RabbitMQ exchange]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
+[these scripts]: https://github.com/swaptacular/swpt_ca_scripts
 [Docker Engine]: https://docs.docker.com/engine/
 [Docker Compose]: https://docs.docker.com/compose/
 [Poetry]: https://poetry.eustace.io/docs/
