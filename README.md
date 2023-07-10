@@ -1,7 +1,8 @@
 STOMP protocol client and server for Swaptacular
 ================================================
 
-This project implements [STOMP protocol] message transport for the
+This project is used by [Swaptacular] nodes to send network messages to each
+other over. It implements [STOMP protocol] message transport for the
 [Swaptacular Messaging Protocol] (SMP). The ultimate deliverable is a
 [docker image], generated from the project's
 [Dockerfile](../master/Dockerfile).
@@ -23,10 +24,10 @@ following services:
    PostgreSQL server instance, are routed to this queue.
 
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
-   or **`accounts_in`** (depending on the type of the [Swaptacular] node)
-   must be configured on the broker instance. This exchange is for messages
-   that are about to be processed by the Swaptacular node. The routing key
-   will represent the highest 24 bits of the MD5 digest of the creditor ID,
+   or **`accounts_in`** (depending on the type of the Swaptacular node) must
+   be configured on the broker instance. This exchange is for messages that
+   are about to be processed by the Swaptacular node. The routing key will
+   represent the highest 24 bits of the MD5 digest of the creditor ID,
    debtor ID, or the debtor/creditor ID pair (again, depending on the type
    of the Swaptacular node). For example, for an "Accounting Authority"
    node, if debtor ID is equal to 123, and creditor ID is equal to 456, the
