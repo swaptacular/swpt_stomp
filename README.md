@@ -39,7 +39,12 @@ following services:
 2. A database containing the current Swaptacular node's data (including
    information about all peer nodes) must be available as a local directory
    mount in the container. To create and maintain such a database, you can
-   use [these scripts].
+   use these [scripts].
+
+3. A server SSL certificate, and its corresponding private key. Those will
+   be used by both the client and the server, to authenticate before peer
+   nodes. You can use the same [scripts] to generate the server certificate
+   and the private key.
 
 
 Configuration
@@ -167,7 +172,7 @@ How to setup a development environment
 [RabbitMQ]: https://www.rabbitmq.com/
 [RabbitMQ queue]: https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html
 [RabbitMQ exchange]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
-[these scripts]: https://github.com/swaptacular/swpt_ca_scripts
+[scripts]: https://github.com/swaptacular/swpt_ca_scripts
 [Docker Engine]: https://docs.docker.com/engine/
 [Docker Compose]: https://docs.docker.com/compose/
 [Poetry]: https://poetry.eustace.io/docs/
