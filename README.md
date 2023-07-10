@@ -26,7 +26,7 @@ following services:
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
    or **`accounts_in`** (depending on the type of the Swaptacular node) must
    be configured on the broker instance. This exchange is for received
-   messages that should be processed by the current Swaptacular node. The
+   messages, which should be processed by the current Swaptacular node. The
    routing key will represent the highest 24 bits of the MD5 digest of the
    creditor ID, the debtor ID, or the debtor/creditor ID pair (again,
    depending on the type of the Swaptacular node). For example, if an
