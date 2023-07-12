@@ -20,8 +20,8 @@ following services:
 1. [RabbitMQ] server instance, which acts as broker for SMP messages.
 
    For each peer node, at least one [RabbitMQ queue] must be configured on
-   the broker instance, so that all SMP messages that need to be send to the
-   given peer, are placed in the peer's respective queue(s). The STOMP
+   the broker instance, so that all SMP messages that need to be send to a
+   given peer, are placed in the respective peer's queue(s). The STOMP
    client(s) for each peer node will read from this queue(s). See the
    `configure-queue` command bellow.
 
