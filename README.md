@@ -38,6 +38,9 @@ following services:
    for different accounts to be routed to different servers for processing
    (sharding).
 
+   **Important note:** The `rabbitmq_random_exchange` plugin must be enabled
+   on the RabbitMQ server instance.
+
 2. A database containing the current Swaptacular node's data (including
    information about all peer nodes) must be available as a local directory
    mount in the container. To create and maintain such a database, you can
