@@ -6,18 +6,28 @@ def test_parse_subnet():
     sn = Subnet.parse('0a')
     assert sn.subnet == 0x0a00000000000000
     assert sn.subnet_mask == 0xff00000000000000
+    assert sn.binding_key == '0a.#'
 
     sn = Subnet.parse('')
     assert sn.subnet == 0x0000000000000000
     assert sn.subnet_mask == 0x0000000000000000
+    assert sn.binding_key == '#'
 
     sn = Subnet.parse('1234567890abcdef')
     assert sn.subnet == 0x1234567890abcdef
     assert sn.subnet_mask == 0xffffffffffffffff
+    assert sn.binding_key == '12.34.56.78.90.ab.cd.ef'
 
     sn = Subnet.parse('0000000000000000')
     assert sn.subnet == 0
     assert sn.subnet_mask == 0xffffffffffffffff
+    assert sn.binding_key == '00.00.00.00.00.00.00.00'
+
+    sn = Subnet.parse('a')
+    assert sn.subnet == 0xa000000000000000
+    assert sn.subnet_mask == 0xf000000000000000
+    with pytest.raises(RuntimeError):
+        sn.binding_key
 
     with pytest.raises(ValueError):
         Subnet.parse('-02')  # negative

@@ -124,6 +124,19 @@ container allows you to execute the following *documented commands*:
 
   For more information, run `swpt-client --help`.
 
+* `configure-queue`
+
+  Configures a RabbitMQ queue that will contain messages which have to be
+  send to a specific peer Swaptacular node. A peer node ID, and a queue name
+  should be specified as arguments.
+
+  For each peer node, before running the `swpt-client` command, you will
+  have to run the `configure-queue` command first. For each peer node, you
+  may configure as many queues as you like, but you must make sure that for
+  every configured queue, a corresponding `swpt-client` will be running.
+
+  For more information, run `configure-queue --help`.
+
 
 How to run the tests
 --------------------

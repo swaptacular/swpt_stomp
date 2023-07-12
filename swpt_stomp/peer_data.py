@@ -66,6 +66,35 @@ class Subnet(NamedTuple):
         return (_MIN_INT64 <= n <= _MAX_INT64
                 and n & self.subnet_mask == self.subnet)
 
+    @property
+    def binding_key(self) -> str:
+        """Return the RabbitMQ binding key for the given subnet.
+
+        Example:
+        >>> Subnet.parse('0a1b').binding_key
+        0a.1b.#
+        >>> Subnet.parse('a').binding_key
+        ValueError: invalid binding key
+        """
+        parts = []
+        subnet_bytes = self.subnet.to_bytes(8, byteorder='big')
+        mask_bytes = self.subnet_mask.to_bytes(8, byteorder='big')
+        for sb, mb in zip(subnet_bytes, mask_bytes):
+            if mb == 0:
+                break
+            if mb != 0xff:
+                raise RuntimeError('invalid binding key')
+            parts.append(format(sb, '02x'))
+
+        n = len(parts)
+        if n == 0:
+            return '#'
+        if n < 8:
+            return '.'.join(parts) + '.#'
+        else:
+            assert n == 8
+            return '.'.join(parts)
+
 
 @dataclass
 class StompConfig:
@@ -117,6 +146,7 @@ class PeerData:
         'sub_cert',
         'creditors_subnet',
         'debtors_subnet',
+        'is_active',
     )
     node_type: NodeType
     node_id: str
@@ -125,6 +155,7 @@ class PeerData:
     sub_cert: bytes
     creditors_subnet: Subnet
     debtors_subnet: Subnet
+    is_active: bool
 
 
 class DatabaseError(Exception):
@@ -181,22 +212,33 @@ class NodePeersDatabase(ABC):
 
         return self.__node_data
 
-    async def get_peer_data(self, node_id: str) -> Optional[PeerData]:
+    async def get_peer_data(
+            self,
+            node_id: str,
+            *,
+            active_peers_only: bool = True,
+    ) -> Optional[PeerData]:
         """Return data for peer with the given node ID."""
 
         peer_data = self.__get_stored_peer_data(node_id)
         if peer_data is None:
             try:
-                peer_data = await self._get_peer_data(node_id)
+                peer_data = await self._get_peer_data(
+                    node_id, active_peers_only=active_peers_only)
             except Exception as e:  # pragma: nocover
                 raise DatabaseError from e
-            if peer_data:
+            if peer_data and peer_data.is_active:
                 self.__store_peer_data(peer_data)
 
         return peer_data
 
     @abstractmethod
-    async def _get_peer_data(self, node_id: str) -> Optional[PeerData]:
+    async def _get_peer_data(
+            self,
+            node_id: str,
+            *,
+            active_peers_only: bool = True,
+    ) -> Optional[PeerData]:
         raise NotImplementedError  # pragma: nocover
 
     @abstractmethod
@@ -222,9 +264,10 @@ def get_database_instance(
     >>> db = get_database_instance(url='file:///path/to/the/database/')
 
     When values for `max_cached_peers`, `peers_cache_seconds`, and
-    `peers_cache_seconds` are not passed, the values of "MAX_CACHED_PEERS",
-    "PEERS_CACHE_SECONDS", and "FILE_READ_THREADS" environment variables
-    will be used. When not set, reasonable default values will be used.
+    `peers_cache_seconds` are not passed, the values of
+    "APP_MAX_CACHED_PEERS", "APP_PEERS_CACHE_SECONDS", and
+    "APP_FILE_READ_THREADS" environment variables will be used. When not
+    set, reasonable default values will be used.
 
     NOTE: The `file_read_threads` parameter specifies the number of threads
     for the `ThreadPoolExecutor`, which will be used for reading local files
@@ -345,7 +388,12 @@ class _LocalDirectory(NodePeersDatabase):
             debtors_subnet=debtors_subnet,
         )
 
-    async def _get_peer_data(self, node_id: str) -> Optional[PeerData]:
+    async def _get_peer_data(
+            self,
+            node_id: str,
+            *,
+            active_peers_only: bool = True,
+    ) -> Optional[PeerData]:
         loop = asyncio.get_running_loop()
         dir = await loop.run_in_executor(
             self._executor,
@@ -361,13 +409,17 @@ class _LocalDirectory(NodePeersDatabase):
 
         try:
             # Peers that do not have a file with the name "ACTIVE" in their
-            # corresponding directories will be ignored. The existence of
-            # this file signals that all necessary objects related to the
-            # peer (configuration files, RabbitMQ queues, exchanges,
-            # bindings etc.) have been created.
+            # corresponding directories are considered inactive. The
+            # existence of this file signals that all necessary objects
+            # related to the peer (configuration files, RabbitMQ queues,
+            # exchanges, bindings etc.) have been created.
             await self._read_file(f'{dir}/ACTIVE')
         except FileNotFoundError:  # pragma: nocover
-            return None
+            if active_peers_only:
+                return None
+            is_active = False
+        else:
+            is_active = True
 
         root_cert = await self._read_cert_file(f'{dir}/root-ca.crt')
 
@@ -420,6 +472,7 @@ class _LocalDirectory(NodePeersDatabase):
             sub_cert=sub_cert,
             creditors_subnet=creditors_subnet,
             debtors_subnet=debtors_subnet,
+            is_active=is_active,
         )
 
 

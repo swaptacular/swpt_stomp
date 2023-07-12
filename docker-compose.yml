@@ -6,6 +6,7 @@ services:
     image: rabbitmq:$RABBITMQ_VERSION
     volumes:
       - './docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf'
+      - './docker/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins'
     environment:
       - 'RABBITMQ_LOGS=-'
     ports:
