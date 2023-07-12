@@ -22,8 +22,8 @@ following services:
    For each peer node, at least one [RabbitMQ queue] must be configured on
    the broker instance, so that all SMP messages that need to be send to a
    given peer, are placed in the respective peer's queue(s). The STOMP
-   client(s) for each peer node will read from this queue(s). See the
-   `configure-queue` command bellow.
+   client(s) for each peer node will read from the respective peer's
+   queue(s). See the `configure-queue` command bellow.
 
    Also, a [RabbitMQ exchange] named **`creditors_in`**, **`debtors_in`**,
    or **`accounts_in`** (depending on the type of the Swaptacular node) must
