@@ -166,8 +166,9 @@ How to setup a development environment
         $ poetry install
 
 4.  You can use `swpt-server` and `swpt-client` to run the server or the
-    client, and `pytest --cov=swpt_stomp --cov-report=html` to run the tests
-    and generate a test coverage report.
+    client, `configure-queue` to configure a queue, and `pytest
+    --cov=swpt_stomp --cov-report=html` to run the tests and generate a test
+    coverage report.
 
     Note however, that the above commands rely on being able to connect to a
     RabbitMQ server instance at "amqp://guest:guest@localhost:5672". Also,
@@ -176,6 +177,11 @@ How to setup a development environment
     connect from anywhere, or create a new RabbitMQ user, and change the
     RabbitMQ connection URL accordingly (`PROTOCOL_BROKER_URL` in the *.env*
     file).
+
+    Moreover, you need to enable the `rabbitmq_random_exchange` plugin by
+    running:
+
+        $ sudo rabbitmq-plugins enable rabbitmq_random_exchange
 
 
 
