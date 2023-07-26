@@ -149,7 +149,7 @@ container allows you to execute the following *documented commands*:
   files, RabbitMQ queues, exchanges, bindings etc.) have been created.
 
 Here are some examples how to use the generated docker image for different
-node types:
+Swaptacular nodes:
 
  - [Accounting authority node](https://github.com/swaptacular/swpt_accounts/blob/master/docker-compose-all.yml),
  - [Creditors agent node](https://github.com/swaptacular/swpt_creditors/blob/master/docker-compose-all.yml),
