@@ -148,6 +148,13 @@ container allows you to execute the following *documented commands*:
   file signals that all necessary objects related to the peer (configuration
   files, RabbitMQ queues, exchanges, bindings etc.) have been created.
 
+Here are some examples how to use the generated docker image for different
+node types:
+
+ - (Accounting Authority Node)[https://github.com/swaptacular/swpt_accounts/blob/master/docker-compose-all.yml],
+ - (Creditors Agent Node)[https://github.com/swaptacular/swpt_creditors/blob/master/docker-compose-all.yml],
+ - (Debtors Agent Node)[https://github.com/swaptacular/swpt_debtors/blob/master/docker-compose-all.yml],
+
 
 How to run the tests
 --------------------
