@@ -34,6 +34,7 @@
 ##############################################################################
 
 import logging
+import sys
 import os
 import os.path
 import asyncio
@@ -258,6 +259,7 @@ def server(
         server_queue_size=server_buffer,
         protocol_broker_url=broker_url,
     ))
+    sys.exit(1)  # pragma: nocover
 
 
 if __name__ == '__main__':  # pragma: nocover

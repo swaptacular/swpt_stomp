@@ -34,6 +34,7 @@
 ##############################################################################
 
 import logging
+import sys
 import tempfile
 import asyncio
 import ssl
@@ -236,6 +237,7 @@ def client(
         protocol_broker_url=broker_url,
         protocol_broker_queue=queue_name,
     ))
+    sys.exit(1)  # pragma: nocover
 
 
 if __name__ == '__main__':  # pragma: nocover
