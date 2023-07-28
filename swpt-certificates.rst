@@ -50,12 +50,12 @@ root certificates
 
 server certificates
   Server certificates are used to authenticate Swaptacular nodes' servers
-  before their peers. Server certificates MUST be signed using the private
-  key used to sign the node's root certificate. Swaptacular nodes may issue
-  as many server certificates as they want, but the subject of each server
-  certificate MUST be exactly the same as the subject of the node's root
-  certificate. The expiration date of server certificates SHOULD be set in
-  the relatively close future (after 1 year for example).
+  before their peers. Server certificates MUST be signed with the private
+  key used for signing the node's root certificate. Swaptacular nodes may
+  issue as many server certificates as they want, but the subject of each
+  server certificate MUST be exactly the same as the subject of the node's
+  root certificate. The expiration date of server certificates SHOULD be set
+  in the relatively close future (after 1 year for example).
 
   Server certificates MUST include the following standard certificate
   extensions:
@@ -69,27 +69,26 @@ server certificates
     ensures that the stated key usage is consistent with the purposes listed
     in the "Extended Key Usage" extension.
 
-  - *Extended Key Usage* extension, marked as "non-critical", with its
-    allowed purposes including ``clientAuth`` and ``serverAuth``. This
-    ensures that the certificate can be used for client and server
-    authentication.
+  - *Extended Key Usage* extension, marked as "non-critical", with allowed
+    purposes ``clientAuth`` and ``serverAuth``. This ensures that the
+    certificate can be used for client and server authentication.
 
   - *Subject Key Identifier* extension, marked as "non-critical", specifying
-    the SHA-1 hash of the server's public key as key identifier. This
-    provides a means to quickly identify the set of certificates containing
-    a particular public key.
+    the SHA-1 hash of the server public key as key identifier. This provides
+    a means to quickly identify the set of certificates containing a
+    particular public key.
 
   - *Authority Key Identifier* extension, marked as "non-critical",
-    specifying the SHA-1 hash of the issuer's public key as key identifier.
-    This provides a means of identifying the public key corresponding to the
-    private key used to sign the certificate.
+    specifying the SHA-1 hash of the root certificate's public key as key
+    identifier. This provides a means of identifying the public key
+    corresponding to the private key used to sign the certificate.
 
 peer certificates
   Peer certificates are issued to peers nodes, so that peers can prove their
-  identity before your servers. A peer certificate is issued for each peer
-  node. Peer certificates MUST be signed using the node's root certificate.
-  The expiration date of peer certificates SHOULD be set very far in the
-  future (after 500 years for example).
+  identity. A peer certificate is issued for each peer node. Peer
+  certificates MUST be signed with the private key used for signing the
+  node's root certificate. The expiration date of peer certificates SHOULD
+  be set very far in the future (after 500 years for example).
 
   Peer certificates MUST include the following standard certificate
   extensions:
@@ -101,11 +100,11 @@ peer certificates
 
   - *Key Usage* extension, marked as "critical" with its ``keyCertSign`` bit
     set to ``true``. This ensures that the public key can be used for
-    verifying signatures on server certificates.
+    verifying signatures on other certificates.
 
   - *Name Constraints* extension, marked as "critical", specifying in its
     ``permittedSubtrees`` field a restriction of the ``directoryName`` form,
-    ensuring that all certificates down the trust chain can not change
+    ensuring that all certificates down the trust chain can not change the
     subject's ``O``, ``OU``, and ``serialNumber`` distinguished name
     attributes.
 
@@ -115,9 +114,9 @@ peer certificates
     particular public key.
 
   - *Authority Key Identifier* extension, marked as "non-critical",
-    specifying the SHA-1 hash of the issuer's public key as key identifier.
-    This provides a means of identifying the public key corresponding to the
-    private key used to sign the certificate.
+    specifying the SHA-1 hash of the root certificate's public key as key
+    identifier. This provides a means of identifying the public key
+    corresponding to the private key used to sign the certificate.
 
   - *Netscape Certificate Comment* extension (OID value:
     2.16.840.1.113730.1.13), marked as "non-critical", ...
