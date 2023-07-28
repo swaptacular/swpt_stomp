@@ -34,13 +34,13 @@ root certificates
 
   Root certificates MUST include the following extensions:
 
-  - *Basic constraints* extension, marked as "critical", with its `cA`
-    boolean field set to `true`, and its `pathLenConstraint` field set to at
-    least `1`, or not set at all. This ensures that the certificate can
-    participate in the chain of trust.
+  - *Basic constraints* extension, marked as "critical", with its ``cA``
+    boolean field set to ``true``, and its ``pathLenConstraint`` field set
+    to at least ``1``, or not set at all. This ensures that the certificate
+    can participate in the chain of trust.
 
-  - *Key usage* extension, marked as "critical" with its `keyCertSign` bit
-    set to `true`. This ensures that the public key can be used for
+  - *Key usage* extension, marked as "critical" with its ``keyCertSign`` bit
+    set to ``true``. This ensures that the public key can be used for
     verifying signatures on peer certificates.
 
   - "Subject Key Identifier" extension, specifying the SHA-1 hash of the
@@ -58,18 +58,19 @@ server certificates
 
   Server certificates MUST include the following extensions:
   
-  - *Basic constraints* extension, marked as "critical", with its `cA`
-    boolean field set to `false`. This ensures that the certificate can only
-    appear at the end of the chain of trust.
+  - *Basic constraints* extension, marked as "critical", with its ``cA``
+    boolean field set to ``false``. This ensures that the certificate can
+    only appear at the end of the chain of trust.
 
-  - *Key usage* extension, marked as "critical" with its `digitalSignature`
-    and `keyEncipherment` bits set to `true`. This ensures that the stated
-    key usage is consistent with the purposes listed in the "Extended key
-    usage" extension.
+  - *Key usage* extension, marked as "critical" with its
+    ``digitalSignature`` and ``keyEncipherment`` bits set to ``true``. This
+    ensures that the stated key usage is consistent with the purposes listed
+    in the "Extended key usage" extension.
 
   - *Extended key usage* extension, marked as "non-critical", with its
-    allowed purposes including `clientAuth` and `serverAuth`. This ensures
-    that the certificate can be used for client and server authentication.
+    allowed purposes including ``clientAuth`` and ``serverAuth``. This
+    ensures that the certificate can be used for client and server
+    authentication.
 
   - *Subject Key Identifier* extension, marked as "non-critical", specifying
     the SHA-1 hash of the server's public key as key identifier. This
@@ -90,19 +91,20 @@ peer certificates
 
   Peer certificates MUST include the following extensions:
 
-  - *Basic constraints* extension, marked as "critical", with its `cA`
-    boolean field set to `true`, and its `pathLenConstraint` field set to at
-    least `0`, or not set at all. This ensures that the certificate can
-    participate in the chain of trust.
+  - *Basic constraints* extension, marked as "critical", with its ``cA``
+    boolean field set to ``true``, and its ``pathLenConstraint`` field set
+    to at least ``0``, or not set at all. This ensures that the certificate
+    can participate in the chain of trust.
 
-  - *Key usage* extension, marked as "critical" with its `keyCertSign` bit
-    set to `true`. This ensures that the public key can be used for
+  - *Key usage* extension, marked as "critical" with its ``keyCertSign`` bit
+    set to ``true``. This ensures that the public key can be used for
     verifying signatures on server certificates.
 
   - *Name constraints* extension, marked as "critical", specifying in its
-    `permittedSubtrees` field a restriction of the `directoryName` form,
+    ``permittedSubtrees`` field a restriction of the ``directoryName`` form,
     ensuring that all certificates down the trust chain can not change
-    subject's `O`, `OU`, and `serialNumber` distinguished name attributes.
+    subject's ``O``, ``OU``, and ``serialNumber`` distinguished name
+    attributes.
 
   - *Subject Key Identifier* extension, marked as "non-critical", specifying
     the SHA-1 hash of the peer's public key as key identifier. This provides
@@ -123,15 +125,15 @@ Certificate Subject's Distinguished Name
 
 TODO
 
-1. The "Organization" (`O`) MUST be `Swaptacular Nodes Registry`.
+1. The "Organization" (``O``) MUST be ``Swaptacular Nodes Registry``.
 
-2. The "Organizational Unit" (`OU`) MUST be:
+2. The "Organizational Unit" (``OU``) MUST be:
 
-   - `Accounting Authorities` for accounting authority nodes;
-   - `Creditors Agents` for creditors agent nodes;
-   - `Debtors Agents` for debtors agent nodes.
+   - ``Accounting Authorities`` for accounting authority nodes;
+   - ``Creditors Agents`` for creditors agent nodes;
+   - ``Debtors Agents`` for debtors agent nodes.
 
-3. The "Serial Number" (`serialNumber`) MUST be...
+3. The "Serial Number" (``serialNumber``) MUST be...
 
 
 
