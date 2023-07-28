@@ -1,8 +1,8 @@
 ++++++++++++++++++++++++++++++++
 Swaptacular SSL/TLS Certificates
 ++++++++++++++++++++++++++++++++
-:Description: Specifies the way Swaptacular Messaging Protocol
-              messages should be serialized to JSON
+:Description: Specifies the different types of SSL/TLS certificates used in
+              Swaptacular.
 :Author: Evgeni Pandurksi
 :Contact: epandurski@gmail.com
 :Date: 2023-08-01
@@ -13,8 +13,8 @@ Swaptacular SSL/TLS Certificates
 Overview
 ========
 
-This document specifies how Swaptacular Messaging Protocol messages
-are serialized to JSON documents (``"applicatoin/json"``).
+This document specifies the different types of SSL/TLS certificates used in
+Swaptacular.
 
 **Note:** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL",
 "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and
@@ -28,50 +28,100 @@ Certificate types
 There are 3 types of certificates:
 
 root certificates
-  Every Swaptacular issues a self-signed certificate to itself.
-  
-  The expiration date of root certificates SHOULD be set very far in the
-  future (500 years for example).
+  Every Swaptacular node issues a self-signed certificate to itself. The
+  expiration date of root certificates SHOULD be set very far in the future
+  (after 500 years for example).
+
+  Root certificates MUST include the following extensions:
+
+  - *Basic constraints* extension, marked as "critical", with its `cA`
+    boolean field set to `true`, and its `pathLenConstraint` field set to at
+    least `1`, or not set at all. This ensures that the certificate can
+    participate in the chain of trust.
+
+  - *Key usage* extension, marked as "critical" with its `keyCertSign` bit
+    set to `true`. This ensures that the public key can be used for
+    verifying signatures on peer certificates.
+
+  - "Subject Key Identifier" extension, specifying the SHA-1 hash of the
+    subject's public key as key identifier. This provides a means to quickly
+    identify the set of certificates containing a particular public key.
 
 server certificates
-  They are used by Swaptacular nodes' servers, so that the server can prove
-  their identity before Swaptacular peer nodes.
+  Server certificates are used to authenticate Swaptacular nodes' servers
+  before their peers. Swaptacular nodes may issue as many different server
+  certificates as they want, but the subject of each server certificate MUST
+  be exactly the same as the subject of the node's root certificate. Also,
+  each server certificate MUST be signed using the node's root certificate.
+  The expiration date of server certificates SHOULD be set in the relatively
+  close future (after 1 year for example).
 
-  Node can issue many server certificates, which MUST be signed using the
-  node's root certificate. The subject's DN for server certificates MUST be
-  the same as for the root certificate.
+  Server certificates MUST include the following extensions:
+  
+  - *Basic constraints* extension, marked as "critical", with its `cA`
+    boolean field set to `false`. This ensures that the certificate can only
+    appear at the end of the chain of trust.
 
-  The expiration date of root certificates SHOULD NOT be set too far in the
-  future (1 year for example).
+  - *Key usage* extension, marked as "critical" with its `digitalSignature`
+    and `keyEncipherment` bits set to `true`. This ensures that the stated
+    key usage is consistent with the purposes listed in the "Extended key
+    usage" extension.
+
+  - *Extended key usage* extension, marked as "non-critical", with its
+    allowed purposes including `clientAuth` and `serverAuth`. This ensures
+    that the certificate can be used for client and server authentication.
+
+  - *Subject Key Identifier* extension, marked as "non-critical", specifying
+    the SHA-1 hash of the server's public key as key identifier. This
+    provides a means to quickly identify the set of certificates containing
+    a particular public key.
+
+  - *Authority Key Identifier* extension, marked as "non-critical",
+    specifying the SHA-1 hash of the issuer's public key as key identifier.
+    This provides a means of identifying the public key corresponding to the
+    private key used to sign the certificate.
 
 peer certificates
-  Are issued to peers nodes, so that peer nodes can prove their identity
-  before your servers.
+  Peer certificates are issued to peers nodes, so that peers can prove their
+  identity before your servers. A peer certificate is issued for each peer
+  node. Peer certificates MUST be signed using the node's root certificate.
+  The expiration date of peer certificates SHOULD be set very far in the
+  future (after 500 years for example).
 
-  Each peer certificate MUST include:
+  Peer certificates MUST include the following extensions:
 
-  - "basicConstraints" extension, marked as "critical", with its "CA" field
-    set to `true`. This ensures that the certificate can participate in a
-    chain of trust.
-    
-  - "keyUsage" extension, marked as "critical" with its "keyCertSign" bit
-    set to `true`.
+  - *Basic constraints* extension, marked as "critical", with its `cA`
+    boolean field set to `true`, and its `pathLenConstraint` field set to at
+    least `0`, or not set at all. This ensures that the certificate can
+    participate in the chain of trust.
 
-  - "nameConstraints" extension, marked as "critical", specifying in its
-    "permittedSubtrees" field a restriction of the `directoryName` form
-    (That is: ensuring that certificates down the chain can not change
-    subject's `O`, `OU`, and `serialNumber` DN attributes).
-    
-  - "Subject Key Identifier" extension, specifying the SHA-1 hash of the
-    subject's public key as key identifier.
+  - *Key usage* extension, marked as "critical" with its `keyCertSign` bit
+    set to `true`. This ensures that the public key can be used for
+    verifying signatures on server certificates.
 
-  A peer certificate is issued for each peer. Peer certificates MUST be
-  signed using the node's root certificate. The expiration date of peer
-  certificates SHOULD be set very far in the future (500 years for example).
+  - *Name constraints* extension, marked as "critical", specifying in its
+    `permittedSubtrees` field a restriction of the `directoryName` form,
+    ensuring that all certificates down the trust chain can not change
+    subject's `O`, `OU`, and `serialNumber` distinguished name attributes.
+
+  - *Subject Key Identifier* extension, marked as "non-critical", specifying
+    the SHA-1 hash of the peer's public key as key identifier. This provides
+    a means to quickly identify the set of certificates containing a
+    particular public key.
+
+  - *Authority Key Identifier* extension, marked as "non-critical",
+    specifying the SHA-1 hash of the issuer's public key as key identifier.
+    This provides a means of identifying the public key corresponding to the
+    private key used to sign the certificate.
+
+  - *Netscape certificate comment* (OID value: 2.16.840.1.113730.1.13),
+    marked as "non-critical", ...
 
 
 Certificate Subject's Distinguished Name
 ========================================
+
+TODO
 
 1. The "Organization" (`O`) MUST be `Swaptacular Nodes Registry`.
 
@@ -83,105 +133,6 @@ Certificate Subject's Distinguished Name
 
 3. The "Serial Number" (`serialNumber`) MUST be...
 
-   
-Certificate Expiration Date
-===========================
-
-The expiration date of peer certificates SHOULD be set very far in the
-future (500 years for example).
 
 
 .. _X509: https://datatracker.ietf.org/doc/html/rfc5280
-
-
-
-
-
-
-Required Message Fields
-=======================
-
-For every specific type of message defined by the Swaptacular
-Messaging Protocol's specification, all of the defined message fields
-MUST be present in the serialized JSON document as properties. In
-addition, a ``"type"`` property MUST exist, specifying the type of the
-message.
-
-For example, the serialization of an ``AccountPurge`` message would
-look like this::
-
-  {
-    "type": "AccountPurge",
-    "debtor_id": 1234,
-    "creditor_id": 5678,
-    "creation_date": "2022-08-19",
-    "ts": "2022-08-20T16:59:59Z"
-  }
-
-
-Message Filed Types
-===================
-
-The specification of the Swaptacular Messaging Protocol uses several
-different field types, which MUST be serialized to JSON values as
-follows:
-
-
-int32
-  To JSON number.
-
-  MUST be formatted as integer. MUST NOT contain a decimal point
-  (``.``) or an exponent (``e`` or ``E``).
-
-
-int64
-  To JSON number.
-
-  MUST be formatted as integer. MUST NOT contain a decimal point
-  (``.``) or an exponent (``e`` or ``E``).
-
-  **Note for implementators:** Even thought ECMAScript 2021 supports
-  `BigInt`s, the standard JSON parser and serializer does not allow to
-  correctly process numbers outside the safe range from ```-(2 ** 53 -
-  1)`` to ``2 ** 53 - 1``.
-  
-float  
-  To JSON number.
-
-  MUST be formatted as floating point number. MUST contain a decimal
-  point (``.``), or an exponent (``e`` or ``E``), or both. The reason
-  for this requirement is to allow generic JSON parsers to easily
-  differentiate integers from floats.
-
-  **Note for implementators:** The standard ECMAScript 2021 JSON
-  serializer does not satisfy this requirement.
-
-string
-  To JSON string.
-
-  Non-ASCII characters SHOULD NOT be escaped using the ``\uXXXX``
-  syntax.
-
-date-time  
-  To JSON string.
-
-  The ISO 8601 timestamp format MUST be used.
-  
-date
-  To JSON string.
-
-  The ISO 8601 date format MUST be used (``YYYY-MM-DD``).
-
-bytes
-  To JSON string.
-  
-  Each byte MUST be represented by exactly two hexadecimal *uppercase*
-  characters (Base16 encoding).
-  
-  
-Default Encoding
-================
-
-When messages are serialized in JSON format, and received as a
-byte-stream, without an explicitly prescribed encoding, UTF-8 encoding
-MUST be presumed.
