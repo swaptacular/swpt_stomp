@@ -88,8 +88,8 @@ peer certificates
   Peer certificates are issued to peers nodes, so that peers nodes' servers
   can present them, along with a server certificate, to prove their identity
   (forming a verifiable chain of trust). A peer certificate should be issued
-  for each peer node. Peer certificates are signed with the private key used
-  for signing the node's root certificate. The expiration date of peer
+  for each peer node. Peer certificates must be signed with the private key
+  used for signing the node's root certificate. The expiration date of peer
   certificates SHOULD be set very far in the future (after 500 years for
   example).
 
@@ -125,10 +125,11 @@ peer certificates
     identifier. This provides a means of identifying the public key
     corresponding to the private key used to sign the certificate.
 
-  For accounting authority nodes:
-
-  - *Netscape Certificate Comment* extension (OID value:
-    2.16.840.1.113730.1.13), marked as "non-critical", ...
+  Peer certificates issued by accounting authority nodes, in addition to the
+  previously listed extensions, MUST include the *Netscape Certificate
+  Comment* extension (OID value: 2.16.840.1.113730.1.13), marked as
+  "non-critical". The content MUST match the reqular expression: ``Subnet:
+  [a-f0-9]{6,16}``.
 
 
 Certificate Subject's Distinguished Name
