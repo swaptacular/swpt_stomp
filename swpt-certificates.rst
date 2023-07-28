@@ -125,11 +125,19 @@ peer certificates
     identifier. This provides a means of identifying the public key
     corresponding to the private key used to sign the certificate.
 
-  Peer certificates issued by accounting authority nodes, in addition to the
-  previously listed extensions, MUST include the *Netscape Certificate
+  Peer certificates issued by *accounting authority nodes*, in addition to
+  the previously listed extensions, MUST include the *Netscape Certificate
   Comment* extension (OID value: 2.16.840.1.113730.1.13), marked as
-  "non-critical". The content MUST match the reqular expression: ``Subnet:
-  [a-f0-9]{6,16}``.
+  "non-critical". The content MUST match the following regular expression::
+
+    Subnet: [a-f0-9]{6,16}
+
+  The hexadecimal value after the "Subnet: " prefix specify the range of
+  creditor/debtor IDs (depending on the peer's node type) that the peer node
+  is responsible for. For example, if "Subnet: 123abc" is given to a
+  *creditors agent node*, the node will be responsible for managing all
+  creditor ID between ``0x123abc0000000000`` and ``0x123abcffffffffff``
+  inclusive.
 
 
 Certificate Subject's Distinguished Name
