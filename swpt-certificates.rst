@@ -16,6 +16,8 @@ Overview
 This document specifies the different types of SSL/TLS certificates used in
 Swaptacular.
 
+TODO
+
 **Note:** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL",
 "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and
 "OPTIONAL" in this document are to be interpreted as described in
@@ -25,9 +27,9 @@ RFC 2119.
 Root certificates
 =================
 
-Every Swaptacular node issues a self-signed certificate to itself. The
-expiration date of root certificates SHOULD be set very far in the future
-(after 500 years for example).
+Every Swaptacular network node MUST issue **exactly one** self-signed root
+certificate to itself. The expiration date of root certificates SHOULD be
+set very far in the future (after 500 years for example).
 
 Root certificates MUST include the following standard certificate
 extensions:
@@ -50,8 +52,8 @@ extensions:
 Server certificates
 ===================
 
-Server certificates are used to authenticate Swaptacular nodes' servers
-before their peer nodes' servers. Server certificates MUST be signed with
+Server certificates are used by Swaptacular nodes' servers to prove their
+identity before peer nodes' servers. Server certificates MUST be signed with
 the private key used for signing the node's root certificate. Swaptacular
 nodes may issue as many server certificates as they want, but the subject of
 each server certificate MUST be exactly the same as the subject of the
@@ -92,8 +94,8 @@ Peer certificates are issued to peers nodes, so that peers nodes' servers
 can present them, along with a server certificate, to prove their identity
 (forming a verifiable chain of trust). A peer certificate should be issued
 for each peer node. Peer certificates must be signed with the private key
-used for signing the node's root certificate. The expiration date of peer
-certificates SHOULD be set very far in the future (after 500 years for
+used for signing the issuing node's root certificate. The expiration date of
+peer certificates SHOULD be set very far in the future (after 500 years for
 example).
 
 For every peer certificate, the subject and the subject's public key MUST
