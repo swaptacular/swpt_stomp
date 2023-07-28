@@ -45,17 +45,18 @@ root certificates
     verifying signatures on other certificates.
 
   - *Subject Key Identifier* extension, specifying the SHA-1 hash of the
-    subject's public key as key identifier. This provides a means to quickly
-    identify the set of certificates containing a particular public key.
+    root certificate's public key as key identifier. This provides a means
+    to quickly identify the set of certificates containing a particular
+    public key.
 
 server certificates
   Server certificates are used to authenticate Swaptacular nodes' servers
-  before their peers. Server certificates MUST be signed with the private
-  key used for signing the node's root certificate. Swaptacular nodes may
-  issue as many server certificates as they want, but the subject of each
-  server certificate MUST be exactly the same as the subject of the node's
-  root certificate. The expiration date of server certificates SHOULD be set
-  in the relatively close future (after 1 year for example).
+  before their peers' servers. Server certificates MUST be signed with the
+  private key used for signing the node's root certificate. Swaptacular
+  nodes may issue as many server certificates as they want, but the subject
+  of each server certificate MUST be exactly the same as the subject of the
+  node's root certificate. The expiration date of server certificates SHOULD
+  be set in the relatively close future (after 1 year for example).
 
   Server certificates MUST include the following standard certificate
   extensions:
@@ -69,9 +70,9 @@ server certificates
     ensures that the stated key usage is consistent with the purposes listed
     in the "Extended Key Usage" extension.
 
-  - *Extended Key Usage* extension, marked as "non-critical", with allowed
-    purposes ``clientAuth`` and ``serverAuth``. This ensures that the
-    certificate can be used for client and server authentication.
+  - *Extended Key Usage* extension, marked as "non-critical", listing
+    ``clientAuth`` and ``serverAuth`` as allowed purposes. This ensures that
+    the certificate can be used for client and server authentication.
 
   - *Subject Key Identifier* extension, marked as "non-critical", specifying
     the SHA-1 hash of the server public key as key identifier. This provides
@@ -84,19 +85,19 @@ server certificates
     corresponding to the private key used to sign the certificate.
 
 peer certificates
-  Peer certificates are issued to peers nodes, so that peers can prove their
-  identity. A peer certificate is issued for each peer node. Peer
-  certificates MUST be signed with the private key used for signing the
-  node's root certificate. The expiration date of peer certificates SHOULD
-  be set very far in the future (after 500 years for example).
+  Peer certificates are issued to peers nodes, so that peers can issue
+  server certificates to prove their servers' identity. A peer certificate
+  should be issued for each peer node. Peer certificates MUST be signed with
+  the private key used for signing the node's root certificate. The
+  expiration date of peer certificates SHOULD be set very far in the future
+  (after 500 years for example).
 
   Peer certificates MUST include the following standard certificate
   extensions:
 
   - *Basic Constraints* extension, marked as "critical", with its ``cA``
-    boolean field set to ``true``, and its ``pathLenConstraint`` field set
-    to at least ``0``, or not set at all. This ensures that the certificate
-    can participate in the chain of trust.
+    boolean field set to ``true``. This ensures that the certificate can
+    participate in the chain of trust.
 
   - *Key Usage* extension, marked as "critical" with its ``keyCertSign`` bit
     set to ``true``. This ensures that the public key can be used for
@@ -104,7 +105,7 @@ peer certificates
 
   - *Name Constraints* extension, marked as "critical", specifying in its
     ``permittedSubtrees`` field a restriction of the ``directoryName`` form,
-    ensuring that all certificates down the trust chain can not change the
+    ensuring that all certificates down the trust chain will not change the
     subject's ``O``, ``OU``, and ``serialNumber`` distinguished name
     attributes.
 
