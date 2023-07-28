@@ -32,42 +32,44 @@ root certificates
   expiration date of root certificates SHOULD be set very far in the future
   (after 500 years for example).
 
-  Root certificates MUST include the following extensions:
+  Root certificates MUST include the following standard certificate
+  extensions:
 
-  - *Basic constraints* extension, marked as "critical", with its ``cA``
+  - *Basic Constraints* extension, marked as "critical", with its ``cA``
     boolean field set to ``true``, and its ``pathLenConstraint`` field set
     to at least ``1``, or not set at all. This ensures that the certificate
     can participate in the chain of trust.
 
-  - *Key usage* extension, marked as "critical" with its ``keyCertSign`` bit
+  - *Key Usage* extension, marked as "critical" with its ``keyCertSign`` bit
     set to ``true``. This ensures that the public key can be used for
-    verifying signatures on peer certificates.
+    verifying signatures on other certificates.
 
-  - "Subject Key Identifier" extension, specifying the SHA-1 hash of the
+  - *Subject Key Identifier* extension, specifying the SHA-1 hash of the
     subject's public key as key identifier. This provides a means to quickly
     identify the set of certificates containing a particular public key.
 
 server certificates
   Server certificates are used to authenticate Swaptacular nodes' servers
-  before their peers. Swaptacular nodes may issue as many different server
-  certificates as they want, but the subject of each server certificate MUST
-  be exactly the same as the subject of the node's root certificate. Also,
-  each server certificate MUST be signed using the node's root certificate.
-  The expiration date of server certificates SHOULD be set in the relatively
-  close future (after 1 year for example).
+  before their peers. Server certificates MUST be signed using the private
+  key used to sign the node's root certificate. Swaptacular nodes may issue
+  as many server certificates as they want, but the subject of each server
+  certificate MUST be exactly the same as the subject of the node's root
+  certificate. The expiration date of server certificates SHOULD be set in
+  the relatively close future (after 1 year for example).
 
-  Server certificates MUST include the following extensions:
+  Server certificates MUST include the following standard certificate
+  extensions:
   
-  - *Basic constraints* extension, marked as "critical", with its ``cA``
+  - *Basic Constraints* extension, marked as "critical", with its ``cA``
     boolean field set to ``false``. This ensures that the certificate can
     only appear at the end of the chain of trust.
 
-  - *Key usage* extension, marked as "critical" with its
+  - *Key Usage* extension, marked as "critical" with its
     ``digitalSignature`` and ``keyEncipherment`` bits set to ``true``. This
     ensures that the stated key usage is consistent with the purposes listed
-    in the "Extended key usage" extension.
+    in the "Extended Key Usage" extension.
 
-  - *Extended key usage* extension, marked as "non-critical", with its
+  - *Extended Key Usage* extension, marked as "non-critical", with its
     allowed purposes including ``clientAuth`` and ``serverAuth``. This
     ensures that the certificate can be used for client and server
     authentication.
@@ -89,18 +91,19 @@ peer certificates
   The expiration date of peer certificates SHOULD be set very far in the
   future (after 500 years for example).
 
-  Peer certificates MUST include the following extensions:
+  Peer certificates MUST include the following standard certificate
+  extensions:
 
-  - *Basic constraints* extension, marked as "critical", with its ``cA``
+  - *Basic Constraints* extension, marked as "critical", with its ``cA``
     boolean field set to ``true``, and its ``pathLenConstraint`` field set
     to at least ``0``, or not set at all. This ensures that the certificate
     can participate in the chain of trust.
 
-  - *Key usage* extension, marked as "critical" with its ``keyCertSign`` bit
+  - *Key Usage* extension, marked as "critical" with its ``keyCertSign`` bit
     set to ``true``. This ensures that the public key can be used for
     verifying signatures on server certificates.
 
-  - *Name constraints* extension, marked as "critical", specifying in its
+  - *Name Constraints* extension, marked as "critical", specifying in its
     ``permittedSubtrees`` field a restriction of the ``directoryName`` form,
     ensuring that all certificates down the trust chain can not change
     subject's ``O``, ``OU``, and ``serialNumber`` distinguished name
@@ -116,8 +119,8 @@ peer certificates
     This provides a means of identifying the public key corresponding to the
     private key used to sign the certificate.
 
-  - *Netscape certificate comment* (OID value: 2.16.840.1.113730.1.13),
-    marked as "non-critical", ...
+  - *Netscape Certificate Comment* extension (OID value:
+    2.16.840.1.113730.1.13), marked as "non-critical", ...
 
 
 Certificate Subject's Distinguished Name
