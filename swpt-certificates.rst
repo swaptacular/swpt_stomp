@@ -22,12 +22,6 @@ Swaptacular.
 RFC 2119.
 
 
-Overview
-========
-
-TODO
-
-
 Root certificates
 =================
 
