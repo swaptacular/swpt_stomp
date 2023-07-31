@@ -19,9 +19,9 @@ self-signed *root certificate* to itself. Each node's trusted certificate
 authority issues *server certificates* and *peer certificates*.
 
 All certificates described here are `Internet X.509 Public Key
-Infrastructure Certificates (RFC 5280)`_. This document details only
-requirements which are specific to the particular kind of certificates used
-in Swaptacular to authenticate peer-to-peer connections.
+Infrastructure Certificates (RFC 5280)`_. This document deals only with the
+requirements specific to the particular kind of certificates used in
+Swaptacular to authenticate peer-to-peer connections.
 
 **Note:** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
 NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
@@ -56,9 +56,9 @@ extensions:
   quickly identify the set of certificates containing a particular public
   key.
 
-When authenticating client SSL/TLS connections from peer Swaptacular network
-nodes, the node's root certificate SHOULD be configured to be **the only
-trusted root certificate**.
+When authenticating client SSL/TLS connections from Swaptacular peers, the
+node's root certificate SHOULD be configured to be **the only trusted root
+certificate**.
 
 
 Server certificates
@@ -104,12 +104,12 @@ Peer certificates
 =================
 
 Peer certificates are issued to peers nodes, so that peers nodes' servers
-can present them, along with a server certificate, to prove their identity
-(forming a verifiable chain of trust). Every Swaptacular node issues a peer
-certificate for each one of its peers. Peer certificates must be signed with
-the private key used for signing the issuing node's root certificate. The
-expiration date of peer certificates SHOULD be set very far in the future
-(after 500 years for example).
+can present them, along with a proper server certificate, to prove their
+identity (forming a verifiable chain of trust). Every Swaptacular should
+issue a peer certificate for each one of its peers. Peer certificates must
+be signed with the private key used for signing the issuing node's root
+certificate. The expiration date of peer certificates SHOULD be set very far
+in the future (after 500 years for example).
 
 For every peer certificate, the subject and the subject's public key MUST
 exactly match those of the corresponding peer's root certificate. Similarly,
@@ -150,17 +150,17 @@ Comment* extension (OID value: 2.16.840.1.113730.1.13), marked as
 
   Subnet: [a-f0-9]{6,16}
 
-The hexadecimal value after the "Subnet: " prefix specify the range of
-creditor/debtor IDs (depending on the peer node's type) which the peer node
-is responsible for.
+The hexadecimal value after the "Subnet: " prefix, specifies the range of
+creditor/debtor IDs (depending on the peer's node type) which the peer node
+is responsible for:
 
-- *For creditors agent nodes*, the hexadecimal value MUST contain exactly 6
+- *For creditors agent peers*, the hexadecimal value MUST contain exactly 6
   hexadecimal characters. For example, if "Subnet: 123abc" is given to a
   creditors agent node, the peer node will be responsible for managing all
   creditor IDs between ``0x123abc0000000000`` and ``0x123abcffffffffff``
   inclusive.
 
-- *For debtors agent nodes*, the hexadecimal value MUST contain at least 8
+- *For debtors agent peers*, the hexadecimal value MUST contain at least 8
   hexadecimal characters. For example, if "Subnet: 1234abcd" is given to a
   debtors agent node, the peer node will be responsible for managing all
   debtor IDs between ``0x1234abcd00000000`` and ``0x1234abcdffffffff``
@@ -188,11 +188,42 @@ following *relative distinguished names* (RDNs):
    consisting of:
 
    - **exactly 8 lowercase hexadecimal characters** for accounting authority
-     nodes;
+     nodes (see the next section);
 
    - **exactly 32 lowercase hexadecimal characters** for creditors agent and
-     debtors agent nodes.
+     debtors agent nodes (see the next section).
 
 Apart from the RDNs listed above, subject's and issuer's distinguished names
 SHOULD NOT contain other RDNs (like a "Country Name" attribute, or a "Common
 Name" attribute).
+
+
+Subject's serial number
+=======================
+
+For *accounting authority* nodes, the subject's "Serial Number" attribute
+MUST specify the range of debtor IDs which the accounting authority node is
+responsible for. For example, the accounting authority node with serial
+number ``1234abcd`` is responsible for managing all debtor IDs between
+``0x1234abcd00000000`` and ``0x1234abcdffffffff`` inclusive.
+
+**Note:** Every accounting authority node SHOULD list its serial number,
+along with its public key fingerprint in a publicly accessible centralized
+registry. This eliminates the possibility malicious nodes to "steal" other
+nodes' serial numbers (and other nodes' debtor IDs).
+
+For for *creditors agent* and *debtors agent* nodes, the subject's "Serial
+Number" attribute SHOULD hold the hexadecimal representation of the highest
+128-bits, of the SHA-256 hash value, of the DER-encoded public for the
+node's root certificate. Here is an example how the ``openssl`` and the
+``hexdump`` utilities can be used to generate the node's serial number, from
+the file containing the node's public/private key pair::
+
+  $ openssl rsa -in "root-ca.key" -pubout | \
+  openssl pkey -pubin -outform DER | \
+  openssl dgst -sha256 -binary | \
+  hexdump -n 16 -ve '/1 "%02x"'
+
+**Note:** Generating nodes' serial numbers from nodes' public keys,
+eliminates the possibility malicious nodes to "steal" other nodes' serial
+numbers.
