@@ -167,20 +167,30 @@ is responsible for.
   inclusive.
 
 
-Subject distinguished names
-===========================
+Subject's and issuer's distinguished names
+==========================================
 
-TODO
+The ``subject`` and ``issuer`` fields in all of the above described
+certificates MUST be a *distinguished name* (DN), which contains the
+following *relative distinguished names* (RDNs):
 
-1. The "Organization" (``O``) MUST be ``Swaptacular Nodes Registry``.
+1. An "Organization" attribute (abbreviated as "O") with the value:
+   "``Swaptacular Nodes Registry``" (the quotation marks are not part of the
+   value).
 
-2. The "Organizational Unit" (``OU``) MUST be:
+2. An "Organizational Unit" attribute (abbreviated as "OU") with the value:
 
-   - ``Accounting Authorities`` for accounting authority nodes;
-   - ``Creditors Agents`` for creditors agent nodes;
-   - ``Debtors Agents`` for debtors agent nodes.
+   - "``Accounting Authorities``" for accounting authority nodes;
+   - "``Creditors Agents``" for creditors agent nodes;
+   - "``Debtors Agents``" for debtors agent nodes.
 
-3. The "Serial Number" (``serialNumber``) MUST be...
+3. An "Serial Number" attribute (abbreviated as "serialNumber") for which:
 
+   - *For accounting authority nodes*, the value MUST contain exactly 8
+     lowercase hexadecimal characters.
 
+   - *For creditors agent nodes*, the value MUST contain exactly 32
+     lowercase hexadecimal characters.
 
+   - *For creditors agent nodes*, the value MUST contain exactly 32
+     lowercase hexadecimal characters.
