@@ -19,8 +19,8 @@ self-signed *root certificate* to itself. Each node's trusted certificate
 authority issues *server certificates* and *peer certificates*.
 
 All certificates described here are `Internet X.509 Public Key
-Infrastructure Certificates (RFC 5280)`_. In this document we will deal only
-with the additional requirements specific to the particular kind of
+Infrastructure Certificates (RFC 5280)`_. In this document, we will deal
+only with the additional requirements specific to the particular kind of
 certificates used in Swaptacular to authenticate peer-to-peer connections.
 
 **Note:** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
@@ -210,7 +210,7 @@ number ``1234abcd`` is responsible for managing all debtor IDs between
 **Note:** Every accounting authority node SHOULD list its serial number,
 along with its public key fingerprint in a publicly accessible centralized
 registry. This eliminates the possibility malicious nodes to "steal" other
-nodes' serial numbers (and other nodes' debtor IDs).
+nodes' serial numbers (and their debtor IDs).
 
 For for *creditors agent* and *debtors agent* nodes, the subject's "Serial
 Number" attribute SHOULD hold the hexadecimal representation of the highest
