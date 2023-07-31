@@ -188,36 +188,44 @@ following *relative distinguished names* (RDNs):
    consisting of:
 
    - **exactly 8 lowercase hexadecimal characters** for accounting authority
-     nodes (see the next section);
+     nodes (see the next two sections);
 
    - **exactly 32 lowercase hexadecimal characters** for creditors agent and
-     debtors agent nodes (see the next section).
+     debtors agent nodes (see the next two sections).
 
 Apart from the RDNs listed above, subject's and issuer's distinguished names
 SHOULD NOT contain other RDNs (like a "Country Name" attribute, or a "Common
 Name" attribute).
 
 
-Subject's serial number
-=======================
+Accounting authorities' serial numbers
+======================================
 
 For *accounting authority* nodes, the subject's "Serial Number" attribute
 MUST specify the range of debtor IDs which the accounting authority node is
-responsible for. For example, the accounting authority node with serial
-number ``1234abcd`` is responsible for managing all debtor IDs between
+responsible for.
+
+For example, an accounting authority node with serial number ``1234abcd``
+would be responsible for managing all debtor IDs between
 ``0x1234abcd00000000`` and ``0x1234abcdffffffff`` inclusive.
 
 **Note:** Every accounting authority node SHOULD list its serial number,
-along with its public key fingerprint in a publicly accessible centralized
+along with its public key fingerprint, in a publicly accessible centralized
 registry. This eliminates the possibility malicious nodes to "steal" other
-nodes' serial numbers (and their range of debtor IDs).
+nodes' serial numbers (and thus, their range of debtor IDs).
+
+
+Creditors/debtors agents' serial numbers
+========================================
 
 For for *creditors agent* and *debtors agent* nodes, the subject's "Serial
 Number" attribute SHOULD hold the hexadecimal representation of the highest
-128-bits, of the SHA-256 hash value, of the DER-encoded public for the
-node's root certificate. Here is an example how the ``openssl`` and the
-``hexdump`` utilities can be used to generate the node's serial number, from
-the file containing the node's public/private key pair::
+128-bits, of the SHA-256 hash value, of the DER-encoded public key, for the
+node's root certificate.
+
+Here is an example how the ``openssl`` and the ``hexdump`` utilities can be
+used together to generate the node's serial number, from the file containing
+the node's public/private key pair::
 
   $ openssl rsa -in "root-ca.key" -pubout | \
   openssl pkey -pubin -outform DER | \
