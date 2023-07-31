@@ -170,13 +170,13 @@ is responsible for.
 Subject's and issuer's distinguished names
 ==========================================
 
-The ``subject`` and ``issuer`` fields in all of the above described
+The value of the ``subject`` and ``issuer`` fields in the above described
 certificates MUST be a *distinguished name* (DN), which contains the
 following *relative distinguished names* (RDNs):
 
-1. An "Organization" attribute (abbreviated as "O") with the value:
-   "``Swaptacular Nodes Registry``" (the quotation marks are not part of the
-   value).
+1. An "Organization" attribute (abbreviated as "O") with the value
+   "``Swaptacular Nodes Registry``". (Here and bellow, the quotation marks
+   are not part of the value.)
 
 2. An "Organizational Unit" attribute (abbreviated as "OU") with the value:
 
@@ -184,13 +184,15 @@ following *relative distinguished names* (RDNs):
    - "``Creditors Agents``" for creditors agent nodes;
    - "``Debtors Agents``" for debtors agent nodes.
 
-3. An "Serial Number" attribute (abbreviated as "serialNumber") for which:
+3. A "Serial Number" attribute (abbreviated as "serialNumber") with a value
+   consisting of:
 
-   - *For accounting authority nodes*, the value MUST contain exactly 8
-     lowercase hexadecimal characters.
+   - **exactly 8 lowercase hexadecimal characters** for accounting authority
+     nodes;
 
-   - *For creditors agent nodes*, the value MUST contain exactly 32
-     lowercase hexadecimal characters.
+   - **exactly 32 lowercase hexadecimal characters** for creditors agent and
+     debtors agent nodes.
 
-   - *For creditors agent nodes*, the value MUST contain exactly 32
-     lowercase hexadecimal characters.
+Apart from the RDNs listed above, subject's and issuer's distinguished names
+SHOULD NOT contain other RDNs (like a "Country Name" attribute, or a "Common
+Name" attribute).
