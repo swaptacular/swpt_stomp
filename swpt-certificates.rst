@@ -13,15 +13,15 @@ Swaptacular SSL/TLS Certificates
 Overview
 ========
 
-Each Swaptacular network node (accounting authority, debtors agent, or
+Every Swaptacular network node (accounting authority, debtors agent, or
 creditors agent) runs its own trusted *certificate authority*, and issues a
 self-signed *root certificate* to itself. Each node's trusted certificate
 authority issues *server certificates* and *peer certificates*.
 
 All certificates described here are `Internet X.509 Public Key
-Infrastructure Certificates (RFC 5280)`_. This document deals only with the
-requirements specific to the particular kind of certificates used in
-Swaptacular to authenticate peer-to-peer connections.
+Infrastructure Certificates (RFC 5280)`_. In this document we will deal only
+with the additional requirements specific to the particular kind of
+certificates used in Swaptacular to authenticate peer-to-peer connections.
 
 **Note:** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
 NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
