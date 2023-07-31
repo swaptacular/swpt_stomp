@@ -210,7 +210,7 @@ number ``1234abcd`` is responsible for managing all debtor IDs between
 **Note:** Every accounting authority node SHOULD list its serial number,
 along with its public key fingerprint in a publicly accessible centralized
 registry. This eliminates the possibility malicious nodes to "steal" other
-nodes' serial numbers (and their debtor IDs).
+nodes' serial numbers (and their range of debtor IDs).
 
 For for *creditors agent* and *debtors agent* nodes, the subject's "Serial
 Number" attribute SHOULD hold the hexadecimal representation of the highest
