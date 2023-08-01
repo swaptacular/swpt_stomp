@@ -1,8 +1,8 @@
 ++++++++++++++++++++++++++++++++
 Swaptacular SSL/TLS Certificates
 ++++++++++++++++++++++++++++++++
-:Description: Specifies the requirements for the various kinds of SSL/TLS
-              certificates used in Swaptacular.
+:Description: Specifies the requirements for the particular kinds of
+              certificates used in Swaptacular for peer authentication.
 :Author: Evgeni Pandurksi
 :Contact: epandurski@gmail.com
 :Date: 2023-08-01
@@ -13,15 +13,18 @@ Swaptacular SSL/TLS Certificates
 Overview
 ========
 
-Every Swaptacular network node (accounting authority, debtors agent, or
-creditors agent) runs its own trusted *certificate authority*, and issues a
-self-signed *root certificate* to itself. Each node's trusted certificate
-authority issues *server certificates* and *peer certificates*.
+This document specifies the requirements for the particular kinds of
+certificates used in Swaptacular for peer authentication.
 
-All certificates described here are `Internet X.509 Public Key
-Infrastructure Certificates (RFC 5280)`_. In this document, we will deal
-only with the additional requirements specific to the particular kind of
-certificates used in Swaptacular to authenticate peer-to-peer connections.
+Every Swaptacular network node (accounting authority, debtors agent, or
+creditors agent node) runs its own trusted *certificate authority*, and
+issues a self-signed *root certificate* to itself. Each node's trusted
+certificate authority issues *server certificates* and *peer certificates*.
+
+The certificates described in this document are `Internet X.509 Public Key
+Infrastructure Certificates (RFC 5280)`_. Therefore, here we deal only with
+the additional requirements specific to the particular kind of certificates
+used in Swaptacular to authenticate connections between peer nodes.
 
 **Note:** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
 NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
@@ -56,9 +59,12 @@ extensions:
   quickly identify the set of certificates containing a particular public
   key.
 
-When authenticating client SSL/TLS connections from Swaptacular peers, the
+When servers accept client SSL/TLS connections from Swaptacular peers, the
 node's root certificate SHOULD be configured to be **the only trusted root
-certificate**.
+certificate**. Conversely, when initiating a client SSL/TLS connection to a
+peer node, the peer node's root certificate SHOULD be configured to be the
+only trusted root certificate, and the authenticated subject MUST be
+verified to match the expected subject (the expected peer).
 
 
 Server certificates
@@ -105,11 +111,11 @@ Peer certificates
 
 Peer certificates are issued to peers nodes, so that peers nodes' servers
 can present them, along with a proper server certificate, to prove their
-identity (forming a verifiable chain of trust). Every Swaptacular should
-issue a peer certificate for each one of its peers. Peer certificates must
-be signed with the private key used for signing the issuing node's root
-certificate. The expiration date of peer certificates SHOULD be set very far
-in the future (after 500 years for example).
+identity (forming a verifiable chain of trust). Every Swaptacular node
+should issue and send a peer certificate to each one of its peers. Peer
+certificates MUST be signed with the private key used for signing the
+issuing node's root certificate. The expiration date of peer certificates
+SHOULD be set very far in the future (after 500 years for example).
 
 For every peer certificate, the subject and the subject's public key MUST
 exactly match those of the corresponding peer's root certificate. Similarly,
@@ -188,18 +194,20 @@ following *relative distinguished names* (RDNs):
    consisting of:
 
    - **exactly 8 lowercase hexadecimal characters** for accounting authority
-     nodes (see the next two sections);
+     nodes (see the "`Accounting authority nodes' serial numbers`_"
+     section);
 
    - **exactly 32 lowercase hexadecimal characters** for creditors agent and
-     debtors agent nodes (see the next two sections).
+     debtors agent nodes (see the "`Creditors/debtors agent nodes' serial
+     numbers`_" section).
 
 Apart from the RDNs listed above, subject's and issuer's distinguished names
 SHOULD NOT contain other RDNs (like a "Country Name" attribute, or a "Common
 Name" attribute).
 
 
-Accounting authorities' serial numbers
-======================================
+Accounting authority nodes' serial numbers
+==========================================
 
 For *accounting authority* nodes, the subject's "Serial Number" attribute
 MUST specify the range of debtor IDs which the accounting authority node is
@@ -211,20 +219,20 @@ would be responsible for managing all debtor IDs between
 
 **Note:** Every accounting authority node SHOULD list its serial number,
 along with its public key fingerprint, in a publicly accessible centralized
-registry. This eliminates the possibility malicious nodes to "steal" other
-nodes' serial numbers (and thus, their range of debtor IDs).
+registry. This largely eliminates the possibility malicious nodes to "steal"
+other nodes' serial numbers (and thus use their range of debtor IDs).
 
 
-Creditors/debtors agents' serial numbers
-========================================
+Creditors/debtors agent nodes' serial numbers
+=============================================
 
 For for *creditors agent* and *debtors agent* nodes, the subject's "Serial
 Number" attribute SHOULD hold the hexadecimal representation of the highest
-128-bits, of the SHA-256 hash value, of the DER-encoded public key, for the
+128-bits, of the SHA-256 hash value, of the DER-encoded public key for the
 node's root certificate.
 
 Here is an example how the ``openssl`` and the ``hexdump`` utilities can be
-used together to generate the node's serial number, from the file containing
+used together, to generate the node's serial number from the file containing
 the node's public/private key pair::
 
   $ openssl rsa -in "root-ca.key" -pubout | \
