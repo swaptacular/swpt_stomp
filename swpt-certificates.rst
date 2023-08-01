@@ -240,6 +240,9 @@ the node's public/private key pair::
   openssl dgst -sha256 -binary | \
   hexdump -n 16 -ve '/1 "%02x"'
 
+  ...
+  f857733abf94b4302b9c8889ae0677c7
+
 **Note:** Generating nodes' serial numbers from nodes' public keys,
 eliminates the possibility malicious nodes to "steal" other nodes' serial
 numbers.
