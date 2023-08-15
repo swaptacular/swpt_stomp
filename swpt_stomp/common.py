@@ -7,20 +7,21 @@ from typing import Callable, List, Any, Optional, TypeVar
 Callback = Callable[[], Any]
 DEFAULT_MAX_NETWORK_DELAY = 10_000  # 10 seconds
 APP_SSL_HANDSHAKE_TIMEOUT = float(
-    os.environ.get('APP_SSL_HANDSHAKE_TIMEOUT', '5'))
+    os.environ.get("APP_SSL_HANDSHAKE_TIMEOUT", "5")
+)
 
 _T = TypeVar("_T")
-_PUT_TASK_ATTR_NAME = '_EnsurePut__task'
+_PUT_TASK_ATTR_NAME = "_EnsurePut__task"
 _logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Message:
     __slots__ = (
-        'id',
-        'type',
-        'body',
-        'content_type',
+        "id",
+        "type",
+        "body",
+        "content_type",
     )
     id: str
     type: str
@@ -35,13 +36,14 @@ class ServerError(Exception):
     `StompServer`'s send queues, indicating that an error has occurred, and
     the connection must be closed.
     """
+
     def __init__(
-            self,
-            error_message: str,
-            receipt_id: Optional[str] = None,
-            context: Optional[bytearray] = None,
-            context_type: Optional[str] = None,
-            context_content_type: Optional[str] = None,
+        self,
+        error_message: str,
+        receipt_id: Optional[str] = None,
+        context: Optional[bytearray] = None,
+        context_type: Optional[str] = None,
+        context_content_type: Optional[str] = None,
     ):
         super().__init__(error_message)
         self.error_message = error_message
@@ -58,9 +60,9 @@ class WatermarkQueue(asyncio.Queue[_T]):
     high_watermark: int
 
     def __init__(
-            self,
-            high_watermark: int,
-            low_watermark: Optional[int] = None,
+        self,
+        high_watermark: int,
+        low_watermark: Optional[int] = None,
     ):
         if low_watermark is None:
             low_watermark = high_watermark // 4
@@ -123,25 +125,24 @@ class WatermarkQueue(asyncio.Queue[_T]):
 
 
 def get_peer_serial_number(transport: asyncio.Transport) -> Optional[str]:
-    """Try to obtain peer's serial number from a certificate.
-    """
+    """Try to obtain peer's serial number from a certificate."""
     data = {}
-    important_keys = set(['organizationName', 'serialNumber'])
-    peercert = transport.get_extra_info('peercert')
+    important_keys = set(["organizationName", "serialNumber"])
+    peercert = transport.get_extra_info("peercert")
     try:
-        subject = peercert['subject']
+        subject = peercert["subject"]
         for rdns in subject:  # traverse all relative distinguished names
             key, value = rdns[0]
             if key in important_keys:
                 if len(rdns) > 1 or key in data:
-                    raise ValueError(f'multi-valued {key}')
+                    raise ValueError(f"multi-valued {key}")
                 data[key] = value
     except (TypeError, IndexError, KeyError, ValueError):
         pass
 
-    if data.get('organizationName') != 'Swaptacular Nodes Registry':
+    if data.get("organizationName") != "Swaptacular Nodes Registry":
         return None
-    return data.get('serialNumber')
+    return data.get("serialNumber")
 
 
 def terminate_queue(queue: asyncio.Queue[_T], item: _T) -> None:
@@ -163,6 +164,8 @@ def terminate_queue(queue: asyncio.Queue[_T], item: _T) -> None:
 
 def set_event_loop_policy():
     import platform
-    if platform.python_implementation() == 'CPython':
+
+    if platform.python_implementation() == "CPython":
         import uvloop
+
         uvloop.install()

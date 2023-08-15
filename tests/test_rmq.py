@@ -4,14 +4,18 @@ import asyncio
 import aio_pika
 from swpt_stomp.common import WatermarkQueue, Message, ServerError
 from swpt_stomp.rmq import (
-    open_robust_channel, consume_from_queue, publish_to_exchange, RmqMessage)
+    open_robust_channel,
+    consume_from_queue,
+    publish_to_exchange,
+    RmqMessage,
+)
 
 
 async def ready_queue(rmq_url: str) -> None:
     connection = await aio_pika.connect(rmq_url)
     channel = await connection.channel()
     async with connection, channel:
-        queue = await channel.declare_queue('test_stomp')
+        queue = await channel.declare_queue("test_stomp")
 
         # Remove all existing messages from the queue.
         while await queue.get(no_ack=True, fail=False):
@@ -20,11 +24,11 @@ async def ready_queue(rmq_url: str) -> None:
         # Add 100 messages to the queue.
         for i in range(1, 101):
             message = aio_pika.Message(
-                str(i).encode('ascii'),
-                type='TestMessage',
-                content_type='text/plain',
+                str(i).encode("ascii"),
+                type="TestMessage",
+                content_type="text/plain",
             )
-            await channel.default_exchange.publish(message, 'test_stomp')
+            await channel.default_exchange.publish(message, "test_stomp")
 
 
 @pytest.mark.asyncio
@@ -50,8 +54,9 @@ async def test_consume_from_queue(rmq_url):
             send_queue,
             recv_queue,
             url=rmq_url,
-            queue_name='test_stomp',
-        ))
+            queue_name="test_stomp",
+        )
+    )
     confirm_task = loop.create_task(confirm_sent_messages())
 
     await asyncio.wait_for(consume_task, 10.0)
@@ -73,9 +78,9 @@ async def test_publish_to_exchange(rmq_url):
         for n in range(1, message_count + 1):
             message = Message(
                 id=str(n),
-                type='TestMessage',
-                body=bytearray(b'Message %i' % n),
-                content_type='text/plain',
+                type="TestMessage",
+                body=bytearray(b"Message %i" % n),
+                content_type="text/plain",
             )
             await recv_queue.put(message)
         await all_received.wait()
@@ -96,14 +101,14 @@ async def test_publish_to_exchange(rmq_url):
             id=m.id,
             body=bytes(m.body),
             headers={
-                'message-type': m.type,
-                'debtor-id': 1,
-                'creditor-id': 2,
-                'coordinator-id': 3,
+                "message-type": m.type,
+                "debtor-id": 1,
+                "creditor-id": 2,
+                "coordinator-id": 3,
             },
             type=m.type,
             content_type=m.content_type,
-            routing_key='test_stomp',
+            routing_key="test_stomp",
         )
 
     publish_task = loop.create_task(
@@ -111,9 +116,10 @@ async def test_publish_to_exchange(rmq_url):
             send_queue,
             recv_queue,
             url=rmq_url,
-            exchange_name='',
+            exchange_name="",
             preprocess_message=preprocess_message,
-        ))
+        )
+    )
     generate_task = loop.create_task(generate_messages())
     read_task = loop.create_task(read_receipts())
 
@@ -135,9 +141,9 @@ async def test_publish_returned_message(caplog, rmq_url):
         for n in range(1, 11):
             message = Message(
                 id=str(n),
-                type='TestMessage',
-                body=bytearray(b'Message %i' % n),
-                content_type='text/plain',
+                type="TestMessage",
+                body=bytearray(b"Message %i" % n),
+                content_type="text/plain",
             )
             await recv_queue.put(message)
         await recv_queue.put(None)
@@ -147,14 +153,14 @@ async def test_publish_returned_message(caplog, rmq_url):
             id=m.id,
             body=bytes(m.body),
             headers={
-                'message-type': m.type,
-                'debtor-id': 1,
-                'creditor-id': 2,
-                'coordinator-id': 3,
+                "message-type": m.type,
+                "debtor-id": 1,
+                "creditor-id": 2,
+                "coordinator-id": 3,
             },
             type=m.type,
             content_type=m.content_type,
-            routing_key='nonexisting_queue',
+            routing_key="nonexisting_queue",
         )
 
     connection, channel = await open_robust_channel(rmq_url, 10.0)
@@ -163,11 +169,12 @@ async def test_publish_returned_message(caplog, rmq_url):
         publish_to_exchange(
             send_queue,
             recv_queue,
-            url='',
-            exchange_name='',
+            url="",
+            exchange_name="",
             preprocess_message=preprocess_message,
             channel=channel,
-        ))
+        )
+    )
 
     await asyncio.wait_for(publish_task, 20.0)
     await asyncio.wait_for(generate_task, 20.0)
@@ -180,7 +187,7 @@ async def test_publish_returned_message(caplog, rmq_url):
 
     m = await send_queue.get()
     assert isinstance(m, ServerError)
-    assert m.error_message == 'Internal server error.'
+    assert m.error_message == "Internal server error."
 
 
 @pytest.mark.asyncio
@@ -191,27 +198,28 @@ async def test_publish_server_error(rmq_url):
     recv_queue = WatermarkQueue(5)
 
     message = Message(
-        id='1',
-        type='TestMessage',
-        body=bytearray(b'Erroneous message'),
-        content_type='text/plain',
+        id="1",
+        type="TestMessage",
+        body=bytearray(b"Erroneous message"),
+        content_type="text/plain",
     )
     await recv_queue.put(message)
 
     async def preprocess_message(m):
-        raise ServerError('Test error')
+        raise ServerError("Test error")
 
     publish_task = loop.create_task(
         publish_to_exchange(
             send_queue,
             recv_queue,
             url=rmq_url,
-            exchange_name='',
+            exchange_name="",
             preprocess_message=preprocess_message,
-        ))
+        )
+    )
 
     await asyncio.wait_for(publish_task, 10.0)
     m = await send_queue.get()
     assert isinstance(m, ServerError)
-    assert m.error_message == 'Test error'
+    assert m.error_message == "Test error"
     assert send_queue.empty()

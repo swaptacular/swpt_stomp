@@ -4,15 +4,19 @@ import logging
 from typing import Callable
 from abc import ABC, abstractmethod
 from swpt_stomp.common import (
-    Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY)
+    Message,
+    ServerError,
+    WatermarkQueue,
+    DEFAULT_MAX_NETWORK_DELAY,
+)
 from swpt_stomp.stomp_parser import StompParser, StompFrame, ProtocolError
 
 MessageProcessorStarter = Callable[[asyncio.Transport], Optional[asyncio.Task]]
 
 DEFAULT_HB_SEND_MIN = 5_000  # 5 seconds
 DEFAULT_HB_RECV_DESIRED = 30_000  # 30 seconds
-DEFAULT_STOMP_HOST = '/'
-DEFAULT_STOMP_DESTINATION = '/exchange/smp'
+DEFAULT_STOMP_HOST = "/"
+DEFAULT_STOMP_DESTINATION = "/exchange/smp"
 _logger = logging.getLogger(__name__)
 
 
@@ -21,16 +25,15 @@ def _NO_MP(x: asyncio.Transport) -> None:
 
 
 def _calc_heartbeat(send_min: int, recv_desired: int) -> int:
-    """Implement the heartbeat logic described in the STOMP specification.
-    """
+    """Implement the heartbeat logic described in the STOMP specification."""
     if send_min == 0 or recv_desired == 0:
         return 0  # no heartbeats
 
     return max(send_min, recv_desired)
 
 
-_U = TypeVar('_U')
-_V = TypeVar('_V')
+_U = TypeVar("_U")
+_V = TypeVar("_V")
 
 
 class _TaskSet:
@@ -47,10 +50,11 @@ class _TaskSet:
         try:
             task.result()
         except asyncio.CancelledError:
-            _logger.debug('Cancelled %s', task)
+            _logger.debug("Cancelled %s", task)
         except Exception:
             _logger.exception(
-                'An error occurred during the execution of %s.', task)
+                "An error occurred during the execution of %s.", task
+            )
 
         self.tasks.remove(task)
 
@@ -59,21 +63,21 @@ _tasks = _TaskSet()
 
 
 class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
-    """Implements functionality common for STOMP clients and servers.
-    """
+    """Implements functionality common for STOMP clients and servers."""
+
     send_queue: asyncio.Queue[Union[_U, None, ServerError]]
     recv_queue: WatermarkQueue[Union[_V, None]]
     connection_lost_event: asyncio.Event
 
     def __init__(
-            self,
-            send_queue: asyncio.Queue[Union[_U, None, ServerError]],
-            recv_queue: WatermarkQueue[Union[_V, None]],
-            loop: Optional[asyncio.AbstractEventLoop],
-            start_message_processor: MessageProcessorStarter,
-            hb_send_min: int,
-            hb_recv_desired: int,
-            max_network_delay: int,
+        self,
+        send_queue: asyncio.Queue[Union[_U, None, ServerError]],
+        recv_queue: WatermarkQueue[Union[_V, None]],
+        loop: Optional[asyncio.AbstractEventLoop],
+        start_message_processor: MessageProcessorStarter,
+        hb_send_min: int,
+        hb_recv_desired: int,
+        max_network_delay: int,
     ):
         assert hb_send_min >= 0
         assert hb_recv_desired >= 0
@@ -101,8 +105,8 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self._start_sending.set()
 
     def connection_made(
-            self,
-            transport: asyncio.Transport,  # type: ignore[override]
+        self,
+        transport: asyncio.Transport,  # type: ignore[override]
     ) -> None:
         loop = self._loop
         self._connection_started_at = loop.time()
@@ -113,10 +117,11 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
 
         self.recv_queue.add_high_watermark_callback(transport.pause_reading)
         self.recv_queue.add_low_watermark_callback(transport.resume_reading)
-        loop.call_later(self._max_network_delay / 1000,
-                        self._detect_connected_timeout)
-        self._peername = transport.get_extra_info('peername')
-        _logger.info('Opened STOMP connection to %s', self._peername)
+        loop.call_later(
+            self._max_network_delay / 1000, self._detect_connected_timeout
+        )
+        self._peername = transport.get_extra_info("peername")
+        _logger.info("Opened STOMP connection to %s", self._peername)
 
     def data_received(self, data: bytes) -> None:
         self._data_receved_at = self._loop.time()
@@ -126,17 +131,17 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         self._done = True
 
         if self._writer_task:
-            self._writer_task.cancel('connection lost')
+            self._writer_task.cancel("connection lost")
 
         if self._watchdog_task:
-            self._watchdog_task.cancel('connection lost')
+            self._watchdog_task.cancel("connection lost")
 
         t = self._transport
         assert t
         self.recv_queue.remove_high_watermark_callback(t.pause_reading)
         self.recv_queue.remove_low_watermark_callback(t.resume_reading)
         self.recv_queue.put_nowait(None)  # Marks the end.
-        _logger.info('Closed STOMP connection to %s', self._peername)
+        _logger.info("Closed STOMP connection to %s", self._peername)
 
     def pause_writing(self) -> None:
         self._start_sending.clear()
@@ -147,12 +152,12 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
     def _connect(self, peer_heartbeat: str) -> None:
         try:
             hb_send_min, hb_recv_desired = [
-                int(n) for n in peer_heartbeat.split(',', 2)
+                int(n) for n in peer_heartbeat.split(",", 2)
             ]
             if hb_send_min < 0 or hb_recv_desired < 0:
                 raise ValueError
         except ValueError:
-            self._close_with_error('Received invalid heart-beat value.')
+            self._close_with_error("Received invalid heart-beat value.")
             return
 
         self._hb_send = _calc_heartbeat(self._hb_send_min, hb_recv_desired)
@@ -160,8 +165,10 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
         loop = self._loop
 
         if self._hb_send != 0:
-            loop.call_at(self._connection_started_at + self._hb_send / 1000,
-                         self._send_heartbeat)
+            loop.call_at(
+                self._connection_started_at + self._hb_send / 1000,
+                self._send_heartbeat,
+            )
 
         if self._hb_recv != 0:
             self._watchdog_task = loop.create_task(self._check_aliveness())
@@ -173,13 +180,13 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
 
     def _detect_connected_timeout(self) -> None:
         if not self._connected:
-            _logger.warning('Protocol error: No response from peer.')
+            _logger.warning("Protocol error: No response from peer.")
             self._close()
 
     def _send_heartbeat(self) -> None:
         if not self._done:
             assert self._transport
-            self._transport.write(b'\n')
+            self._transport.write(b"\n")
             self._loop.call_later(self._hb_send / 1000, self._send_heartbeat)
 
     async def _check_aliveness(self) -> None:
@@ -191,7 +198,8 @@ class _BaseStompProtocol(asyncio.Protocol, ABC, Generic[_U, _V]):
             await asyncio.sleep(sleep_seconds)
             if loop.time() - self._data_receved_at > watchdog_seconds:
                 self._close_with_warning(
-                    f'No data received for {watchdog_seconds:.3f} seconds.')
+                    f"No data received for {watchdog_seconds:.3f} seconds."
+                )
                 return
 
     async def _process_send_queue(self) -> None:
@@ -248,20 +256,21 @@ class StompClient(_BaseStompProtocol[Message, str]):
     as to instruct the server to send a receipt confirmation only after the
     message has been durably saved.
     """
+
     def __init__(
-            self,
-            send_queue: asyncio.Queue[Union[Message, None, ServerError]],
-            recv_queue: WatermarkQueue[Union[str, None]],
-            *,
-            loop: Optional[asyncio.AbstractEventLoop] = None,
-            start_message_processor: MessageProcessorStarter = _NO_MP,
-            hb_send_min: int = DEFAULT_HB_SEND_MIN,
-            hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
-            max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
-            host: str = DEFAULT_STOMP_HOST,
-            login: Optional[str] = None,
-            passcode: Optional[str] = None,
-            send_destination: str = DEFAULT_STOMP_DESTINATION,
+        self,
+        send_queue: asyncio.Queue[Union[Message, None, ServerError]],
+        recv_queue: WatermarkQueue[Union[str, None]],
+        *,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+        start_message_processor: MessageProcessorStarter = _NO_MP,
+        hb_send_min: int = DEFAULT_HB_SEND_MIN,
+        hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
+        max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
+        host: str = DEFAULT_STOMP_HOST,
+        login: Optional[str] = None,
+        passcode: Optional[str] = None,
+        send_destination: str = DEFAULT_STOMP_DESTINATION,
     ):
         super().__init__(
             send_queue,
@@ -281,21 +290,21 @@ class StompClient(_BaseStompProtocol[Message, str]):
         self._sent_disconnect = False
 
     def connection_made(
-            self,
-            transport: asyncio.Transport,  # type: ignore[override]
+        self,
+        transport: asyncio.Transport,  # type: ignore[override]
     ) -> None:
         super().connection_made(transport)
         headers = {
-            'accept-version': '1.2',
-            'host': self._host,
-            'heart-beat': f'{self._hb_send_min},{self._hb_recv_desired}',
+            "accept-version": "1.2",
+            "host": self._host,
+            "heart-beat": f"{self._hb_send_min},{self._hb_recv_desired}",
         }
         if self._login is not None:
-            headers['login'] = self._login
+            headers["login"] = self._login
         if self._passcode is not None:
-            headers['passcode'] = self._passcode
+            headers["passcode"] = self._passcode
 
-        connect_frame = StompFrame(command='STOMP', headers=headers)
+        connect_frame = StompFrame(command="STOMP", headers=headers)
         transport.write(bytes(connect_frame))
 
     def data_received(self, data: bytes) -> None:
@@ -313,11 +322,11 @@ class StompClient(_BaseStompProtocol[Message, str]):
 
         for frame in parser:
             cmd = frame.command
-            if cmd == 'CONNECTED':
+            if cmd == "CONNECTED":
                 self._received_connected_command(frame)
-            elif cmd == 'RECEIPT':
+            elif cmd == "RECEIPT":
                 self._received_receipt_command(frame)
-            elif cmd == 'ERROR':
+            elif cmd == "ERROR":
                 self._received_error_command(frame)
             else:
                 self._close_with_error(f'Received unexpected command "{cmd}".')
@@ -327,30 +336,36 @@ class StompClient(_BaseStompProtocol[Message, str]):
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
         if not self._done:
-            _logger.warning('The connection to the STOMP server has been lost.')
+            _logger.warning(
+                "The connection to the STOMP server has been lost."
+            )
 
         super().connection_lost(exc)
 
     def _received_connected_command(self, frame: StompFrame) -> None:
         if self._connected:
-            self._close_with_error('Received CONNECTED command more than once.')
+            self._close_with_error(
+                "Received CONNECTED command more than once."
+            )
             return
 
-        if frame.headers.get('version') != '1.2':
-            self._close_with_error('Received wrong protocol version.')
+        if frame.headers.get("version") != "1.2":
+            self._close_with_error("Received wrong protocol version.")
             return
 
-        self._connect(frame.headers.get('heart-beat', '0,0'))
+        self._connect(frame.headers.get("heart-beat", "0,0"))
 
     def _received_receipt_command(self, frame: StompFrame) -> None:
         if not self._connected:
-            self._close_with_error('Received another command before CONNECTED.')
+            self._close_with_error(
+                "Received another command before CONNECTED."
+            )
             return
 
         try:
-            receipt_id = frame.headers['receipt-id']
+            receipt_id = frame.headers["receipt-id"]
         except KeyError:
-            self._close_with_error('RECEIPT command without a receipt ID.')
+            self._close_with_error("RECEIPT command without a receipt ID.")
             return
 
         self.recv_queue.put_nowait(receipt_id)
@@ -360,7 +375,7 @@ class StompClient(_BaseStompProtocol[Message, str]):
             self._close()
 
     def _received_error_command(self, frame: StompFrame) -> None:
-        error_message = frame.headers.get('message', '')
+        error_message = frame.headers.get("message", "")
         self._close_with_error(f'Received server error "{error_message}".')
 
     def _send_frame(self, message: Message) -> None:
@@ -368,13 +383,13 @@ class StompClient(_BaseStompProtocol[Message, str]):
             return
 
         message_frame = StompFrame(
-            command='SEND',
+            command="SEND",
             headers={
-                'destination': self._send_destination,
-                'type': message.type,
-                'content-type': message.content_type,
-                'persistent': 'true',
-                'receipt': message.id,
+                "destination": self._send_destination,
+                "type": message.type,
+                "content-type": message.content_type,
+                "persistent": "true",
+                "receipt": message.id,
             },
             body=message.body,
         )
@@ -393,17 +408,17 @@ class StompClient(_BaseStompProtocol[Message, str]):
             self._close()
             return
 
-        disconnect_frame = StompFrame('DISCONNECT', {'receipt': last_msg_id})
+        disconnect_frame = StompFrame("DISCONNECT", {"receipt": last_msg_id})
         assert self._transport
         self._transport.write(bytes(disconnect_frame))
         self._sent_disconnect = True
 
     def _close_with_error(self, message: str) -> None:
-        _logger.error('Protocol error: %s', message)
+        _logger.error("Protocol error: %s", message)
         self._close()
 
     def _close_with_warning(self, message: str) -> None:
-        _logger.warning('Protocol warning: %s', message)
+        _logger.warning("Protocol warning: %s", message)
         self._close()
 
 
@@ -429,17 +444,18 @@ class StompServer(_BaseStompProtocol[str, Message]):
     confirmation from the server, simply does not make sense in
     Swaptacular's context.
     """
+
     def __init__(
-            self,
-            send_queue: asyncio.Queue[Union[str, None, ServerError]],
-            recv_queue: WatermarkQueue[Union[Message, None]],
-            *,
-            loop: Optional[asyncio.AbstractEventLoop] = None,
-            start_message_processor: MessageProcessorStarter = _NO_MP,
-            hb_send_min: int = DEFAULT_HB_SEND_MIN,
-            hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
-            max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
-            recv_destination: str = DEFAULT_STOMP_DESTINATION
+        self,
+        send_queue: asyncio.Queue[Union[str, None, ServerError]],
+        recv_queue: WatermarkQueue[Union[Message, None]],
+        *,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+        start_message_processor: MessageProcessorStarter = _NO_MP,
+        hb_send_min: int = DEFAULT_HB_SEND_MIN,
+        hb_recv_desired: int = DEFAULT_HB_RECV_DESIRED,
+        max_network_delay: int = DEFAULT_MAX_NETWORK_DELAY,
+        recv_destination: str = DEFAULT_STOMP_DESTINATION,
     ):
         super().__init__(
             send_queue,
@@ -471,12 +487,12 @@ class StompServer(_BaseStompProtocol[str, Message]):
         for frame in parser:
             cmd = frame.command
             if self._disconnect_receipt_id is not None:
-                self._close_with_error('Received command after DISCONNECT.')
-            elif cmd == 'STOMP' or cmd == 'CONNECT':
+                self._close_with_error("Received command after DISCONNECT.")
+            elif cmd == "STOMP" or cmd == "CONNECT":
                 self._received_connect_command(frame)
-            elif cmd == 'SEND':
+            elif cmd == "SEND":
                 self._received_send_command(frame)
-            elif cmd == 'DISCONNECT':
+            elif cmd == "DISCONNECT":
                 self._received_disconnect_command(frame)
             else:
                 self._close_with_error(f'Received unexpected command "{cmd}".')
@@ -486,24 +502,26 @@ class StompServer(_BaseStompProtocol[str, Message]):
 
     def _received_connect_command(self, frame: StompFrame) -> None:
         if self._connected:
-            self._close_with_error('Received CONNECT command more than once.')
+            self._close_with_error("Received CONNECT command more than once.")
             return
 
-        accept_version = frame.headers.get('accept-version', '')
-        versions = set(v for v in accept_version.split(',', 10))
-        if '1.2' not in versions:
-            self._close_with_error('STOMP 1.2 is not supported by the client.')
+        accept_version = frame.headers.get("accept-version", "")
+        versions = set(v for v in accept_version.split(",", 10))
+        if "1.2" not in versions:
+            self._close_with_error("STOMP 1.2 is not supported by the client.")
             return
 
         self._connection_started_at = self._loop.time()
-        self._connect(frame.headers.get('heart-beat', '0,0'))
+        self._connect(frame.headers.get("heart-beat", "0,0"))
 
         if self._connected:
             connected_frame = StompFrame(
-                command='CONNECTED',
+                command="CONNECTED",
                 headers={
-                    'version': '1.2',
-                    'heart-beat': f'{self._hb_send_min},{self._hb_recv_desired}',
+                    "version": "1.2",
+                    "heart-beat": (
+                        f"{self._hb_send_min},{self._hb_recv_desired}"
+                    ),
                 },
             )
             assert self._transport
@@ -512,18 +530,18 @@ class StompServer(_BaseStompProtocol[str, Message]):
 
     def _received_send_command(self, frame: StompFrame) -> None:
         if not self._connected:
-            self._close_with_error('Received another command before CONNECT.')
+            self._close_with_error("Received another command before CONNECT.")
             return
 
         headers = frame.headers
-        content_type = headers.get('content-type', 'application/octet-stream')
+        content_type = headers.get("content-type", "application/octet-stream")
         try:
-            message_id = headers['receipt']
-            message_type = headers['type']
-            destination = headers['destination']
+            message_id = headers["receipt"]
+            message_type = headers["type"]
+            destination = headers["destination"]
         except KeyError as e:
             header = e.args[0]
-            self._close_with_error(f'SEND command without a {header} header.')
+            self._close_with_error(f"SEND command without a {header} header.")
             return
 
         if destination != self._recv_destination:
@@ -547,11 +565,11 @@ class StompServer(_BaseStompProtocol[str, Message]):
 
     def _received_disconnect_command(self, frame: StompFrame) -> None:
         if not self._connected:
-            self._close_with_error('Received DISCONNECT before CONNECT.')
+            self._close_with_error("Received DISCONNECT before CONNECT.")
             return
 
         try:
-            self._disconnect_receipt_id = frame.headers['receipt']
+            self._disconnect_receipt_id = frame.headers["receipt"]
         except KeyError:
             self._close()
             return
@@ -563,7 +581,7 @@ class StompServer(_BaseStompProtocol[str, Message]):
             self._close()
 
     def _send_receipt_command(self, receipt_id: str) -> None:
-        receipt_frame = StompFrame('RECEIPT', {'receipt-id': receipt_id})
+        receipt_frame = StompFrame("RECEIPT", {"receipt-id": receipt_id})
         assert self._transport
         self._transport.write(bytes(receipt_frame))
 
@@ -581,26 +599,26 @@ class StompServer(_BaseStompProtocol[str, Message]):
         self._last_receipt_id = receipt_id
 
     def _send_error_frame(
-            self,
-            message: str,
-            receipt_id: Optional[str] = None,
-            context: Optional[bytearray] = None,
-            context_type: Optional[str] = None,
-            context_content_type: Optional[str] = None,
+        self,
+        message: str,
+        receipt_id: Optional[str] = None,
+        context: Optional[bytearray] = None,
+        context_type: Optional[str] = None,
+        context_content_type: Optional[str] = None,
     ) -> None:
         transport = self._transport
         assert transport
         if not transport.is_closing():
-            headers = {'message': message}
+            headers = {"message": message}
             if receipt_id is not None:
-                headers['receipt-id'] = receipt_id
+                headers["receipt-id"] = receipt_id
             if context is not None and context_type is not None:
-                headers['type'] = context_type
+                headers["type"] = context_type
             if context is not None and context_content_type is not None:
-                headers['content-type'] = context_content_type
+                headers["content-type"] = context_content_type
 
             body = bytearray() if context is None else context
-            error_frame = StompFrame('ERROR', headers, body)
+            error_frame = StompFrame("ERROR", headers, body)
             transport.write(bytes(error_frame))
 
     def _close_gracefully(self, error: Optional[ServerError]) -> None:
@@ -614,18 +632,18 @@ class StompServer(_BaseStompProtocol[str, Message]):
             )
             return
 
-        self._close_with_error('The connection has been closed by the server.')
+        self._close_with_error("The connection has been closed by the server.")
 
     def _close_with_error(
-            self,
-            message: str,
-            receipt_id: Optional[str] = None,
-            context: Optional[bytearray] = None,
-            context_type: Optional[str] = None,
-            context_content_type: Optional[str] = None,
+        self,
+        message: str,
+        receipt_id: Optional[str] = None,
+        context: Optional[bytearray] = None,
+        context_type: Optional[str] = None,
+        context_content_type: Optional[str] = None,
     ) -> None:
         # Log this as a warning, since this is client's problem, not ours.
-        _logger.warning('Protocol error: %s', message)
+        _logger.warning("Protocol error: %s", message)
 
         self._send_error_frame(
             message,
@@ -637,6 +655,6 @@ class StompServer(_BaseStompProtocol[str, Message]):
         self._close()
 
     def _close_with_warning(self, message: str) -> None:
-        _logger.warning('Protocol warning: %s', message)
+        _logger.warning("Protocol warning: %s", message)
         self._send_error_frame(message)
         self._close()

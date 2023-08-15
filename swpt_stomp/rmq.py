@@ -10,7 +10,10 @@ from typing import Optional, Union, Callable, Awaitable, AsyncGenerator
 from collections import deque
 from aio_pika.abc import HeadersType
 from swpt_stomp.common import (
-    Message, ServerError, WatermarkQueue, DEFAULT_MAX_NETWORK_DELAY,
+    Message,
+    ServerError,
+    WatermarkQueue,
+    DEFAULT_MAX_NETWORK_DELAY,
     terminate_queue,
 )
 
@@ -19,7 +22,7 @@ _PERSISTENT = aio_pika.DeliveryMode.PERSISTENT
 _RMQ_CONNECTION_ERRORS = CONNECTION_EXCEPTIONS + (asyncio.TimeoutError,)
 
 
-def _NO_TM(m: 'RmqMessage') -> Message:
+def _NO_TM(m: "RmqMessage") -> Message:
     return Message(
         id=m.id,
         type=m.type,
@@ -28,20 +31,24 @@ def _NO_TM(m: 'RmqMessage') -> Message:
     )
 
 
-APP_RMQ_CONNECTION_TIMEOUT_SECONDS = float(os.environ.get(
-    'APP_RMQ_CONNECTION_TIMEOUT_SECONDS',
-    str(DEFAULT_MAX_NETWORK_DELAY / 1000),
-))
-APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS = float(os.environ.get(
-    'APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS',
-    '20',
-))
+APP_RMQ_CONNECTION_TIMEOUT_SECONDS = float(
+    os.environ.get(
+        "APP_RMQ_CONNECTION_TIMEOUT_SECONDS",
+        str(DEFAULT_MAX_NETWORK_DELAY / 1000),
+    )
+)
+APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS = float(
+    os.environ.get(
+        "APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS",
+        "20",
+    )
+)
 AbstractConnection = aio_pika.abc.AbstractConnection
 AbstractChannel = aio_pika.abc.AbstractChannel
 
 
 class _Delivery:
-    __slots__ = ('message_id', 'confirmed')
+    __slots__ = ("message_id", "confirmed")
 
     def __init__(self, message_id: str):
         self.message_id = message_id
@@ -59,14 +66,14 @@ class RmqMessage:
 
 
 async def consume_from_queue(
-        send_queue: asyncio.Queue[Union[Message, None, ServerError]],
-        recv_queue: WatermarkQueue[Union[str, None]],
-        *,
-        url: str,
-        queue_name: str,
-        transform_message: Callable[[RmqMessage], Message] = _NO_TM,
-        connection_timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
-        prefetch_size: int = 0,
+    send_queue: asyncio.Queue[Union[Message, None, ServerError]],
+    recv_queue: WatermarkQueue[Union[str, None]],
+    *,
+    url: str,
+    queue_name: str,
+    transform_message: Callable[[RmqMessage], Message] = _NO_TM,
+    connection_timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
+    prefetch_size: int = 0,
 ) -> None:
     """Consumes messages from a RabbitMQ queue.
 
@@ -86,10 +93,10 @@ async def consume_from_queue(
     """
     try:
         async with _open_channel(
-                url,
-                timeout=connection_timeout,
-                prefetch_count=max(send_queue.maxsize, 1),
-                prefetch_size=prefetch_size,
+            url,
+            timeout=connection_timeout,
+            prefetch_count=max(send_queue.maxsize, 1),
+            prefetch_size=prefetch_size,
         ) as channel:
             await _consume_from_queue(
                 send_queue,
@@ -99,24 +106,24 @@ async def consume_from_queue(
                 transform_message=transform_message,
             )
     except (asyncio.CancelledError, Exception) as e:  # pragma: nocover
-        terminate_queue(send_queue, ServerError('Abruptly closed connection.'))
+        terminate_queue(send_queue, ServerError("Abruptly closed connection."))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):
             raise
-        _logger.exception('RabbitMQ connection error')
+        _logger.exception("RabbitMQ connection error")
     else:
         terminate_queue(send_queue, None)
 
 
 async def publish_to_exchange(
-        send_queue: asyncio.Queue[Union[str, None, ServerError]],
-        recv_queue: WatermarkQueue[Union[Message, None]],
-        *,
-        url: str,
-        exchange_name: str,
-        preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
-        confirmation_timeout: float = APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS,
-        connection_timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
-        channel: Optional[AbstractChannel] = None,
+    send_queue: asyncio.Queue[Union[str, None, ServerError]],
+    recv_queue: WatermarkQueue[Union[Message, None]],
+    *,
+    url: str,
+    exchange_name: str,
+    preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
+    confirmation_timeout: float = APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS,
+    connection_timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
+    channel: Optional[AbstractChannel] = None,
 ) -> None:
     """Publishes messages to a RabbitMQ exchange.
 
@@ -160,17 +167,17 @@ async def publish_to_exchange(
     except ServerError as e:
         terminate_queue(send_queue, e)
     except (asyncio.CancelledError, Exception) as e:
-        terminate_queue(send_queue, ServerError('Internal server error.'))
+        terminate_queue(send_queue, ServerError("Internal server error."))
         if not isinstance(e, _RMQ_CONNECTION_ERRORS):  # pragma: nocover
             raise
-        _logger.exception('RabbitMQ connection error')
+        _logger.exception("RabbitMQ connection error")
     else:
         terminate_queue(send_queue, None)
 
 
 async def open_robust_channel(
-        url: str,
-        timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
+    url: str,
+    timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
 ) -> tuple[AbstractConnection, AbstractChannel]:
     """Returns a robust RabbitMQ connection, and a robust RabbitMQ channel
     suitable for publishing messages.
@@ -181,7 +188,7 @@ async def open_robust_channel(
     RabbitMQ. Note, however, that the publish confirmations for some of the
     published messages may still be lost during an automatic reconnect.
     """
-    _logger.info('Creating a robust connection to %s.', url)
+    _logger.info("Creating a robust connection to %s.", url)
     connection = await aio_pika.connect_robust(url, timeout=timeout)
     channel = await asyncio.wait_for(
         connection.channel(
@@ -195,14 +202,13 @@ async def open_robust_channel(
 
 @asynccontextmanager
 async def _open_channel(
-        url: str,
-        timeout: float,
-        *,
-        prefetch_count: int = 0,
-        prefetch_size: int = 0,
+    url: str,
+    timeout: float,
+    *,
+    prefetch_count: int = 0,
+    prefetch_size: int = 0,
 ) -> AsyncGenerator[AbstractChannel, None]:
-
-    _logger.info('Connecting to %s.', url)
+    _logger.info("Connecting to %s.", url)
     async with await aio_pika.connect(url, timeout=timeout) as connection:
         channel = await asyncio.wait_for(
             connection.channel(
@@ -218,42 +224,44 @@ async def _open_channel(
                 timeout=timeout,
             )
         yield channel
-    _logger.info('Disconnected from %s.', url)
+    _logger.info("Disconnected from %s.", url)
 
 
 async def _consume_from_queue(
-        send_queue: asyncio.Queue[Union[Message, None, ServerError]],
-        recv_queue: WatermarkQueue[Union[str, None]],
-        *,
-        channel: AbstractChannel,
-        queue_name: str,
-        transform_message: Callable[[RmqMessage], Message],
+    send_queue: asyncio.Queue[Union[Message, None, ServerError]],
+    recv_queue: WatermarkQueue[Union[str, None]],
+    *,
+    channel: AbstractChannel,
+    queue_name: str,
+    transform_message: Callable[[RmqMessage], Message],
 ) -> None:
     async def consume_queue() -> None:
         queue = await channel.get_queue(queue_name, ensure=False)
         async with queue.iterator() as queue_iter:
-            _logger.info('Started consuming from %s.', queue_name)
+            _logger.info("Started consuming from %s.", queue_name)
             async for message in queue_iter:
                 message_type = message.type
                 if message_type is None:  # pragma: nocover
-                    raise RuntimeError('Message without a type.')
+                    raise RuntimeError("Message without a type.")
 
                 message_content_type = message.content_type
                 if message_content_type is None:  # pragma: nocover
-                    raise RuntimeError('Message without a content-type.')
+                    raise RuntimeError("Message without a content-type.")
 
                 delivery_tag = message.delivery_tag
                 if delivery_tag is None:  # pragma: nocover
-                    raise RuntimeError('Message without a delivery tag.')
+                    raise RuntimeError("Message without a delivery tag.")
 
-                m = transform_message(RmqMessage(
-                    id=str(delivery_tag),
-                    body=message.body,
-                    headers=message.headers,
-                    type=message_type,
-                    content_type=message_content_type,
-                    routing_key=None,
-                ))
+                m = transform_message(
+                    RmqMessage(
+                        id=str(delivery_tag),
+                        body=message.body,
+                        headers=message.headers,
+                        type=message_type,
+                        content_type=message_content_type,
+                        routing_key=None,
+                    )
+                )
                 await send_queue.put(m)
 
     async def send_acks() -> None:
@@ -262,7 +270,7 @@ async def _consume_from_queue(
             try:
                 delivery_tag = int(receipt_id)
             except ValueError:  # pragma: nocover
-                _logger.error('Invalid receipt-id: %s', receipt_id)
+                _logger.error("Invalid receipt-id: %s", receipt_id)
             else:
                 await aiormq_channel.basic_ack(delivery_tag, multiple=True)
             recv_queue.task_done()
@@ -284,13 +292,13 @@ async def _consume_from_queue(
 
 
 async def _publish_to_exchange(
-        send_queue: asyncio.Queue[Union[str, None, ServerError]],
-        recv_queue: WatermarkQueue[Union[Message, None]],
-        *,
-        channel: AbstractChannel,
-        exchange_name: str,
-        preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
-        confirmation_timeout: float,
+    send_queue: asyncio.Queue[Union[str, None, ServerError]],
+    recv_queue: WatermarkQueue[Union[Message, None]],
+    *,
+    channel: AbstractChannel,
+    exchange_name: str,
+    preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
+    confirmation_timeout: float,
 ) -> None:
     exchange = await channel.get_exchange(exchange_name, ensure=False)
     deliveries: deque[_Delivery] = deque()
@@ -303,8 +311,8 @@ async def _publish_to_exchange(
     failed_confirmation: Optional[asyncio.Future] = None
 
     def on_confirmation(
-            delivery: _Delivery,
-            confirmation: asyncio.Future,
+        delivery: _Delivery,
+        confirmation: asyncio.Future,
     ) -> None:
         pending_confirmations.remove(confirmation)
         failed = confirmation.cancelled() or confirmation.exception()
@@ -326,9 +334,9 @@ async def _publish_to_exchange(
                 type=m.type,
                 content_type=m.content_type,
                 delivery_mode=_PERSISTENT,
-                app_id='swpt_stomp',
+                app_id="swpt_stomp",
             ),
-            m.routing_key or '',
+            m.routing_key or "",
             mandatory=True,
             timeout=confirmation_timeout,
         )

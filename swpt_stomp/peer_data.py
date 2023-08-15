@@ -23,15 +23,19 @@ _PEM_CERTIFICATE_RE = re.compile(
     ^-----END\ CERTIFICATE-----$    # end marker
     (?:\r?\n)?                      # optional new line
     """,
-    re.VERBOSE | re.DOTALL | re.MULTILINE)
+    re.VERBOSE | re.DOTALL | re.MULTILINE,
+)
 
-APP_MAX_CACHED_PEERS = int(os.environ.get('APP_MAX_CACHED_PEERS', '5000'))
+APP_MAX_CACHED_PEERS = int(os.environ.get("APP_MAX_CACHED_PEERS", "5000"))
 APP_PEERS_CACHE_SECONDS = float(
-    os.environ.get('APP_PEERS_CACHE_SECONDS', '600'))
-APP_FILE_READ_THREADS = int(os.environ.get(
-    'APP_FILE_READ_THREADS',
-    str(5 * (os.cpu_count() or 1)),
-))
+    os.environ.get("APP_PEERS_CACHE_SECONDS", "600")
+)
+APP_FILE_READ_THREADS = int(
+    os.environ.get(
+        "APP_FILE_READ_THREADS",
+        str(5 * (os.cpu_count() or 1)),
+    )
+)
 
 
 class NodeType(Enum):
@@ -49,22 +53,23 @@ class Subnet(NamedTuple):
         """Parse from a hexadecimal string."""
         n = 4 * len(s)
         if n > 64:
-            raise ValueError(f'invalid subnet: {s}')
+            raise ValueError(f"invalid subnet: {s}")
 
         try:
             subnet = (int(s, base=16) << (64 - n)) if n > 0 else 0
-            if not 0 <= subnet < 0xffffffffffffffff:
+            if not 0 <= subnet < 0xFFFFFFFFFFFFFFFF:
                 raise ValueError
         except ValueError:
-            raise ValueError(f'invalid subnet: {s}')
+            raise ValueError(f"invalid subnet: {s}")
 
-        return Subnet(subnet, (-1 << (64 - n)) & 0xffffffffffffffff)
+        return Subnet(subnet, (-1 << (64 - n)) & 0xFFFFFFFFFFFFFFFF)
 
     def match(self, n: int) -> bool:
-        """Return True if `n` is in the subnet.
-        """
-        return (_MIN_INT64 <= n <= _MAX_INT64
-                and n & self.subnet_mask == self.subnet)
+        """Return True if `n` is in the subnet."""
+        return (
+            _MIN_INT64 <= n <= _MAX_INT64
+            and n & self.subnet_mask == self.subnet
+        )
 
     @property
     def binding_key(self) -> str:
@@ -77,36 +82,36 @@ class Subnet(NamedTuple):
         ValueError: invalid binding key
         """
         parts = []
-        subnet_bytes = self.subnet.to_bytes(8, byteorder='big')
-        mask_bytes = self.subnet_mask.to_bytes(8, byteorder='big')
+        subnet_bytes = self.subnet.to_bytes(8, byteorder="big")
+        mask_bytes = self.subnet_mask.to_bytes(8, byteorder="big")
         for sb, mb in zip(subnet_bytes, mask_bytes):
             if mb == 0:
                 break
-            if mb != 0xff:
-                raise RuntimeError('invalid binding key')
-            parts.append(format(sb, '02x'))
+            if mb != 0xFF:
+                raise RuntimeError("invalid binding key")
+            parts.append(format(sb, "02x"))
 
         n = len(parts)
         if n == 0:
-            return '#'
+            return "#"
         if n < 8:
-            return '.'.join(parts) + '.#'
+            return ".".join(parts) + ".#"
         else:
             assert n == 8
-            return '.'.join(parts)
+            return ".".join(parts)
 
 
 @dataclass
 class StompConfig:
-    """Data parsed from the stomp.toml file.
-    """
+    """Data parsed from the stomp.toml file."""
+
     __slots__ = (
-        'servers',
-        'host',
-        'destination',
-        'login',
-        'passcode',
-        'accepted_content_types',
+        "servers",
+        "host",
+        "destination",
+        "login",
+        "passcode",
+        "accepted_content_types",
     )
     servers: list[tuple[str, int]]
     host: str
@@ -118,14 +123,14 @@ class StompConfig:
 
 @dataclass
 class NodeData:
-    """Basic data about the owner of the node.
-    """
+    """Basic data about the owner of the node."""
+
     __slots__ = (
-        'node_type',
-        'node_id',
-        'root_cert',
-        'creditors_subnet',
-        'debtors_subnet',
+        "node_type",
+        "node_id",
+        "root_cert",
+        "creditors_subnet",
+        "debtors_subnet",
     )
     node_type: NodeType
     node_id: str
@@ -136,17 +141,17 @@ class NodeData:
 
 @dataclass
 class PeerData:
-    """Basic data about a peer of the owner of the node.
-    """
+    """Basic data about a peer of the owner of the node."""
+
     __slots__ = (
-        'node_type',
-        'node_id',
-        'stomp_config',
-        'root_cert',
-        'sub_cert',
-        'creditors_subnet',
-        'debtors_subnet',
-        'is_active',
+        "node_type",
+        "node_id",
+        "stomp_config",
+        "root_cert",
+        "sub_cert",
+        "creditors_subnet",
+        "debtors_subnet",
+        "is_active",
     )
     node_type: NodeType
     node_id: str
@@ -166,10 +171,10 @@ class NodePeersDatabase(ABC):
     """A database containing information for the node and its peers."""
 
     def __init__(
-            self,
-            *,
-            max_cached_peers: Optional[int] = None,
-            peers_cache_seconds: Optional[float] = None,
+        self,
+        *,
+        max_cached_peers: Optional[int] = None,
+        peers_cache_seconds: Optional[float] = None,
     ):
         if max_cached_peers is None:
             max_cached_peers = APP_MAX_CACHED_PEERS
@@ -213,10 +218,10 @@ class NodePeersDatabase(ABC):
         return self.__node_data
 
     async def get_peer_data(
-            self,
-            node_id: str,
-            *,
-            active_peers_only: bool = True,
+        self,
+        node_id: str,
+        *,
+        active_peers_only: bool = True,
     ) -> Optional[PeerData]:
         """Return data for peer with the given node ID."""
 
@@ -224,7 +229,8 @@ class NodePeersDatabase(ABC):
         if peer_data is None:
             try:
                 peer_data = await self._get_peer_data(
-                    node_id, active_peers_only=active_peers_only)
+                    node_id, active_peers_only=active_peers_only
+                )
             except Exception as e:  # pragma: nocover
                 raise DatabaseError from e
             if peer_data and peer_data.is_active:
@@ -234,10 +240,10 @@ class NodePeersDatabase(ABC):
 
     @abstractmethod
     async def _get_peer_data(
-            self,
-            node_id: str,
-            *,
-            active_peers_only: bool = True,
+        self,
+        node_id: str,
+        *,
+        active_peers_only: bool = True,
     ) -> Optional[PeerData]:
         raise NotImplementedError  # pragma: nocover
 
@@ -247,12 +253,12 @@ class NodePeersDatabase(ABC):
 
 
 def get_database_instance(
-        *,
-        url: Optional[str] = None,
-        max_cached_peers: Optional[int] = None,
-        peers_cache_seconds: Optional[float] = None,
-        file_read_threads: Optional[int] = None,
-        **kwargs,
+    *,
+    url: Optional[str] = None,
+    max_cached_peers: Optional[int] = None,
+    peers_cache_seconds: Optional[float] = None,
+    file_read_threads: Optional[int] = None,
+    **kwargs,
 ) -> NodePeersDatabase:
     """Return an instance of a node-info database.
 
@@ -273,7 +279,7 @@ def get_database_instance(
     for the `ThreadPoolExecutor`, which will be used for reading local files
     asynchronously.
     """
-    if url and url.startswith('file:///'):
+    if url and url.startswith("file:///"):
         return _LocalDirectory(
             url,
             max_cached_peers=max_cached_peers,
@@ -281,34 +287,34 @@ def get_database_instance(
             file_read_threads=file_read_threads,
         )
 
-    raise ValueError(f'invalid database URL: {url}')
+    raise ValueError(f"invalid database URL: {url}")
 
 
 @dataclass
 class _PeerCacheRecord:
-    slots = ('peer_data', 'time')
+    slots = ("peer_data", "time")
     peer_data: PeerData
     time: float
 
 
-_ZERO_SUBNET = Subnet.parse(8 * '00')
-_UNIVERSAL_SUBNET = Subnet.parse('')
+_ZERO_SUBNET = Subnet.parse(8 * "00")
+_UNIVERSAL_SUBNET = Subnet.parse("")
 
 
 class _LocalDirectory(NodePeersDatabase):
     def __init__(
-            self,
-            url: str,
-            *,
-            max_cached_peers: Optional[int] = None,
-            peers_cache_seconds: Optional[float] = None,
-            file_read_threads: Optional[int] = None,
+        self,
+        url: str,
+        *,
+        max_cached_peers: Optional[int] = None,
+        peers_cache_seconds: Optional[float] = None,
+        file_read_threads: Optional[int] = None,
     ):
         super().__init__(
             max_cached_peers=max_cached_peers,
             peers_cache_seconds=peers_cache_seconds,
         )
-        assert url.startswith('file:///')
+        assert url.startswith("file:///")
         self._root_dir: str = os.path.normpath(url[7:])
 
         if file_read_threads is None:
@@ -319,11 +325,11 @@ class _LocalDirectory(NodePeersDatabase):
 
     def _fetch_file(self, filepath: str) -> bytes:
         abspath = os.path.join(self._root_dir, filepath)
-        with open(abspath, 'br') as f:
+        with open(abspath, "br") as f:
             return f.read()
 
     def _get_peer_dir(self, node_id: str) -> Optional[str]:
-        abspath = os.path.join(self._root_dir, f'peers/{node_id}')
+        abspath = os.path.join(self._root_dir, f"peers/{node_id}")
         return abspath if os.path.isdir(abspath) else None
 
     async def _read_file(self, filepath: str) -> bytes:
@@ -335,7 +341,7 @@ class _LocalDirectory(NodePeersDatabase):
 
     async def _read_text_file(self, filepath: str) -> str:
         octets = await self._read_file(filepath)
-        return octets.decode('utf8')
+        return octets.decode("utf8")
 
     async def _read_cert_file(self, filepath: str) -> bytes:
         content = await self._read_file(filepath)
@@ -344,15 +350,15 @@ class _LocalDirectory(NodePeersDatabase):
         # contains multiple certificates, return only the first one.
         m = _PEM_CERTIFICATE_RE.search(content)
         if m is None:  # pragma: nocover
-            raise RuntimeError('invalid certificate file')
+            raise RuntimeError("invalid certificate file")
 
         return m[0]
 
     async def _read_oneline(self, filepath: str) -> str:
         content = await self._read_text_file(filepath)
-        if content.endswith('\r\n'):
+        if content.endswith("\r\n"):
             return content[:-2]
-        elif content.endswith('\n'):
+        elif content.endswith("\n"):
             return content[:-1]
 
         return content
@@ -362,9 +368,9 @@ class _LocalDirectory(NodePeersDatabase):
         return Subnet.parse(s)
 
     async def _get_node_data(self) -> NodeData:
-        root_cert = await self._read_cert_file('root-ca.crt')
-        node_id = await self._read_oneline('db/nodeid')
-        node_type_str = await self._read_oneline('db/nodetype')
+        root_cert = await self._read_cert_file("root-ca.crt")
+        node_id = await self._read_oneline("db/nodeid")
+        node_type_str = await self._read_oneline("db/nodetype")
         node_type = _parse_node_type(node_type_str)
 
         if node_type == NodeType.AA:
@@ -372,13 +378,13 @@ class _LocalDirectory(NodePeersDatabase):
             debtors_subnet = Subnet.parse(node_id)
         elif node_type == NodeType.CA:
             creditors_subnet = await self._read_subnet_file(
-                'creditors-subnet.txt')
+                "creditors-subnet.txt"
+            )
             debtors_subnet = _UNIVERSAL_SUBNET
         else:
             assert node_type == NodeType.DA
             creditors_subnet = _ZERO_SUBNET
-            debtors_subnet = await self._read_subnet_file(
-                'debtors-subnet.txt')
+            debtors_subnet = await self._read_subnet_file("debtors-subnet.txt")
 
         return NodeData(
             node_type=node_type,
@@ -389,10 +395,10 @@ class _LocalDirectory(NodePeersDatabase):
         )
 
     async def _get_peer_data(
-            self,
-            node_id: str,
-            *,
-            active_peers_only: bool = True,
+        self,
+        node_id: str,
+        *,
+        active_peers_only: bool = True,
     ) -> Optional[PeerData]:
         loop = asyncio.get_running_loop()
         dir = await loop.run_in_executor(
@@ -403,7 +409,7 @@ class _LocalDirectory(NodePeersDatabase):
             return None
 
         try:
-            sub_cert = await self._read_cert_file(f'{dir}/sub-ca.crt')
+            sub_cert = await self._read_cert_file(f"{dir}/sub-ca.crt")
         except FileNotFoundError:  # pragma: nocover
             return None
 
@@ -413,7 +419,7 @@ class _LocalDirectory(NodePeersDatabase):
             # existence of this file signals that all necessary objects
             # related to the peer (configuration files, RabbitMQ queues,
             # exchanges, bindings etc.) have been created.
-            await self._read_file(f'{dir}/ACTIVE')
+            await self._read_file(f"{dir}/ACTIVE")
         except FileNotFoundError:  # pragma: nocover
             if active_peers_only:
                 return None
@@ -421,9 +427,9 @@ class _LocalDirectory(NodePeersDatabase):
         else:
             is_active = True
 
-        root_cert = await self._read_cert_file(f'{dir}/root-ca.crt')
+        root_cert = await self._read_cert_file(f"{dir}/root-ca.crt")
 
-        node_type_str = await self._read_oneline(f'{dir}/nodetype.txt')
+        node_type_str = await self._read_oneline(f"{dir}/nodetype.txt")
         node_type = _parse_node_type(node_type_str)
 
         owner_node_data = await self.get_node_data()
@@ -431,12 +437,12 @@ class _LocalDirectory(NodePeersDatabase):
         owner_node_type = owner_node_data.node_type
 
         stomp_config = _parse_stomp_toml(
-            await self._read_text_file(f'{dir}/nodeinfo/stomp.toml'),
+            await self._read_text_file(f"{dir}/nodeinfo/stomp.toml"),
             node_id=owner_node_id,
         )
 
         if owner_node_type == NodeType.AA:
-            subnet = await self._read_subnet_file(f'{dir}/subnet.txt')
+            subnet = await self._read_subnet_file(f"{dir}/subnet.txt")
             if node_type == NodeType.CA:
                 creditors_subnet = subnet
                 debtors_subnet = owner_node_data.debtors_subnet
@@ -444,25 +450,27 @@ class _LocalDirectory(NodePeersDatabase):
                 creditors_subnet = _ZERO_SUBNET
                 debtors_subnet = subnet
             else:  # pragma: nocover
-                raise ValueError('invalid peer type')
+                raise ValueError("invalid peer type")
         elif owner_node_type == NodeType.CA:
             if node_type == NodeType.AA:
                 creditors_subnet = await self._read_subnet_file(
-                    f'{dir}/masq-subnet.txt')
+                    f"{dir}/masq-subnet.txt"
+                )
                 mask = owner_node_data.creditors_subnet.subnet_mask
                 if creditors_subnet.subnet_mask != mask:  # pragma: nocover
                     raise ValueError(
-                        f'invalid sunbnet mask in {dir}/masq-subnet.txt')
+                        f"invalid sunbnet mask in {dir}/masq-subnet.txt"
+                    )
                 debtors_subnet = Subnet.parse(node_id)
             else:  # pragma: nocover
-                raise ValueError('invalid peer type')
+                raise ValueError("invalid peer type")
         else:
             assert owner_node_type == NodeType.DA
             if node_type == NodeType.AA:
                 creditors_subnet = _ZERO_SUBNET
                 debtors_subnet = owner_node_data.debtors_subnet
             else:  # pragma: nocover
-                raise ValueError('invalid peer type')
+                raise ValueError("invalid peer type")
 
         return PeerData(
             node_type=node_type,
@@ -484,31 +492,31 @@ def _parse_node_type(s: str) -> NodeType:
     elif s == "Debtors Agents":
         return NodeType.DA
     else:
-        raise ValueError(f'invalid node type: {s}')
+        raise ValueError(f"invalid node type: {s}")
 
 
 def _parse_servers_list(servers: list[object]) -> list[tuple[str, int]]:
     if len(servers) == 0:
-        raise ValueError('empty server list')
+        raise ValueError("empty server list")
 
     parsed_servers = []
     for server in servers:
         try:
             if not isinstance(server, str):
                 raise TypeError
-            host, port_str = server.split(':', maxsplit=1)
+            host, port_str = server.split(":", maxsplit=1)
         except (TypeError, ValueError):
-            raise ValueError(f'invalid server: {server}')
+            raise ValueError(f"invalid server: {server}")
 
         if not _is_valid_hostname(host):
-            raise ValueError(f'invalid host: {host}')
+            raise ValueError(f"invalid host: {host}")
 
         try:
             port = int(port_str)
             if not 1 <= port <= 65535:
                 raise ValueError
         except ValueError:
-            raise ValueError(f'invalid port: {port_str}')
+            raise ValueError(f"invalid port: {port_str}")
 
         parsed_servers.append((host, port))
 
@@ -518,36 +526,38 @@ def _parse_servers_list(servers: list[object]) -> list[tuple[str, int]]:
 def _parse_stomp_toml(s: str, *, node_id: str) -> StompConfig:
     data = tomli.loads(s)
 
-    servers: object = data.get('servers')
+    servers: object = data.get("servers")
     if not isinstance(servers, list):
-        raise ValueError('invalid servers value')
+        raise ValueError("invalid servers value")
     parsed_servers = _parse_servers_list(servers)
 
-    host: object = data.get('host')
+    host: object = data.get("host")
     if not isinstance(host, str):
-        raise ValueError('invalid host value')
-    host = host.replace('${NODE_ID}', node_id)
+        raise ValueError("invalid host value")
+    host = host.replace("${NODE_ID}", node_id)
 
-    destination: object = data.get('destination')
+    destination: object = data.get("destination")
     if not isinstance(destination, str):
-        raise ValueError('invalid destination value')
-    destination = destination.replace('${NODE_ID}', node_id)
+        raise ValueError("invalid destination value")
+    destination = destination.replace("${NODE_ID}", node_id)
 
-    login: object = data.get('login')
+    login: object = data.get("login")
     if login is not None:
         if not isinstance(login, str):
-            raise ValueError('invalid login value')
-        login = login.replace('${NODE_ID}', node_id)
+            raise ValueError("invalid login value")
+        login = login.replace("${NODE_ID}", node_id)
 
-    passcode: object = data.get('passcode')
+    passcode: object = data.get("passcode")
     if not (passcode is None or isinstance(passcode, str)):
-        raise ValueError('invalid passcode value')
+        raise ValueError("invalid passcode value")
 
-    accepted_content_types: object = data.get('accepted-content-types', [])
-    if not (isinstance(accepted_content_types, list)
-            and all(isinstance(x, str) for x in accepted_content_types)):
-        raise ValueError('invalid accepted-content-types')
-    accepted_content_types.append('application/json')
+    accepted_content_types: object = data.get("accepted-content-types", [])
+    if not (
+        isinstance(accepted_content_types, list)
+        and all(isinstance(x, str) for x in accepted_content_types)
+    ):
+        raise ValueError("invalid accepted-content-types")
+    accepted_content_types.append("application/json")
 
     return StompConfig(
         servers=parsed_servers,
