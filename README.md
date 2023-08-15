@@ -141,6 +141,20 @@ container allows you to execute the following *documented commands*:
 
   For more information, run `configure-queue --help`.
 
+  **Important note:** Peers that do not have an empty file with the name
+  `ACTIVE` in their corresponding directory in the node's database (see the
+  `SWPT_NODEDATA_URL` environment variable), will be considered inactive,
+  and no connections to/from them will be allowed. The existence of this
+  file signals that all necessary objects related to the peer (configuration
+  files, RabbitMQ queues, exchanges, bindings etc.) have been created.
+
+Here are some examples how to use the generated docker image for different
+Swaptacular nodes:
+
+ - [Accounting authority node](https://github.com/swaptacular/swpt_accounts/blob/master/docker-compose-all.yml)
+ - [Creditors agent node](https://github.com/swaptacular/swpt_creditors/blob/master/docker-compose-all.yml)
+ - [Debtors agent node](https://github.com/swaptacular/swpt_debtors/blob/master/docker-compose-all.yml)
+
 
 How to run the tests
 --------------------

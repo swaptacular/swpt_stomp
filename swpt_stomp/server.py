@@ -34,6 +34,7 @@
 ##############################################################################
 
 import logging
+import sys
 import os
 import os.path
 import asyncio
@@ -287,6 +288,7 @@ def server(
     """
     set_event_loop_policy()
     configure_logging(level=log_level, format=log_format)
+
     asyncio.run(
         serve(
             server_cert=server_cert,
@@ -297,6 +299,7 @@ def server(
             protocol_broker_url=broker_url,
         )
     )
+    sys.exit(1)  # pragma: nocover
 
 
 if __name__ == "__main__":  # pragma: nocover

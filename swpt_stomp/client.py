@@ -34,6 +34,7 @@
 ##############################################################################
 
 import logging
+import sys
 import tempfile
 import asyncio
 import ssl
@@ -260,6 +261,7 @@ def client(
     """
     set_event_loop_policy()
     configure_logging(level=log_level, format=log_format)
+
     asyncio.run(
         connect(
             peer_node_id=peer_node_id,
@@ -271,7 +273,8 @@ def client(
             protocol_broker_queue=queue_name,
         )
     )
+    sys.exit(1)  # pragma: nocover
 
 
-if __name__ == "__main__":  # pragma: nocover
+if __name__ == '__main__':  # pragma: nocover
     client()
