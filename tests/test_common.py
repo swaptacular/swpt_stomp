@@ -1,6 +1,8 @@
 import pytest
 from swpt_stomp.common import (
-    WatermarkQueue, get_peer_serial_number, terminate_queue,
+    WatermarkQueue,
+    get_peer_serial_number,
+    terminate_queue,
 )
 from unittest.mock import NonCallableMock, Mock
 
@@ -103,10 +105,10 @@ def test_remove_watermark_callbacks():
     assert cb_called == 1
 
     with pytest.raises(ValueError):
-        q.remove_low_watermark_callback('invalid')
+        q.remove_low_watermark_callback("invalid")
 
     with pytest.raises(ValueError):
-        q.remove_high_watermark_callback('invalid')
+        q.remove_high_watermark_callback("invalid")
 
 
 def test_watermark_queue_put(loop):
@@ -120,68 +122,76 @@ def test_watermark_queue_put(loop):
     q.add_high_watermark_callback(cb)
 
     assert cb_called == 0
-    loop.run_until_complete(q.put('item'))
+    loop.run_until_complete(q.put("item"))
     assert cb_called == 1
 
 
 def test_get_peer_serial_number():
     data = {
-        'issuer': (
-            (('countryName', 'IL'),),
-            (('organizationName', 'StartCom Ltd.'),),
-            (('organizationalUnitName',
-              'Secure Digital Certificate Signing'),),
-            (('commonName',
-              'StartCom Class 2 Primary Intermediate Server CA'),)
+        "issuer": (
+            (("countryName", "IL"),),
+            (("organizationName", "StartCom Ltd."),),
+            (
+                (
+                    "organizationalUnitName",
+                    "Secure Digital Certificate Signing",
+                ),
+            ),
+            (
+                (
+                    "commonName",
+                    "StartCom Class 2 Primary Intermediate Server CA",
+                ),
+            ),
         ),
-        'notAfter': 'Nov 22 08:15:19 2013 GMT',
-        'notBefore': 'Nov 21 03:09:52 2011 GMT',
-        'serialNumber': '95F0',
-        'subject': (
-            (('description', '571208-SLe257oHY9fVQ07Z'),),
-            (('countryName', 'US'),),
-            (('stateOrProvinceName', 'California'),),
-            (('localityName', 'San Francisco'),),
-            (('organizationName', 'Swaptacular Nodes Registry'),),
-            (('commonName', '*.eff.org'),),
-            (('serialNumber', '1234abcd'),),
-            (('emailAddress', 'hostmaster@eff.org'),)
+        "notAfter": "Nov 22 08:15:19 2013 GMT",
+        "notBefore": "Nov 21 03:09:52 2011 GMT",
+        "serialNumber": "95F0",
+        "subject": (
+            (("description", "571208-SLe257oHY9fVQ07Z"),),
+            (("countryName", "US"),),
+            (("stateOrProvinceName", "California"),),
+            (("localityName", "San Francisco"),),
+            (("organizationName", "Swaptacular Nodes Registry"),),
+            (("commonName", "*.eff.org"),),
+            (("serialNumber", "1234abcd"),),
+            (("emailAddress", "hostmaster@eff.org"),),
         ),
-        'subjectAltName': (('DNS', '*.eff.org'), ('DNS', 'eff.org')),
-        'version': 3,
+        "subjectAltName": (("DNS", "*.eff.org"), ("DNS", "eff.org")),
+        "version": 3,
     }
-    transport = NonCallableMock(get_extra_info=Mock(
-        return_value=data),
+    transport = NonCallableMock(
+        get_extra_info=Mock(return_value=data),
     )
-    assert get_peer_serial_number(transport) == '1234abcd'
+    assert get_peer_serial_number(transport) == "1234abcd"
 
-    data['subject'] = (
-        (('description', '571208-SLe257oHY9fVQ07Z'),),
-        (('countryName', 'US'),),
-        (('stateOrProvinceName', 'California'),),
-        (('localityName', 'San Francisco'),),
-        (('organizationName', 'SOMETHING ELSE'),),
-        (('commonName', '*.eff.org'),),
-        (('serialNumber', '1234abcd'),),
-        (('emailAddress', 'hostmaster@eff.org'),)
+    data["subject"] = (
+        (("description", "571208-SLe257oHY9fVQ07Z"),),
+        (("countryName", "US"),),
+        (("stateOrProvinceName", "California"),),
+        (("localityName", "San Francisco"),),
+        (("organizationName", "SOMETHING ELSE"),),
+        (("commonName", "*.eff.org"),),
+        (("serialNumber", "1234abcd"),),
+        (("emailAddress", "hostmaster@eff.org"),),
     )
-    transport = NonCallableMock(get_extra_info=Mock(
-        return_value=data),
+    transport = NonCallableMock(
+        get_extra_info=Mock(return_value=data),
     )
     assert get_peer_serial_number(transport) is None
 
-    data['subject'] = (
-        (('description', '571208-SLe257oHY9fVQ07Z'),),
-        (('countryName', 'US'),),
-        (('stateOrProvinceName', 'California'),),
-        (('localityName', 'San Francisco'),),
-        (('organizationName', 'Swaptacular Nodes Registry'),),
-        (('commonName', '*.eff.org'),),
-        (('serialNumber', '1234abcd'), ('serialNumber', '00000000')),
-        (('emailAddress', 'hostmaster@eff.org'),)
+    data["subject"] = (
+        (("description", "571208-SLe257oHY9fVQ07Z"),),
+        (("countryName", "US"),),
+        (("stateOrProvinceName", "California"),),
+        (("localityName", "San Francisco"),),
+        (("organizationName", "Swaptacular Nodes Registry"),),
+        (("commonName", "*.eff.org"),),
+        (("serialNumber", "1234abcd"), ("serialNumber", "00000000")),
+        (("emailAddress", "hostmaster@eff.org"),),
     )
-    transport = NonCallableMock(get_extra_info=Mock(
-        return_value=data),
+    transport = NonCallableMock(
+        get_extra_info=Mock(return_value=data),
     )
     assert get_peer_serial_number(transport) is None
 
@@ -192,11 +202,11 @@ async def test_terminate_queue():
 
     loop = asyncio.get_running_loop()
     queue = asyncio.Queue(1)
-    terminate_queue(queue, 'first')
+    terminate_queue(queue, "first")
     assert queue.qsize() == 1
-    terminate_queue(queue, 'second')
+    terminate_queue(queue, "second")
     assert queue.qsize() == 1
     loop.call_soon(queue.get_nowait)
     await asyncio.sleep(0.2)
     assert queue.qsize() == 1
-    assert queue.get_nowait() == 'second'
+    assert queue.get_nowait() == "second"

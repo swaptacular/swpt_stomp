@@ -3,9 +3,7 @@ from typing import Iterator
 from collections import deque
 import re
 
-_HEARTBEAT_RE = re.compile(
-    rb"""(?:\r?\n)+    # empty lines""",
-    re.VERBOSE)
+_HEARTBEAT_RE = re.compile(rb"""(?:\r?\n)+    # empty lines""", re.VERBOSE)
 
 _HEAD_RE = re.compile(
     rb"""(?:\Z|
@@ -21,22 +19,25 @@ _HEAD_RE = re.compile(
         \r?(?:\Z|(\n))
       )
     ))))""",
-    re.VERBOSE)
+    re.VERBOSE,
+)
 
-_HEADER_SEPARATOR_RE = re.compile(rb'\r?\n|:')
-_HEADER_UNESCAPE_RE = re.compile(rb'\\.')
+_HEADER_SEPARATOR_RE = re.compile(rb"\r?\n|:")
+_HEADER_UNESCAPE_RE = re.compile(rb"\\.")
 _HEADER_UNESCAPE_CHARS = {
-    rb'\r': b'\r',
-    rb'\n': b'\n',
-    rb'\c': b':',
-    rb'\\': b'\\',
+    rb"\r": b"\r",
+    rb"\n": b"\n",
+    rb"\c": b":",
+    rb"\\": b"\\",
 }
-_HEADER_ESCAPE_TABLE = str.maketrans({
-    ord('\r'): r'\r',
-    ord('\n'): r'\n',
-    ord(':'): r'\c',
-    ord('\\'): r'\\',
-})
+_HEADER_ESCAPE_TABLE = str.maketrans(
+    {
+        ord("\r"): r"\r",
+        ord("\n"): r"\n",
+        ord(":"): r"\c",
+        ord("\\"): r"\\",
+    }
+)
 
 
 def _substitute_header_escape_chars(s: bytes) -> bytes:
@@ -44,25 +45,28 @@ def _substitute_header_escape_chars(s: bytes) -> bytes:
     # escape symbols are not allowed.
     try:
         return _HEADER_UNESCAPE_RE.sub(
-            lambda m: _HEADER_UNESCAPE_CHARS[m[0]], s)
+            lambda m: _HEADER_UNESCAPE_CHARS[m[0]], s
+        )
     except KeyError:
-        raise ProtocolError('Invalid header.')
+        raise ProtocolError("Invalid header.")
 
 
 def _parse_headers(s: bytes) -> dict[str, str]:
     if len(s) > HEADER_MAX_LENGTH:
-        raise ProtocolError('The frame header is too big.')
+        raise ProtocolError("The frame header is too big.")
 
     headers = {}
     parts = _HEADER_SEPARATOR_RE.split(s)
     try:
         for i in range(0, len(parts) - 1, 2):
-            key = _substitute_header_escape_chars(parts[i]).decode('utf8')
-            value = _substitute_header_escape_chars(parts[i + 1]).decode('utf8')
+            key = _substitute_header_escape_chars(parts[i]).decode("utf8")
+            value = _substitute_header_escape_chars(parts[i + 1]).decode(
+                "utf8"
+            )
             if key not in headers:
                 headers[key] = value
     except UnicodeDecodeError:
-        raise ProtocolError('UTF-8 decode error.')
+        raise ProtocolError("UTF-8 decode error.")
 
     return headers
 
@@ -72,8 +76,7 @@ BODY_MAX_LENGTH = 8_192
 
 
 class ProtocolError(Exception):
-    """STOMP 1.2 protocol error.
-    """
+    """STOMP 1.2 protocol error."""
 
     def __init__(self, message: str):
         super().__init__(message)
@@ -84,14 +87,13 @@ class ProtocolError(Exception):
 
 
 class EmptyQueue(Exception):
-    """There are no available frames in the queue.
-    """
+    """There are no available frames in the queue."""
 
 
 @dataclass
 class StompFrame:
-    """STOMP 1.2 Protocol Frame.
-    """
+    """STOMP 1.2 Protocol Frame."""
+
     command: str
     headers: dict[str, str] = field(default_factory=dict)
     body: bytearray = field(default_factory=bytearray)
@@ -101,31 +103,29 @@ class StompFrame:
         body = self.body
         headers = self.headers
         header_lines = [
-            f'{k.translate(t)}:{v.translate(t)}\n'
-            for k, v in headers.items()
+            f"{k.translate(t)}:{v.translate(t)}\n" for k, v in headers.items()
         ]
-        if body and 'content-length' not in headers:
-            header_lines.append(f'content-length:{len(body)}\n')
+        if body and "content-length" not in headers:
+            header_lines.append(f"content-length:{len(body)}\n")
 
-        headers_bytes = ''.join(header_lines).encode('utf8')
-        command_bytes = self.command.encode('ascii')
-        return b'%s\n%s\n%s\0' % (command_bytes, headers_bytes, body)
+        headers_bytes = "".join(header_lines).encode("utf8")
+        command_bytes = self.command.encode("ascii")
+        return b"%s\n%s\n%s\0" % (command_bytes, headers_bytes, body)
 
 
 class StompParser:
-    """STOMP version 1.2 parser.
-    """
+    """STOMP version 1.2 parser."""
+
     frames: deque[StompFrame]
 
     def __init__(self):
         self.reset()
 
     def reset(self) -> None:
-        """Reset the parser, parsed frames will be lost.
-        """
+        """Reset the parser, parsed frames will be lost."""
         self._data = bytearray()
         self._current_pos = 0
-        self._command = ''
+        self._command = ""
         self._headers: dict[str, str] = {}
         self._body_end = 0
         self.frames: deque[StompFrame] = deque()
@@ -151,8 +151,7 @@ class StompParser:
             self._current_pos = 0
 
     def has_frame(self) -> bool:
-        """Return whether at least one frame is available for reading.
-        """
+        """Return whether at least one frame is available for reading."""
         return bool(self.frames)
 
     def pop_frame(self) -> StompFrame:
@@ -166,8 +165,7 @@ class StompParser:
             raise EmptyQueue()
 
     def __iter__(self) -> Iterator[StompFrame]:
-        """Iterate over available frames, removing them from the queue.
-        """
+        """Iterate over available frames, removing them from the queue."""
         while True:
             try:
                 yield self.pop_frame()
@@ -197,21 +195,21 @@ class StompParser:
 
         m = _HEAD_RE.match(data, current_pos)
         if m is None:
-            raise ProtocolError('Invalid frame.')
+            raise ProtocolError("Invalid frame.")
 
         if m[3] is None:
             return False  # The head seems valid, but incomplete.
 
         self._current_pos = current_pos = m.end()
-        self._command = m[1].decode('ascii')
+        self._command = m[1].decode("ascii")
         self._headers = _parse_headers(m[2])
 
         try:
-            n = int(self._headers['content-length'])
+            n = int(self._headers["content-length"])
         except (KeyError, ValueError):
             n = 0
         if n > BODY_MAX_LENGTH:
-            raise ProtocolError('Content-length is too large.')
+            raise ProtocolError("Content-length is too large.")
 
         self._body_end = current_pos + n
         return True
@@ -223,18 +221,22 @@ class StompParser:
         if n > body_end:
             first_illegal_index = self._current_pos + BODY_MAX_LENGTH + 1
             stop = data.find(0, body_end, first_illegal_index)
-            if (stop == -1):
+            if stop == -1:
                 if n >= first_illegal_index:
-                    raise ProtocolError('The body is too large.')
+                    raise ProtocolError("The body is too large.")
                 self._body_end = n
             else:
-                self.frames.append(StompFrame(
-                    command=self._command,
-                    headers=self._headers,
-                    body=data[self._current_pos:stop],
-                ))
-                self._current_pos = stop + 1  # Skip the frame-terminating NULL.
-                self._command = ''
+                self.frames.append(
+                    StompFrame(
+                        command=self._command,
+                        headers=self._headers,
+                        body=data[self._current_pos:stop],
+                    )
+                )
+                self._current_pos = (
+                    stop + 1
+                )  # Skip the frame-terminating NULL.
+                self._command = ""
                 return True
 
         return False
