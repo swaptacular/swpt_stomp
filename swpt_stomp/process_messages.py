@@ -1,6 +1,7 @@
 import json
 from hashlib import md5
 from typing import Union, Any
+from datetime import datetime, timezone
 from swpt_stomp.common import Message, ServerError
 from swpt_stomp.peer_data import NodeData, PeerData, NodeType, Subnet
 from swpt_stomp.rmq import RmqMessage, HeadersType
@@ -63,6 +64,13 @@ def transform_message(
 
     if not peer_data.debtors_subnet.match(debtor_id):
         raise ProcessingError(f"Invalid debtor ID: {_as_hex(debtor_id)}.")
+
+    current_ts = datetime.now(tz=timezone.utc)
+    secs_ahead = (msg_data["ts"] - current_ts).total_seconds()
+    if secs_ahead > 7200:  # pragma: no cover
+        raise ProcessingError(
+            f"The message timestamp is {secs_ahead:.0f} seconds in the future."
+        )
 
     msg_json = JSON_SCHEMAS[message.type].dumps(msg_data)
     return Message(
