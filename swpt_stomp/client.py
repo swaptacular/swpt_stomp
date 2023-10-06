@@ -276,5 +276,5 @@ def client(
     sys.exit(1)  # pragma: nocover
 
 
-if __name__ == '__main__':  # pragma: nocover
+if __name__ == "__main__":  # pragma: nocover
     client()

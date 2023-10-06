@@ -230,7 +230,7 @@ class StompParser:
                     StompFrame(
                         command=self._command,
                         headers=self._headers,
-                        body=data[self._current_pos:stop],
+                        body=data[self._current_pos : stop],
                     )
                 )
                 self._current_pos = (

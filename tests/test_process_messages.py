@@ -332,6 +332,22 @@ async def test_transform_message_ca(datadir):
         create_prepare_transfer_msg(0x1234ABCD00000001, 0x0000010000000ABC)
     )
 
+    s = create_prepare_transfer_msg(
+        0x1234ABCD00000001,
+        0x0000080000000ABC,
+        coordinator_type="agent",
+        coordinator_id=0x0000080000000002,
+    )
+    m = transform(s)
+    assert json.loads(m.body.decode("utf8")) == json.loads(
+        create_prepare_transfer_msg(
+            0x1234ABCD00000001,
+            0x0000010000000ABC,
+            coordinator_type="agent",
+            coordinator_id=0x0000010000000002,
+        )
+    )
+
     # Invalid debtor ID:
     s = create_prepare_transfer_msg(0x1234ABCE00000001, 0x0000080000000ABC)
     with pytest.raises(ProcessingError):
@@ -511,6 +527,29 @@ async def test_preprocess_message_ca(datadir):
     assert m.routing_key == _calc_bin_routing_key(0x0000080000000ABC)
     assert json.loads(m.body.decode("utf8")) == json.loads(
         create_rejected_transfer_msg(0x1234ABCD00000001, 0x0000080000000ABC)
+    )
+
+    s = create_rejected_transfer_msg(
+        0x1234ABCD00000001,
+        0x0000010000000ABC,
+        coordinator_type="agent",
+        coordinator_id=0x0000010000000002,
+    )
+    m = await preprocess(s)
+    assert m.headers == {
+        "message-type": "RejectedTransfer",
+        "debtor-id": 0x1234ABCD00000001,
+        "creditor-id": 0x0000080000000ABC,
+        "coordinator-id": 0x0000080000000002,
+        "coordinator-type": "agent",
+    }
+    assert json.loads(m.body.decode("utf8")) == json.loads(
+        create_rejected_transfer_msg(
+            0x1234ABCD00000001,
+            0x0000080000000ABC,
+            coordinator_type="agent",
+            coordinator_id=0x0000080000000002,
+        )
     )
 
     s = create_rejected_transfer_msg(0x1234ABCE00000001, 0x0000010000000ABC)

@@ -9,6 +9,7 @@ from swpt_stomp.smp_schemas import (
     JSON_SCHEMAS,
     IN_MESSAGE_TYPES,
     OUT_MESSAGE_TYPES,
+    ROOT_CREDITOR_ID,
     ValidationError,
 )
 
@@ -45,32 +46,31 @@ def transform_message(
         # accounting authority, we must update "creditor_id" and
         # "coordinator_id" fields, so as they are in the range (subnet)
         # reserved for the creditors agent.
-        orig_id = creditor_id
         msg_data["creditor_id"] = creditor_id = _change_subnet(
             creditor_id,
             from_=owner_node_data.creditors_subnet,
             to_=peer_data.creditors_subnet,
         )
-        if (
-            "coordinator_id" in msg_data
-            and msg_data["coordinator_type"] == "direct"
-        ):
-            if msg_data["coordinator_id"] != orig_id:  # pragma: nocover
-                raise ProcessingError("Invalid coordinator ID.")
-            msg_data["coordinator_id"] = creditor_id
+        if "coordinator_id" in msg_data and msg_data["coordinator_type"] in [
+            "direct",
+            "agent",
+        ]:
+            coordinator_id: int = msg_data["coordinator_id"]
+            if not owner_node_data.creditors_subnet.match(coordinator_id):
+                raise ProcessingError(
+                    f"Invalid coordinator ID: {_as_hex(coordinator_id)}."
+                )  # pragma: no cover
+            msg_data["coordinator_id"] = _change_subnet(
+                coordinator_id,
+                from_=owner_node_data.creditors_subnet,
+                to_=peer_data.creditors_subnet,
+            )
 
     if not peer_data.creditors_subnet.match(creditor_id):
         raise ProcessingError(f"Invalid creditor ID: {_as_hex(creditor_id)}.")
 
     if not peer_data.debtors_subnet.match(debtor_id):
         raise ProcessingError(f"Invalid debtor ID: {_as_hex(debtor_id)}.")
-
-    current_ts = datetime.now(tz=timezone.utc)
-    secs_ahead = (msg_data["ts"] - current_ts).total_seconds()
-    if secs_ahead > 7200:  # pragma: no cover
-        raise ProcessingError(
-            f"The message timestamp is {secs_ahead:.0f} seconds in the future."
-        )
 
     msg_json = JSON_SCHEMAS[message.type].dumps(msg_data)
     return Message(
@@ -93,6 +93,15 @@ async def preprocess_message(
             allow_in_messages=(owner_node_type == NodeType.AA),
             allow_out_messages=(owner_node_type != NodeType.AA),
         )
+
+        current_ts = datetime.now(tz=timezone.utc)
+        secs_ahead = (msg_data["ts"] - current_ts).total_seconds()
+        if secs_ahead > 7200:  # pragma: no cover
+            raise ProcessingError(
+                f"The message timestamp is {secs_ahead:.0f} seconds in the"
+                " future."
+            )
+
         creditor_id: int = msg_data["creditor_id"]
         debtor_id: int = msg_data["debtor_id"]
 
@@ -104,24 +113,60 @@ async def preprocess_message(
         if not peer_data.debtors_subnet.match(debtor_id):
             raise ProcessingError(f"Invalid debtor ID: {_as_hex(debtor_id)}.")
 
+        if "coordinator_id" in msg_data:
+            coordinator_type: str = msg_data["coordinator_type"]
+            coordinator_id: int = msg_data["coordinator_id"]
+
+            # Validate `coordinator_type`.
+            peer_type = peer_data.node_type
+            if (
+                (owner_node_type == NodeType.CA or peer_type == NodeType.CA)
+                and coordinator_type != "direct"
+                and coordinator_type != "agent"
+            ) or (
+                (owner_node_type == NodeType.DA or peer_type == NodeType.DA)
+                and coordinator_type != "issuing"
+            ):
+                raise ProcessingError(
+                    f"Invalid coordinator type: {coordinator_type}."
+                )
+
+            # Validate `coordinator_id`.
+            if (
+                (
+                    coordinator_type == "direct"
+                    and coordinator_id != creditor_id
+                )
+                or (
+                    coordinator_type == "agent"
+                    and not peer_data.creditors_subnet.match(coordinator_id)
+                )
+                or (
+                    coordinator_type == "issuing"
+                    and (
+                        coordinator_id != debtor_id
+                        or creditor_id != ROOT_CREDITOR_ID
+                    )
+                )
+            ):  # pragma: no cover
+                raise ProcessingError("Invalid coordinator ID.")
+
         if owner_node_type == NodeType.CA:
             # NOTE: For creditors agent nodes, before we accept a message
             # from an accounting authority, we must update "creditor_id" and
             # "coordinator_id" fields, so as they are in the range (subnet)
             # used by the creditors agent.
-            orig_id = creditor_id
             msg_data["creditor_id"] = creditor_id = _change_subnet(
                 creditor_id,
                 from_=peer_data.creditors_subnet,
                 to_=owner_node_data.creditors_subnet,
             )
-            if (
-                "coordinator_id" in msg_data
-                and msg_data["coordinator_type"] == "direct"
-            ):
-                if msg_data["coordinator_id"] != orig_id:  # pragma: nocover
-                    raise ProcessingError("Invalid coordinator ID.")
-                msg_data["coordinator_id"] = creditor_id
+            if "coordinator_id" in msg_data:
+                msg_data["coordinator_id"] = coordinator_id = _change_subnet(
+                    coordinator_id,
+                    from_=peer_data.creditors_subnet,
+                    to_=owner_node_data.creditors_subnet,
+                )
 
         msg_type = message.type
         headers: HeadersType = {
@@ -130,13 +175,8 @@ async def preprocess_message(
             "creditor-id": creditor_id,
         }
         if "coordinator_id" in msg_data:
-            headers["coordinator-id"] = msg_data["coordinator_id"]
-            headers["coordinator-type"] = c_type = msg_data["coordinator_type"]
-            peer_type = peer_data.node_type
-            if (peer_type == NodeType.CA and c_type != "direct") or (
-                peer_type == NodeType.DA and c_type != "issuing"
-            ):
-                raise ProcessingError(f"Invalid coordinator type: {c_type}.")
+            headers["coordinator-id"] = coordinator_id
+            headers["coordinator-type"] = coordinator_type
 
         if owner_node_type == NodeType.AA:
             routing_key = _calc_bin_routing_key(debtor_id, creditor_id)
