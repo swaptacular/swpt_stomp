@@ -157,10 +157,10 @@ async def preprocess_message(
             # NOTE: We assume that from all creditor IDs managed by the
             # creditors agent (a 40-bit range), the smallest 4294967296
             # creditor IDs are reserved for system accounts, which are used
-            # to perform automatic circular exchanges.
-            concerns_exchange_account = creditor_id & 0xff00000000 == 0
-            concerns_exchange_transfer = False
-            is_exchange_transfer_noitification = (
+            # to perform automatic circular trades.
+            concerns_trade_account = creditor_id & 0xff00000000 == 0
+            concerns_trade_transfer = False
+            is_trade_transfer_noitification = (
                 msg_type == "AccountTransfer"
                 and msg_data["coordinator_type"] == "agent"
             )
@@ -180,20 +180,20 @@ async def preprocess_message(
                     from_=peer_data.creditors_subnet,
                     to_=owner_node_data.creditors_subnet,
                 )
-                concerns_exchange_transfer = coordinator_type == "agent"
+                concerns_trade_transfer = coordinator_type == "agent"
 
-            # Messages having a "ca-regular: true" header concern regular
-            # creditor accounts. Messages having a "ca-exchange: true"
-            # header concern automatic circular exchanges. Note that some
+            # Messages having a "ca-creditors: true" header concern regular
+            # creditor accounts. Messages having a "ca-trade: true" header
+            # concern automatic circular trades. Note that some
             # "AccountTransfer" messages will concern both.
             ca_headers = {
-                "ca-regular": not (
-                    concerns_exchange_account or concerns_exchange_transfer
+                "ca-creditors": not (
+                    concerns_trade_account or concerns_trade_transfer
                 ),
-                "ca-exchange": (
-                    concerns_exchange_account
-                    or concerns_exchange_transfer
-                    or is_exchange_transfer_noitification
+                "ca-trade": (
+                    concerns_trade_account
+                    or concerns_trade_transfer
+                    or is_trade_transfer_noitification
                 ),
             }
 

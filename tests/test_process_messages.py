@@ -523,8 +523,8 @@ async def test_preprocess_message_ca(datadir):
         "creditor-id": 0x0000080100000ABC,
         "coordinator-id": 0x0000080100000ABC,
         "coordinator-type": "direct",
-        "ca-regular": True,
-        "ca-exchange": False,
+        "ca-creditors": True,
+        "ca-trade": False,
     }
     assert m.routing_key == _calc_bin_routing_key(0x0000080100000ABC)
     assert json.loads(m.body.decode("utf8")) == json.loads(
@@ -544,8 +544,8 @@ async def test_preprocess_message_ca(datadir):
         "creditor-id": 0x0000080100000ABC,
         "coordinator-id": 0x0000080100000002,
         "coordinator-type": "agent",
-        "ca-regular": False,
-        "ca-exchange": True,
+        "ca-creditors": False,
+        "ca-trade": True,
     }
     assert json.loads(m.body.decode("utf8")) == json.loads(
         create_rejected_transfer_msg(
