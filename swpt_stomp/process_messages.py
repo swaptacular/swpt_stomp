@@ -1,6 +1,6 @@
 import json
 from hashlib import md5
-from typing import Union, Any
+from typing import Union, Any, Optional
 from datetime import datetime, timezone
 from swpt_stomp.common import Message, ServerError
 from swpt_stomp.peer_data import NodeData, PeerData, NodeType, Subnet
@@ -102,6 +102,8 @@ async def preprocess_message(
                 " future."
             )
 
+        msg_type = message.type
+        ca_headers: Optional[HeadersType] = None
         creditor_id: int = msg_data["creditor_id"]
         debtor_id: int = msg_data["debtor_id"]
 
@@ -152,6 +154,13 @@ async def preprocess_message(
                 raise ProcessingError("Invalid coordinator ID.")
 
         if owner_node_type == NodeType.CA:
+            concerns_exchange_transfer = False
+            concerns_exchange_account = creditor_id & 0xff00000000 == 0
+            is_exchange_transfer_noitification = (
+                msg_type == "AccountTransfer"
+                and msg_data["coordinator_type"] == "agent"
+            )
+
             # NOTE: For creditors agent nodes, before we accept a message
             # from an accounting authority, we must update "creditor_id" and
             # "coordinator_id" fields, so as they are in the range (subnet)
@@ -167,13 +176,30 @@ async def preprocess_message(
                     from_=peer_data.creditors_subnet,
                     to_=owner_node_data.creditors_subnet,
                 )
+                concerns_exchange_transfer = coordinator_type == "agent"
 
-        msg_type = message.type
+            # Messages having a "ca-regular: true" header concern regular
+            # creditor accounts. Messages having a "ca-exchange: true"
+            # header concern automatic circular exchanges. Note that some
+            # "AccountTransfer" messages will concern both.
+            ca_headers = {
+                "ca-regular": not (
+                    concerns_exchange_account or concerns_exchange_transfer
+                ),
+                "ca-exchange": (
+                    concerns_exchange_account
+                    or concerns_exchange_transfer
+                    or is_exchange_transfer_noitification
+                ),
+            }
+
         headers: HeadersType = {
             "message-type": msg_type,
             "debtor-id": debtor_id,
             "creditor-id": creditor_id,
         }
+        if ca_headers:
+            headers.update(ca_headers)
         if "coordinator_id" in msg_data:
             headers["coordinator-id"] = coordinator_id
             headers["coordinator-type"] = coordinator_type
