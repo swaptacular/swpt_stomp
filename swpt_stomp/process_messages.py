@@ -154,8 +154,12 @@ async def preprocess_message(
                 raise ProcessingError("Invalid coordinator ID.")
 
         if owner_node_type == NodeType.CA:
-            concerns_exchange_transfer = False
+            # NOTE: We assume that from all creditor IDs managed by the
+            # creditors agent (a 40-bit range), the smallest 4294967296
+            # creditor IDs are reserved for system accounts, which are used
+            # to perform automatic circular exchanges.
             concerns_exchange_account = creditor_id & 0xff00000000 == 0
+            concerns_exchange_transfer = False
             is_exchange_transfer_noitification = (
                 msg_type == "AccountTransfer"
                 and msg_data["coordinator_type"] == "agent"
