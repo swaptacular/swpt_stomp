@@ -547,6 +547,7 @@ async def test_preprocess_message_ca(datadir):
         "ca-creditors": False,
         "ca-trade": True,
     }
+    assert m.routing_key == _calc_bin_routing_key(0x0000080100000002)
     assert json.loads(m.body.decode("utf8")) == json.loads(
         create_rejected_transfer_msg(
             0x1234ABCD00000001,
