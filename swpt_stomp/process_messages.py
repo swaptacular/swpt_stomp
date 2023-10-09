@@ -104,6 +104,7 @@ async def preprocess_message(
 
         msg_type = message.type
         ca_headers: Optional[HeadersType] = None
+        routing_key: str = ""
         creditor_id: int = msg_data["creditor_id"]
         debtor_id: int = msg_data["debtor_id"]
 
@@ -180,7 +181,9 @@ async def preprocess_message(
                     from_=peer_data.creditors_subnet,
                     to_=owner_node_data.creditors_subnet,
                 )
-                concerns_trade_transfer = coordinator_type == "agent"
+                if coordinator_type == "agent":
+                    concerns_trade_transfer = True
+                    routing_key = _calc_bin_routing_key(coordinator_id)
 
             # Messages having a "ca-creditors: true" header concern regular
             # creditor accounts. Messages having a "ca-trade: true" header
@@ -208,13 +211,14 @@ async def preprocess_message(
             headers["coordinator-id"] = coordinator_id
             headers["coordinator-type"] = coordinator_type
 
-        if owner_node_type == NodeType.AA:
-            routing_key = _calc_bin_routing_key(debtor_id, creditor_id)
-        elif owner_node_type == NodeType.CA:
-            routing_key = _calc_bin_routing_key(creditor_id)
-        else:
-            assert owner_node_type == NodeType.DA
-            routing_key = _calc_bin_routing_key(debtor_id)
+        if not routing_key:
+            if owner_node_type == NodeType.AA:
+                routing_key = _calc_bin_routing_key(debtor_id, creditor_id)
+            elif owner_node_type == NodeType.CA:
+                routing_key = _calc_bin_routing_key(creditor_id)
+            else:
+                assert owner_node_type == NodeType.DA
+                routing_key = _calc_bin_routing_key(debtor_id)
 
         msg_json = JSON_SCHEMAS[msg_type].dumps(msg_data)
         return RmqMessage(
