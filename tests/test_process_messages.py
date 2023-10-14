@@ -332,6 +332,22 @@ async def test_transform_message_ca(datadir):
         create_prepare_transfer_msg(0x1234ABCD00000001, 0x0000010000000ABC)
     )
 
+    s = create_prepare_transfer_msg(
+        0x1234ABCD00000001,
+        0x0000080000000ABC,
+        coordinator_type="agent",
+        coordinator_id=0x0000080000000002,
+    )
+    m = transform(s)
+    assert json.loads(m.body.decode("utf8")) == json.loads(
+        create_prepare_transfer_msg(
+            0x1234ABCD00000001,
+            0x0000010000000ABC,
+            coordinator_type="agent",
+            coordinator_id=0x0000010000000002,
+        )
+    )
+
     # Invalid debtor ID:
     s = create_prepare_transfer_msg(0x1234ABCE00000001, 0x0000080000000ABC)
     with pytest.raises(ProcessingError):
@@ -495,7 +511,7 @@ async def test_preprocess_message_ca(datadir):
         return await preprocess_message(owner_node_data, peer_data, message)
 
     peer_data = await db.get_peer_data("1234abcd")
-    s = create_rejected_transfer_msg(0x1234ABCD00000001, 0x0000010000000ABC)
+    s = create_rejected_transfer_msg(0x1234ABCD00000001, 0x0000010100000ABC)
     m = await preprocess(s)
     assert isinstance(m, RmqMessage)
     assert m.id == "1"
@@ -504,13 +520,41 @@ async def test_preprocess_message_ca(datadir):
     assert m.headers == {
         "message-type": "RejectedTransfer",
         "debtor-id": 0x1234ABCD00000001,
-        "creditor-id": 0x0000080000000ABC,
-        "coordinator-id": 0x0000080000000ABC,
+        "creditor-id": 0x0000080100000ABC,
+        "coordinator-id": 0x0000080100000ABC,
         "coordinator-type": "direct",
+        "ca-creditors": True,
+        "ca-trade": False,
     }
-    assert m.routing_key == _calc_bin_routing_key(0x0000080000000ABC)
+    assert m.routing_key == _calc_bin_routing_key(0x0000080100000ABC)
     assert json.loads(m.body.decode("utf8")) == json.loads(
-        create_rejected_transfer_msg(0x1234ABCD00000001, 0x0000080000000ABC)
+        create_rejected_transfer_msg(0x1234ABCD00000001, 0x0000080100000ABC)
+    )
+
+    s = create_rejected_transfer_msg(
+        0x1234ABCD00000001,
+        0x0000010100000ABC,
+        coordinator_type="agent",
+        coordinator_id=0x0000010100000002,
+    )
+    m = await preprocess(s)
+    assert m.headers == {
+        "message-type": "RejectedTransfer",
+        "debtor-id": 0x1234ABCD00000001,
+        "creditor-id": 0x0000080100000ABC,
+        "coordinator-id": 0x0000080100000002,
+        "coordinator-type": "agent",
+        "ca-creditors": False,
+        "ca-trade": True,
+    }
+    assert m.routing_key == _calc_bin_routing_key(0x0000080100000002)
+    assert json.loads(m.body.decode("utf8")) == json.loads(
+        create_rejected_transfer_msg(
+            0x1234ABCD00000001,
+            0x0000080100000ABC,
+            coordinator_type="agent",
+            coordinator_id=0x0000080100000002,
+        )
     )
 
     s = create_rejected_transfer_msg(0x1234ABCE00000001, 0x0000010000000ABC)
