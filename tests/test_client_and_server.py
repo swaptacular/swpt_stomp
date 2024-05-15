@@ -24,7 +24,7 @@ def create_prepare_transfer_msg(
       "min_locked_amount": 1000,
       "max_locked_amount": 2000,
       "recipient": "RECIPIENT",
-      "min_interest_rate": -10.0,
+      "final_interest_rate_ts": "9999-12-31T23:59:59+00:00",
       "max_commit_delay": 100000,
       "coordinator_type": "{coordinator_type}",
       "coordinator_id": {coordinator_id},
