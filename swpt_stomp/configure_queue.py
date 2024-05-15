@@ -153,7 +153,9 @@ def configure_queue(
     set_event_loop_policy()
     configure_logging(level=log_level, format=log_format)
     asyncio.run(bind_queue())
-    _logger.info("Successully configured queue: %s", queue_name)
+    _logger.info(
+        "Successully configured queue: %s", queue_name
+    )  # pragma: no cover
 
 
 if __name__ == "__main__":  # pragma: nocover
