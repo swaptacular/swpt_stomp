@@ -18,6 +18,7 @@ Containers started from the generated docker image must have access to the
 following services:
 
 1. [RabbitMQ] server instance, which acts as broker for SMP messages.
+   The [rabbitmq_random_exchange plugin] should be enabled.
 
    For each peer node, at least one [RabbitMQ queue] must be configured on
    the broker instance, so that all SMP messages that need to be send to a
@@ -211,6 +212,7 @@ How to setup a development environment
 [RabbitMQ]: https://www.rabbitmq.com/
 [RabbitMQ queue]: https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html
 [RabbitMQ exchange]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
+[rabbitmq_random_exchange plugin]: https://github.com/rabbitmq/rabbitmq-random-exchange
 [scripts]: https://github.com/swaptacular/swpt_ca_scripts
 [Docker Engine]: https://docs.docker.com/engine/
 [Docker Compose]: https://docs.docker.com/compose/
