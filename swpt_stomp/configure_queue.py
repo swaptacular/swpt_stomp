@@ -106,8 +106,14 @@ def configure_queue(
         elif owner_node_type == NodeType.CA:
             assert peer_node_type == NodeType.AA
             owner_prefix = "ca"
+            await channel.declare_exchange(
+                "ca.loopback_filter", "headers", durable=True
+            )
             main_exchange = await channel.declare_exchange(
-                "creditors_out", "topic", durable=True
+                "creditors_out",
+                "topic",
+                durable=True,
+                arguments={"alternate-exchange": "ca.loopback_filter"},
             )
             binding_key = peer_data.debtors_subnet.binding_key
         else:
