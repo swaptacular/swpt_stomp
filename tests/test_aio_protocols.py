@@ -799,7 +799,7 @@ def test_server_immediate_disconnect(transport, loop):
     transport.write.reset_mock()
     c.data_received(b"DISCONNECT\nreceipt:x\n\n\x00")
     transport.write.assert_called_once()
-    transport.write.called_with(b"RECEIPT\nreceipt-id:x\n\n\x00")
+    transport.write.assert_called_with(b"RECEIPT\nreceipt-id:x\n\n\x00")
     transport.close.assert_called_once()
     assert c._connected
     assert c._done
