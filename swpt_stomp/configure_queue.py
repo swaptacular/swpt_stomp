@@ -137,19 +137,23 @@ def configure_queue(
 
         # Declare the requested queue along with its corresponding
         # dead-letter queue, and bind it to the peer exchange.
+        #
+        # TODO: It would probably be better to use a "stream" instead
+        #       of classic queues here, given that we have figured out
+        #       how to do the stream offset tracking. This would allow
+        #       for high-availability. Using a "quorum" queues here is
+        #       almost certainly not a good idea, because quorum
+        #       queues consume lots of memory when there are lots of
+        #       messages in the queue, which should be expected.
         dead_letter_queue_name = queue_name + ".XQ"
         await channel.declare_queue(
             dead_letter_queue_name,
             durable=True,
-            arguments={
-                "x-message-ttl": 604800000,
-            },
         )
         queue = await channel.declare_queue(
             queue_name,
             durable=True,
             arguments={
-                "x-message-ttl": 604800000,
                 "x-dead-letter-exchange": "",
                 "x-dead-letter-routing-key": dead_letter_queue_name,
             },
