@@ -223,3 +223,54 @@ async def test_publish_server_error(rmq_url):
     assert isinstance(m, ServerError)
     assert m.error_message == "Test error"
     assert send_queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_publish_deactivated_peer(rmq_url):
+    await ready_queue(rmq_url)
+    loop = asyncio.get_running_loop()
+    send_queue = asyncio.Queue(5)
+    recv_queue = WatermarkQueue(5)
+
+    message = Message(
+        id="1",
+        type="TestMessage",
+        body=bytearray(b"Test message"),
+        content_type="text/plain",
+    )
+    await recv_queue.put(message)
+
+    async def preprocess_message(m):
+        return RmqMessage(
+            id=m.id,
+            body=bytes(m.body),
+            headers={
+                "message-type": m.type,
+                "debtor-id": 1,
+                "creditor-id": 2,
+                "coordinator-id": 3,
+            },
+            type=m.type,
+            content_type=m.content_type,
+            routing_key="test_stomp",
+        )
+
+    async def always() -> bool:
+        return True
+
+    publish_task = loop.create_task(
+        publish_to_exchange(
+            send_queue,
+            recv_queue,
+            url=rmq_url,
+            exchange_name="",
+            preprocess_message=preprocess_message,
+            is_peer_deactivated=always,
+        )
+    )
+
+    await asyncio.wait_for(publish_task, 10.0)
+    m = await send_queue.get()
+    assert isinstance(m, ServerError)
+    assert m.error_message == "The peer has been deactivated."
+    assert send_queue.empty()
