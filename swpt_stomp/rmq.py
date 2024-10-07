@@ -305,7 +305,7 @@ async def _publish_to_exchange(
     exchange_name: str,
     preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
     confirmation_timeout: float,
-    is_peer_deactivated: Callable[[], Awaitable[bool]] = _NEVER,
+    is_peer_deactivated: Callable[[], Awaitable[bool]],
 ) -> None:
     exchange = await channel.get_exchange(exchange_name, ensure=False)
     deliveries: deque[_Delivery] = deque()
