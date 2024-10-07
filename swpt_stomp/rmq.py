@@ -31,6 +31,10 @@ def _NO_TM(m: "RmqMessage") -> Message:
     )
 
 
+async def _NEVER() -> bool:
+    return False
+
+
 APP_RMQ_CONNECTION_TIMEOUT_SECONDS = float(
     os.environ.get(
         "APP_RMQ_CONNECTION_TIMEOUT_SECONDS",
@@ -124,6 +128,7 @@ async def publish_to_exchange(
     confirmation_timeout: float = APP_RMQ_CONFIRMATION_TIMEOUT_SECONDS,
     connection_timeout: float = APP_RMQ_CONNECTION_TIMEOUT_SECONDS,
     channel: Optional[AbstractChannel] = None,
+    is_peer_deactivated: Callable[[], Awaitable[bool]] = _NEVER,
 ) -> None:
     """Publishes messages to a RabbitMQ exchange.
 
@@ -156,6 +161,7 @@ async def publish_to_exchange(
             exchange_name=exchange_name,
             preprocess_message=preprocess_message,
             confirmation_timeout=confirmation_timeout,
+            is_peer_deactivated=is_peer_deactivated,
         )
 
     try:
@@ -299,6 +305,7 @@ async def _publish_to_exchange(
     exchange_name: str,
     preprocess_message: Callable[[Message], Awaitable[RmqMessage]],
     confirmation_timeout: float,
+    is_peer_deactivated: Callable[[], Awaitable[bool]] = _NEVER,
 ) -> None:
     exchange = await channel.get_exchange(exchange_name, ensure=False)
     deliveries: deque[_Delivery] = deque()
@@ -343,6 +350,9 @@ async def _publish_to_exchange(
 
     async def publish_messages() -> None:
         while message := await recv_queue.get():
+            if await is_peer_deactivated():
+                raise ServerError("The peer has been deactivated.")
+
             delivery = _Delivery(message.id)
             mark_as_confirmed = partial(on_confirmation, delivery)
 

@@ -414,6 +414,13 @@ class _LocalDirectory(NodePeersDatabase):
             return None
 
         try:
+            await self._read_file(f"{dir}/DEACTIVATED")
+        except FileNotFoundError:
+            pass
+        else:  # pragma: nocover
+            return None
+
+        try:
             # Peers that do not have a file with the name "ACTIVE" in their
             # corresponding directories are considered inactive. The
             # existence of this file signals that all necessary objects

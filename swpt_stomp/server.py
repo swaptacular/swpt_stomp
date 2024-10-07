@@ -35,6 +35,8 @@
 
 import logging
 import sys
+import time
+import random
 import os
 import os.path
 import asyncio
@@ -68,6 +70,9 @@ APP_STOMP_SERVER_BACKLOG = int(
 )
 APP_MAX_CONNECTIONS_PER_PEER = int(
     os.environ.get("APP_MAX_CONNECTIONS_PER_PEER", "10")
+)
+APP_PEERS_CHECK_SECONDS = float(
+    os.environ.get("APP_PEERS_CHECK_SECONDS", "3600")
 )
 
 _EXCHANGE_NAMES = {
@@ -129,6 +134,20 @@ async def serve(
                 )
                 raise
             else:
+                next_peer_check_at = (
+                    time.time() + random.random() * APP_PEERS_CHECK_SECONDS
+                )
+
+                async def is_peer_deactivated() -> bool:
+                    nonlocal next_peer_check_at
+                    now = time.time()
+                    if now < next_peer_check_at:
+                        return False
+                    else:  # pragma: no cover
+                        next_peer_check_at = now + APP_PEERS_CHECK_SECONDS
+                        peer_data = await db.get_peer_data(peer_serial_number)
+                        return peer_data is None
+
                 with _allowed_peer_connection(peer_data.node_id):
                     await publish_to_exchange(
                         send_queue,
@@ -139,6 +158,7 @@ async def serve(
                             preprocess_message, owner_node_data, peer_data
                         ),
                         channel=channel,
+                        is_peer_deactivated=is_peer_deactivated,
                     )
 
         return StompServer(
