@@ -79,6 +79,9 @@ def configure_queue(
         if peer_data is None:
             _logger.error("Peer %s is not in the database.", peer_node_id)
             sys.exit(1)
+        if peer_data.is_deactivated:  # pragma: no cover
+            _logger.error("Peer %s has been deactivated.", peer_node_id)
+            sys.exit(1)
 
         connection = await aio_pika.connect(broker_url)
         channel = await connection.channel()

@@ -47,6 +47,9 @@ case $1 in
     swpt-client)
         exec "$@"
         ;;
+    swpt-drainer)
+        exec "$@"
+        ;;
     configure-queue)
         exec "$@"
         ;;

@@ -152,6 +152,7 @@ class PeerData:
         "creditors_subnet",
         "debtors_subnet",
         "is_active",
+        "is_deactivated",
     )
     node_type: NodeType
     node_id: str
@@ -161,6 +162,7 @@ class PeerData:
     creditors_subnet: Subnet
     debtors_subnet: Subnet
     is_active: bool
+    is_deactivated: bool
 
 
 class DatabaseError(Exception):
@@ -416,9 +418,10 @@ class _LocalDirectory(NodePeersDatabase):
         try:
             await self._read_file(f"{dir}/DEACTIVATED")
         except FileNotFoundError:
+            is_deactivated = False
             pass
         else:  # pragma: nocover
-            return None
+            is_deactivated = True
 
         try:
             # Peers that do not have a file with the name "ACTIVE" in their
@@ -428,11 +431,12 @@ class _LocalDirectory(NodePeersDatabase):
             # exchanges, bindings etc.) have been created.
             await self._read_file(f"{dir}/ACTIVE")
         except FileNotFoundError:  # pragma: nocover
-            if active_peers_only:
-                return None
             is_active = False
         else:
-            is_active = True
+            is_active = not is_deactivated
+
+        if active_peers_only and not is_active:
+            return None  # pragma: nocover
 
         root_cert = await self._read_cert_file(f"{dir}/root-ca.crt")
 
@@ -488,6 +492,7 @@ class _LocalDirectory(NodePeersDatabase):
             creditors_subnet=creditors_subnet,
             debtors_subnet=debtors_subnet,
             is_active=is_active,
+            is_deactivated=is_deactivated,
         )
 
 
