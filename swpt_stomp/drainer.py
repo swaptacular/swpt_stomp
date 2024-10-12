@@ -259,7 +259,7 @@ async def drain(
     default=100,
     show_envvar=True,
     show_default=True,
-    help="Maximum number of response messages to store in memory.",
+    help="Maximum number of generated response messages to store in memory.",
 )
 @click.option(
     "-l",
@@ -291,10 +291,10 @@ def drainer(
     log_level: str,
     log_format: str,
 ):
-    """Consumes (drains) an existing queue associated with an already
-    deactivated Swaptacular node.
+    """Consumes (drains) a RabbitMQ queue associated with an already
+    deactivated Swaptacular peer node, freeing up resources.
 
-    PEER_NODE_ID: The node ID of the deactivated peer Swaptacular node.
+    PEER_NODE_ID: The node ID of the deactivated Swaptacular peer node.
 
     QUEUE_NAME: The name of the RabbitMQ queue to consume messages from.
     """
