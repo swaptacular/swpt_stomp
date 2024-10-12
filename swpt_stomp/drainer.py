@@ -56,17 +56,18 @@ from swpt_stomp.process_messages import (
 )
 
 _logger = logging.getLogger(__name__)
-_configure_account_message = smp_schemas.ConfigureAccountMessageSchema()
-_finalize_transfer_message = smp_schemas.FinalizeTransferMessageSchema()
-_rejected_config_message = smp_schemas.RejectedConfigMessageSchema()
+_configure_account = smp_schemas.ConfigureAccountMessageSchema()
+_finalize_transfer = smp_schemas.FinalizeTransferMessageSchema()
+_rejected_config = smp_schemas.RejectedConfigMessageSchema()
 
 
 def generate_optional_response(message: Message) -> Optional[Message]:
-    if message.type == "AccountUpdate":
+    msg_type = message.type
+    if msg_type == "AccountUpdate":
         msg_data = parse_message_body(message)
-        assert msg_data["type"] == message.type
+        assert msg_data["type"] == msg_type
         response_type = "ConfigureAccount"
-        response_json = _configure_account_message.dumps({
+        response_json = _configure_account.dumps({
             "type": response_type,
             "creditor_id": msg_data["creditor_id"],
             "debtor_id": msg_data["debtor_id"],
@@ -76,11 +77,11 @@ def generate_optional_response(message: Message) -> Optional[Message]:
             "seqnum": 0,
             "ts": datetime.now(tz=timezone.utc),
         })
-    elif message.type == "PreparedTransfer":
+    elif msg_type == "PreparedTransfer":
         msg_data = parse_message_body(message)
-        assert msg_data["type"] == message.type
+        assert msg_data["type"] == msg_type
         response_type = "FinalizeTransfer"
-        response_json = _finalize_transfer_message.dumps({
+        response_json = _finalize_transfer.dumps({
             "type": response_type,
             "creditor_id": msg_data["creditor_id"],
             "debtor_id": msg_data["debtor_id"],
@@ -93,11 +94,11 @@ def generate_optional_response(message: Message) -> Optional[Message]:
             "transfer_note_format": "",
             "ts": datetime.now(tz=timezone.utc),
         })
-    elif message.type == "ConfigureAccount":
+    elif msg_type == "ConfigureAccount":
         msg_data = parse_message_body(message)
-        assert msg_data["type"] == message.type
+        assert msg_data["type"] == msg_type
         response_type = "RejectedConfig"
-        response_json = _rejected_config_message.dumps({
+        response_json = _rejected_config.dumps({
             "type": response_type,
             "creditor_id": msg_data["creditor_id"],
             "debtor_id": msg_data["debtor_id"],
