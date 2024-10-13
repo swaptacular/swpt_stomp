@@ -55,7 +55,6 @@ from swpt_stomp.process_messages import (
     parse_message_body,
 )
 
-_logger = logging.getLogger(__name__)
 _configure_account = smp_schemas.ConfigureAccountMessageSchema()
 _finalize_transfer = smp_schemas.FinalizeTransferMessageSchema()
 _rejected_config = smp_schemas.RejectedConfigMessageSchema()
@@ -152,7 +151,7 @@ async def drain(
         Union[str, None, ServerError]
     ] = asyncio.Queue(server_queue_size)
 
-    async def respond_to_messages_if_necessary():
+    async def ack_and_respond_if_necessary():
         while m := await messages_queue.get():
             if isinstance(m, ServerError):
                 messages_queue.task_done()
@@ -183,8 +182,8 @@ async def drain(
             ),
         )
     )
-    respond_to_messages_task = loop.create_task(
-        respond_to_messages_if_necessary()
+    process_messages_task = loop.create_task(
+        ack_and_respond_if_necessary()
     )
     publish_responses_task = loop.create_task(
         publish_to_exchange(
@@ -197,15 +196,15 @@ async def drain(
             ),
         )
     )
-    ignore_confirmations_task = loop.create_task(
+    process_publish_confirmations_task = loop.create_task(
         ignore_confirmations()
     )
 
     tasks = [
         read_messages_task,
-        respond_to_messages_task,
+        process_messages_task,
         publish_responses_task,
-        ignore_confirmations_task,
+        process_publish_confirmations_task,
     ]
     try:
         await asyncio.gather(*tasks)
