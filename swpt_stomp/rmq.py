@@ -281,6 +281,7 @@ async def _consume_from_queue(
                 await aiormq_channel.basic_ack(delivery_tag, multiple=True)
             recv_queue.task_done()
 
+        recv_queue.task_done()
         consume_queue_task.cancel()
 
     loop = asyncio.get_running_loop()
@@ -366,6 +367,7 @@ async def _publish_to_exchange(
             pending_confirmations.add(confirmation)
             recv_queue.task_done()
 
+        recv_queue.task_done()
         send_receipts_task.cancel()
         report_task.cancel()
 

@@ -75,7 +75,7 @@ APP_PEERS_CHECK_SECONDS = float(
     os.environ.get("APP_PEERS_CHECK_SECONDS", "3600")
 )
 
-_EXCHANGE_NAMES = {
+EXCHANGE_NAMES = {
     NodeType.AA: "accounts_in",
     NodeType.CA: "creditors_in",
     NodeType.DA: "debtors_in",
@@ -103,7 +103,7 @@ async def serve(
     loop = asyncio.get_running_loop()
     db = get_database_instance(url=nodedata_url)
     owner_node_data = await db.get_node_data()
-    exchange_name = _EXCHANGE_NAMES[owner_node_data.node_type]
+    exchange_name = EXCHANGE_NAMES[owner_node_data.node_type]
     connection, channel = await open_robust_channel(protocol_broker_url)
 
     def create_protocol() -> StompServer:

@@ -28,7 +28,7 @@ def transform_message(
     message: RmqMessage,
 ) -> Message:
     owner_node_type = owner_node_data.node_type
-    msg_data = _parse_message_body(
+    msg_data = parse_message_body(
         message,
         allow_in_messages=(owner_node_type != NodeType.AA),
         allow_out_messages=(owner_node_type == NodeType.AA),
@@ -88,7 +88,7 @@ async def preprocess_message(
 ) -> RmqMessage:
     try:
         owner_node_type = owner_node_data.node_type
-        msg_data = _parse_message_body(
+        msg_data = parse_message_body(
             message,
             allow_in_messages=(owner_node_type == NodeType.AA),
             allow_out_messages=(owner_node_type != NodeType.AA),
@@ -240,7 +240,7 @@ async def preprocess_message(
         )
 
 
-def _parse_message_body(
+def parse_message_body(
     m: Union[Message, RmqMessage],
     *,
     allow_in_messages: bool = True,

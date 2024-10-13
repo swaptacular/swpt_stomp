@@ -129,6 +129,15 @@ container allows you to execute the following *documented commands*:
 
   For more information, run `swpt-client --help`.
 
+* `swpt-drainer`
+
+  Consumes (drains) a RabbitMQ queue associated with an already
+  deactivated Swaptacular peer node, freeing up resources. A peer node
+  ID, and a queue name should be specified as arguments. You can start
+  simultaneously as many drainers as you like.
+
+  For more information, run `swpt-drainer --help`.
+
 * `configure-queue`
 
   Configures a RabbitMQ queue that will contain messages which have to be

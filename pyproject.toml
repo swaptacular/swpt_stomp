@@ -27,6 +27,7 @@ black = "^23.7.0"
 [tool.poetry.scripts]
 swpt-client = "swpt_stomp.client:client"
 swpt-server = "swpt_stomp.server:server"
+swpt-drainer = "swpt_stomp.drainer:drainer"
 configure-queue = "swpt_stomp.configure_queue:configure_queue"
 
 [tool.pylsp-mypy]

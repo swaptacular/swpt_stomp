@@ -125,7 +125,7 @@ def test_change_subnet():
 
 
 def test_parse_message_body():
-    from swpt_stomp.process_messages import _parse_message_body
+    from swpt_stomp.process_messages import parse_message_body
 
     acc_purge_body = bytearray(
         create_account_purge_msg(123, 456).encode("utf8")
@@ -135,7 +135,7 @@ def test_parse_message_body():
     )
 
     with pytest.raises(ProcessingError):
-        _parse_message_body(
+        parse_message_body(
             Message(
                 id="1",
                 type="AccountPurge",
@@ -144,7 +144,7 @@ def test_parse_message_body():
             )
         )
     with pytest.raises(ProcessingError):
-        _parse_message_body(
+        parse_message_body(
             Message(
                 id="1",
                 type="WrongType",
@@ -153,7 +153,7 @@ def test_parse_message_body():
             )
         )
     with pytest.raises(ProcessingError):
-        _parse_message_body(
+        parse_message_body(
             Message(
                 id="1",
                 type="AccountPurge",
@@ -162,7 +162,7 @@ def test_parse_message_body():
             )
         )
     with pytest.raises(ProcessingError):
-        _parse_message_body(
+        parse_message_body(
             Message(
                 id="1",
                 type="AccountPurge",
@@ -171,7 +171,7 @@ def test_parse_message_body():
             )
         )
     with pytest.raises(ProcessingError):
-        _parse_message_body(
+        parse_message_body(
             Message(
                 id="1",
                 type="AccountPurge",
@@ -180,7 +180,7 @@ def test_parse_message_body():
             )
         )
     with pytest.raises(ProcessingError):
-        _parse_message_body(
+        parse_message_body(
             Message(
                 id="1",
                 type="AccountPurge",
@@ -189,7 +189,7 @@ def test_parse_message_body():
             )
         )
 
-    obj = _parse_message_body(
+    obj = parse_message_body(
         Message(
             id="1",
             type="AccountPurge",
@@ -202,7 +202,7 @@ def test_parse_message_body():
     assert obj["creditor_id"] == 456
 
     with pytest.raises(ProcessingError):
-        _parse_message_body(
+        parse_message_body(
             Message(
                 id="1",
                 type="AccountPurge",
@@ -213,7 +213,7 @@ def test_parse_message_body():
         )
 
     with pytest.raises(ProcessingError):
-        _parse_message_body(
+        parse_message_body(
             Message(
                 id="1",
                 type="AccountPurge",
@@ -223,7 +223,7 @@ def test_parse_message_body():
             allow_out_messages=False,
         )
     with pytest.raises(ProcessingError):
-        _parse_message_body(
+        parse_message_body(
             Message(
                 id="1",
                 type="PrepareTransfer",
@@ -233,7 +233,7 @@ def test_parse_message_body():
             allow_in_messages=False,
         )
 
-    obj = _parse_message_body(
+    obj = parse_message_body(
         Message(
             id="1",
             type="PrepareTransfer",

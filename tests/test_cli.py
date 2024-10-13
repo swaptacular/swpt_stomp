@@ -2,6 +2,8 @@ from click.testing import CliRunner
 from swpt_stomp.client import client
 from swpt_stomp.server import server
 from swpt_stomp.configure_queue import configure_queue
+from swpt_stomp.drainer import drainer
+from swpt_stomp.common import ServerError
 
 
 def test_client_cli(datadir):
@@ -33,6 +35,21 @@ def test_server_cli(datadir):
     )
     assert result.exit_code == 1
     assert isinstance(result.exception, FileNotFoundError)
+
+
+def test_drainer_cli(datadir):
+    runner = CliRunner()
+    result = runner.invoke(
+        drainer,
+        [
+            f'--nodedata-url=file://{datadir["CA"]}',
+            "--log-format=json",
+            "deac00ed",
+            "test_nonexistent_queue",
+        ],
+    )
+    assert result.exit_code == 1
+    assert isinstance(result.exception, ServerError)
 
 
 def test_configure_queue(datadir):
