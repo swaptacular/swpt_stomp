@@ -1,0 +1,3 @@
+servers = ["ca.example.com:1234"]
+host = "/"
+destination = "/exchange/creditors_in"

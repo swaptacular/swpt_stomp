@@ -133,9 +133,9 @@ async def drain(
     db = get_database_instance(url=nodedata_url)
     owner_node_data = await db.get_node_data()
     peer_data = await db.get_peer_data(peer_node_id, active_peers_only=False)
-    if peer_data is None:
+    if peer_data is None:  # pragma: no cover
         raise RuntimeError(f"Peer {peer_node_id} is not in the database.")
-    if not peer_data.is_deactivated:
+    if not peer_data.is_deactivated:  # pragma: no cover
         raise RuntimeError(f"Peer {peer_node_id} has not been deactivated.")
 
     acks_queue: WatermarkQueue[Union[str, None]] = WatermarkQueue(
@@ -153,23 +153,23 @@ async def drain(
     ] = asyncio.Queue(server_queue_size)
 
     async def respond_to_messages_if_necessary():
-        while message := await messages_queue.get():
-            if isinstance(message, ServerError):
+        while m := await messages_queue.get():
+            if isinstance(m, ServerError):
                 messages_queue.task_done()
-                raise message
-            if r := generate_optional_response(message):
+                raise m
+
+            if r := generate_optional_response(m):
                 await responses_queue.put(r)
-            await acks_queue.put(message.id)
+
+            await acks_queue.put(m.id)
             messages_queue.task_done()
-        messages_queue.task_done()
+
+        messages_queue.task_done()  # pragma: no cover
 
     async def ignore_confirmations():
-        while confirm := await confirms_queue.get():
-            if isinstance(confirm, ServerError):
-                confirms_queue.task_done()
-                raise confirm
+        while True:
+            await confirms_queue.get()
             confirms_queue.task_done()
-        confirms_queue.task_done()
 
     loop = asyncio.get_running_loop()
     read_messages_task = loop.create_task(
