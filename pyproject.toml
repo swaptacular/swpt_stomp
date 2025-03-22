@@ -1,14 +1,23 @@
-[tool.poetry]
+[project]
 name = "swpt-stomp"
 version = "0.1.0"
 description = "Client and server implementations of the STOMP protocol for Swaptacular"
-authors = ["Evgeni Pandurski <epandurski@gmail.com>"]
+authors = [
+  { name = "Evgeni Pandurski", email = "epandurski@gmail.com" }
+]
 license = "MIT"
 readme = "README.md"
+requires-python = ">=3.9,<4.0"
 packages = [{include = "swpt_stomp"}]
+dynamic = [ "dependencies" ]
+
+[project.scripts]
+swpt-client = "swpt_stomp.client:client"
+swpt-server = "swpt_stomp.server:server"
+swpt-drainer = "swpt_stomp.drainer:drainer"
+configure-queue = "swpt_stomp.configure_queue:configure_queue"
 
 [tool.poetry.dependencies]
-python = "^3.9"
 python-json-logger = "^2.0.7"
 aio-pika = "^9.0.7"
 uvloop = "^0.17.0"
@@ -23,12 +32,6 @@ python-lsp-server = {extras = ["all"], version = "^1.7.1"}
 pytest-cov = "^4.0.0"
 pylsp-mypy = "^0.6.6"
 black = "^23.7.0"
-
-[tool.poetry.scripts]
-swpt-client = "swpt_stomp.client:client"
-swpt-server = "swpt_stomp.server:server"
-swpt-drainer = "swpt_stomp.drainer:drainer"
-configure-queue = "swpt_stomp.configure_queue:configure_queue"
 
 [tool.pylsp-mypy]
 enabled = true
