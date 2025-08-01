@@ -54,6 +54,6 @@ RUN python -m compileall -x '^\./(migrations|tests)/' . \
     && rm -f .env \
     && chown -R "$APP_NAME:$APP_NAME" .
 
-USER $APP_NAME
+USER $APP_NAME:$APP_NAME
 ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
 CMD ["swpt-server"]
