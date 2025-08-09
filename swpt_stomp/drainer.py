@@ -251,7 +251,7 @@ async def drain(
     help="Maximum number of consumed messages to store in memory.",
 )
 @click.option(
-    "-b",
+    "-B",
     "--server-buffer",
     type=int,
     envvar="SWPT_SERVER_BUFFER",
