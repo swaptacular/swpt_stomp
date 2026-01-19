@@ -1,3 +1,4 @@
+import logging
 import os
 import asyncio
 import pytest
@@ -25,6 +26,16 @@ def rmq_url(request):
 
 @pytest.fixture
 def loop(request):
+    # NOTE: Without this, we can randomly get harmless "--- Logging
+    # error ---" messages from Python's logging code during the tests,
+    # because Pytest may happen to close stdout/stderr before the log
+    # messages emitted from the background threads reach the logging
+    # system. In this case, Python's logging system will try to write
+    # to a closed stream. Setting `logging.raiseExceptions` to False
+    # prevents the logging system's error messages from cluttering
+    # Pytest's output.
+    logging.raiseExceptions = False
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
