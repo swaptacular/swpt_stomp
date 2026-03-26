@@ -270,6 +270,8 @@ async def _consume_from_queue(
                 )
                 await send_queue.put(m)
 
+        raise ConnectionError  # pragma: nocover
+
     async def send_acks() -> None:
         aiormq_channel = await channel.get_underlay_channel()
         while receipt_id := await recv_queue.get():
