@@ -3,6 +3,7 @@ import sys
 import asyncio
 import click
 import aio_pika
+from swpt_stomp.common import register_signal_handlers
 from swpt_stomp.loggers import configure_logging
 from swpt_stomp.common import set_event_loop_policy
 from swpt_stomp.peer_data import get_database_instance, NodeType
@@ -163,6 +164,7 @@ def configure_queue(
         )
         await queue.bind(peer_exchange)
 
+    register_signal_handlers()
     set_event_loop_policy()
     configure_logging(level=log_level, format=log_format)
     asyncio.run(bind_queue())

@@ -44,6 +44,7 @@ from swpt_stomp.common import (
     ServerError,
     Message,
     set_event_loop_policy,
+    register_signal_handlers,
 )
 from swpt_stomp import smp_schemas
 from swpt_stomp.rmq import consume_from_queue, publish_to_exchange
@@ -297,6 +298,7 @@ def drainer(
 
     QUEUE_NAME: The name of the RabbitMQ queue to consume messages from.
     """
+    register_signal_handlers()
     set_event_loop_policy()
     configure_logging(level=log_level, format=log_format)
 

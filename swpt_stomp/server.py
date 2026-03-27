@@ -54,6 +54,7 @@ from swpt_stomp.common import (
     get_peer_serial_number,
     terminate_queue,
     set_event_loop_policy,
+    register_signal_handlers,
 )
 from swpt_stomp.rmq import publish_to_exchange, open_robust_channel, RmqMessage
 from swpt_stomp.peer_data import (
@@ -303,9 +304,8 @@ def server(
     log_format: str,
 ):
     """Starts a STOMP server for a Swaptacular node.
-
-    EXCHANGE_NAME: The name of the RabbitMQ exchange to publish messages to.
     """
+    register_signal_handlers()
     set_event_loop_policy()
     configure_logging(level=log_level, format=log_format)
 
