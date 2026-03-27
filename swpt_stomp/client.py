@@ -52,6 +52,7 @@ from swpt_stomp.common import (
     get_peer_serial_number,
     terminate_queue,
     set_event_loop_policy,
+    register_signal_handlers,
 )
 from swpt_stomp.rmq import consume_from_queue, RmqMessage
 from swpt_stomp.peer_data import get_database_instance, NodeData, PeerData
@@ -259,6 +260,7 @@ def client(
 
     QUEUE_NAME: The name of the RabbitMQ queue to consume messages from.
     """
+    register_signal_handlers()
     set_event_loop_policy()
     configure_logging(level=log_level, format=log_format)
 

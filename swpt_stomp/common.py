@@ -1,6 +1,7 @@
 import logging
 import os
 import asyncio
+import signal
 from dataclasses import dataclass
 from typing import Callable, List, Any, Optional, TypeVar
 
@@ -169,3 +170,13 @@ def set_event_loop_policy():
         import uvloop
 
         uvloop.install()
+
+
+def _raise_keyboard_interrupt(signum, frame):  # pragma: no cover
+    _logger.warning("Received %s signal. Exiting...", signal.strsignal(signum))
+    raise KeyboardInterrupt()
+
+
+def register_signal_handlers():
+    signal.signal(signal.SIGTERM, _raise_keyboard_interrupt)
+    signal.signal(signal.SIGINT, _raise_keyboard_interrupt)
