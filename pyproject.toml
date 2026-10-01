@@ -7,7 +7,7 @@ authors = [
 ]
 license = "MIT"
 readme = "README.md"
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.11,<4.0"
 packages = [{include = "swpt_stomp"}]
 dynamic = [ "dependencies" ]
 
@@ -19,8 +19,8 @@ configure-queue = "swpt_stomp.configure_queue:configure_queue"
 
 [tool.poetry.dependencies]
 python-json-logger = "^2.0.7"
-aio-pika = "^9.0.7"
-uvloop = "^0.17.0"
+aio-pika = "^10.1.0"
+uvloop = "^0.23.0"
 tomli = "^2.0.1"
 marshmallow = "^3.19.0"
 click = "^8.1.3"
