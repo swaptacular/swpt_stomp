@@ -210,6 +210,11 @@ class StompParser:
             n = 0
         if n > BODY_MAX_LENGTH:
             raise ProtocolError("Content-length is too large.")
+        if n < 0:
+            # NOTE: A negative content-length would make the parser
+            # search for the frame-terminating NULL before the end of
+            # the headers, and treat the body as a separate frame.
+            raise ProtocolError("Content-length is negative.")
 
         self._body_end = current_pos + n
         return True
