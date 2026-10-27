@@ -210,7 +210,8 @@ class StompParser:
             n = 0
         if n > BODY_MAX_LENGTH:
             raise ProtocolError("Content-length is too large.")
-
+        if n < 0:
+            raise ProtocolError("Content-length is negative.")
         self._body_end = current_pos + n
         return True
 

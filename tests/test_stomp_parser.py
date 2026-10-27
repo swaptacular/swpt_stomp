@@ -206,6 +206,19 @@ def test_content_length_too_big():
         )
 
 
+@pytest.mark.parametrize("content_length", ["-1", "-4", " -100 "])
+def test_content_length_negative(content_length):
+    p = StompParser()
+
+    data = (
+        f"SEND\ncontent-length:{content_length}\nx:".encode("ascii")
+        + b"\0\n\nSEND\ndestination:/exchange/smp\n\nsmuggled\0"
+    )
+    with pytest.raises(ProtocolError, match="negative"):
+        p.add_bytes(data)
+    assert not p.has_frame()
+
+
 def test_body_is_too_large():
     from swpt_stomp.stomp_parser import BODY_MAX_LENGTH
 
