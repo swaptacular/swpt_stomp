@@ -1,4 +1,4 @@
-FROM python:3.11.11-alpine3.21 AS venv-image
+FROM python:3.11.18-alpine3.23 AS venv-image
 WORKDIR /usr/src/app
 
 ENV POETRY_VERSION="2.1.1"
@@ -27,7 +27,7 @@ RUN poetry config virtualenvs.create false --local \
 
 # This is the final app image. Starting from a clean alpine image, it
 # copies over the previously created virtual environment.
-FROM python:3.11.11-alpine3.21 AS app-image
+FROM python:3.11.18-alpine3.23 AS app-image
 ARG APP_NAME=swpt_stomp
 
 ENV APP_NAME=$APP_NAME
